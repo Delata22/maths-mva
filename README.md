@@ -67,6 +67,19 @@ le contenu genere.
 Les modeles sont configurables (Preferences) : Opus pour les cours et le chat,
 Sonnet pour les exercices par defaut.
 
+**Ordre de grandeur.** Un cours complet fait 8 a 9 sections, soit environ
+150 000 caracteres, une quinzaine de figures interactives et une trentaine de
+resultats demontres. Comptez **15 a 20 minutes et 5 a 6 dollars** par cours avec
+Opus. Generer les 142 cours du syllabus represente donc plusieurs jours de
+calcul : mieux vaut generer parcours par parcours, ou au fil de l'eau.
+
+Deux mecanismes rendent cela supportable :
+
+- **les sections sont redigees en parallele** (3 par defaut, jusqu'a 6) ;
+- **la generation est reprenable** : chaque section est ecrite dans son propre
+  fichier, marque par une empreinte du plan. Une generation interrompue reprend
+  ou elle s'etait arretee. Si le plan change, le cache est invalide.
+
 ### Ce qu'on attend d'un cours
 
 Les prompts imposent une ligne editoriale precise : l'intuition avant le
@@ -131,6 +144,18 @@ python tools/generate.py --track mva-optimisation
 python tools/generate.py --list
 ```
 
+## Outils de developpement
+
+```bash
+python tools/selftest.py           # verification de bout en bout, sans fenetre
+python tools/selftest.py --chat    # ajoute un aller-retour reel avec Claude
+python tools/shot.py al-svd                    # capture la page d'un cours
+python tools/shot.py al-svd --view quiz        # ou son QCM
+python tools/shot.py al-svd --anchor fig-svd   # cadre sur une figure
+python tools/shot_app.py graphe /tmp/g.png     # capture une vue de l'app
+python tools/install-desktop.sh                # entree dans le lanceur Ubuntu
+```
+
 ---
 
 ## Ou vivent les donnees
@@ -140,6 +165,7 @@ library/
   <id-du-cours>/
     body.html        cours genere
     plan.json        plan et resultats laisses en exercice
+    sections/        une section par fichier (reprise de generation)
     exercises.json   QCM et demonstrations
     meta.json        modele, duree, cout
   progress.db        scores, statuts, notes, fils de discussion
@@ -170,4 +196,7 @@ mathsapp/
 tools/
   build_syllabus.py  source du syllabus
   generate.py        generation sans interface
+  selftest.py        verification de bout en bout
+  shot.py            capture d'une page de cours
+  shot_app.py        capture d'une vue de l'application
 ```
