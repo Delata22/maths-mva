@@ -26,7 +26,7 @@
       "color": "#ef4444"
     },
     {
-      "id": "algebre_linéaire",
+      "id": "algebre_lineaire",
       "name": "Algèbre linéaire",
       "description": "Le socle absolu de l'IA : vecteurs, matrices, réduction, SVD.",
       "color": "#f97316"
@@ -126,17 +126,17 @@
       "title": "Remise à niveau - Probabilités",
       "goal": "pro-lgn-tcl",
       "extra": [
-        "pro-espérance-conditionnelle",
+        "pro-esperance-conditionnelle",
         "pro-markov"
       ]
     },
     {
       "id": "mva-optimisation",
       "title": "Remise à niveau - Optimisation convexe",
-      "goal": "opt-dualité-kkt",
+      "goal": "opt-dualite-kkt",
       "extra": [
         "opt-gradient",
-        "opt-accélération",
+        "opt-acceleration",
         "opt-stochastique",
         "opt-proximal"
       ]
@@ -203,7 +203,7 @@
       ]
     },
     {
-      "id": "log-prédicats",
+      "id": "log-predicats",
       "title": "Quantificateurs et prédicats",
       "domain": "logique",
       "level": 1,
@@ -229,7 +229,7 @@
       "domain": "logique",
       "level": 1,
       "prereqs": [
-        "log-prédicats"
+        "log-predicats"
       ],
       "summary": "Direct, contraposé, absurde, disjonction de cas, analyse-synthèse, contre-exemple : quand utiliser quoi, et comment rédiger.",
       "objectives": [
@@ -246,7 +246,7 @@
       ]
     },
     {
-      "id": "log-récurrence",
+      "id": "log-recurrence",
       "title": "Récurrence",
       "domain": "logique",
       "level": 1,
@@ -272,7 +272,7 @@
       "domain": "ensembles",
       "level": 1,
       "prereqs": [
-        "log-prédicats"
+        "log-predicats"
       ],
       "summary": "Appartenance, inclusion, union, intersection, complémentaire, produit cartésien, parties d'un ensemble.",
       "objectives": [
@@ -404,7 +404,7 @@
       "domain": "arithmetique",
       "level": 1,
       "prereqs": [
-        "log-récurrence"
+        "log-recurrence"
       ],
       "summary": "Division euclidienne, PGCD, Bézout, Gauss, nombres premiers, congruences.",
       "objectives": [
@@ -484,7 +484,7 @@
       ]
     },
     {
-      "id": "ari-polynômes",
+      "id": "ari-polynomes",
       "title": "Polynômes",
       "domain": "arithmetique",
       "level": 2,
@@ -550,7 +550,7 @@
       ]
     },
     {
-      "id": "ana-séries",
+      "id": "ana-series",
       "title": "Séries numériques",
       "domain": "analyse",
       "level": 2,
@@ -572,7 +572,7 @@
       ]
     },
     {
-      "id": "ana-continuité",
+      "id": "ana-continuite",
       "title": "Limites et continuité des fonctions",
       "domain": "analyse",
       "level": 1,
@@ -598,7 +598,7 @@
       "domain": "analyse",
       "level": 2,
       "prereqs": [
-        "ana-continuité",
+        "ana-continuite",
         "ana-suites-avance"
       ],
       "summary": "Théorème des valeurs intermédiaires, image d'un segment, théorème de Heine et continuité uniforme.",
@@ -620,7 +620,7 @@
       "domain": "analyse",
       "level": 1,
       "prereqs": [
-        "ana-continuité"
+        "ana-continuite"
       ],
       "summary": "Dérivée comme limite et comme approximation affine, Rolle, théorème des accroissements finis, variations.",
       "objectives": [
@@ -657,7 +657,7 @@
       ]
     },
     {
-      "id": "ana-convexité-1d",
+      "id": "ana-convexite-1d",
       "title": "Convexité en une variable",
       "domain": "analyse",
       "level": 2,
@@ -705,7 +705,7 @@
       "level": 2,
       "prereqs": [
         "ana-integrale",
-        "ana-séries"
+        "ana-series"
       ],
       "summary": "Convergence en une borne infinie ou en un point singulier, critères, intégrales de référence.",
       "objectives": [
@@ -726,7 +726,7 @@
       "domain": "analyse",
       "level": 3,
       "prereqs": [
-        "ana-séries",
+        "ana-series",
         "ana-integrale"
       ],
       "summary": "Convergence simple contre convergence uniforme : le point où l'analyse devient sérieuse.",
@@ -743,7 +743,7 @@
       ]
     },
     {
-      "id": "ana-séries-entieres",
+      "id": "ana-series-entieres",
       "title": "Séries entières",
       "domain": "analyse",
       "level": 3,
@@ -788,7 +788,7 @@
     {
       "id": "al-espaces",
       "title": "Espaces vectoriels et sous-espaces",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 1,
       "prereqs": [
         "ens-structures"
@@ -809,7 +809,7 @@
     {
       "id": "al-bases",
       "title": "Familles libres, génératrices, bases et dimension",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 1,
       "prereqs": [
         "al-espaces"
@@ -831,7 +831,7 @@
     {
       "id": "al-applications",
       "title": "Applications linéaires, noyau, image, rang",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 2,
       "prereqs": [
         "al-bases"
@@ -852,7 +852,7 @@
     {
       "id": "al-matrices",
       "title": "Matrices et calcul matriciel",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 1,
       "prereqs": [
         "al-applications"
@@ -872,9 +872,9 @@
       ]
     },
     {
-      "id": "al-systèmes",
+      "id": "al-systemes",
       "title": "Systèmes linéaires et pivot de Gauss",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 1,
       "prereqs": [
         "al-matrices"
@@ -895,7 +895,7 @@
     {
       "id": "al-changement-base",
       "title": "Changement de base et matrices semblables",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 2,
       "prereqs": [
         "al-matrices"
@@ -914,9 +914,9 @@
       ]
     },
     {
-      "id": "al-déterminant",
+      "id": "al-determinant",
       "title": "Déterminants",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 2,
       "prereqs": [
         "al-changement-base"
@@ -935,9 +935,9 @@
       ]
     },
     {
-      "id": "al-dualité",
+      "id": "al-dualite",
       "title": "Dualité et formes linéaires",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
         "al-bases"
@@ -956,12 +956,12 @@
       ]
     },
     {
-      "id": "al-réduction",
+      "id": "al-reduction",
       "title": "Valeurs propres, vecteurs propres, diagonalisation",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 2,
       "prereqs": [
-        "al-déterminant"
+        "al-determinant"
       ],
       "summary": "Le cœur de l'algèbre linéaire appliquée : trouver la base où l'application devient triviale.",
       "objectives": [
@@ -979,11 +979,11 @@
     {
       "id": "al-trigonalisation",
       "title": "Trigonalisation, Cayley-Hamilton, réduction de Jordan",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
-        "al-réduction",
-        "ari-polynômes"
+        "al-reduction",
+        "ari-polynomes"
       ],
       "summary": "Quand la diagonalisation échoue : polynôme minimal, sous-espaces caractéristiques, forme de Jordan.",
       "objectives": [
@@ -1002,7 +1002,7 @@
     {
       "id": "al-euclidien",
       "title": "Espaces euclidiens : produit scalaire et orthogonalité",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 2,
       "prereqs": [
         "al-bases"
@@ -1023,7 +1023,7 @@
     {
       "id": "al-projections",
       "title": "Projections orthogonales, Gram-Schmidt et moindres carrés",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 2,
       "prereqs": [
         "al-euclidien"
@@ -1045,10 +1045,10 @@
     {
       "id": "al-spectral",
       "title": "Théorème spectral pour les matrices symétriques",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
-        "al-réduction",
+        "al-reduction",
         "al-euclidien"
       ],
       "summary": "Toute matrice symétrique réelle est diagonalisable en base orthonormée. Le théorème le plus utile du ML.",
@@ -1067,7 +1067,7 @@
     {
       "id": "al-quadratiques",
       "title": "Formes quadratiques et matrices définies positives",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
         "al-spectral"
@@ -1088,7 +1088,7 @@
     {
       "id": "al-svd",
       "title": "Décomposition en valeurs singulières (SVD)",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
         "al-spectral"
@@ -1110,7 +1110,7 @@
     {
       "id": "al-normes-matricielles",
       "title": "Normes matricielles et conditionnement",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
         "al-svd"
@@ -1131,7 +1131,7 @@
     {
       "id": "al-hermitien",
       "title": "Espaces hermitiens et matrices complexes",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 3,
       "prereqs": [
         "al-euclidien",
@@ -1153,10 +1153,10 @@
     {
       "id": "al-tenseurs",
       "title": "Produit tensoriel et calcul multilinéaire",
-      "domain": "algebre_linéaire",
+      "domain": "algebre_lineaire",
       "level": 4,
       "prereqs": [
-        "al-dualité",
+        "al-dualite",
         "al-matrices"
       ],
       "summary": "Produit de Kronecker, vectorisation, tenseurs : le vocabulaire des couches de réseaux profonds.",
@@ -1218,7 +1218,7 @@
       ]
     },
     {
-      "id": "top-continuité",
+      "id": "top-continuite",
       "title": "Continuité et topologie",
       "domain": "topologie",
       "level": 2,
@@ -1287,7 +1287,7 @@
       "domain": "topologie",
       "level": 3,
       "prereqs": [
-        "top-continuité"
+        "top-continuite"
       ],
       "summary": "Connexité, connexité par arcs, composantes connexes, généralisation du TVI.",
       "objectives": [
@@ -1308,7 +1308,7 @@
       "level": 2,
       "prereqs": [
         "top-normes",
-        "ana-continuité"
+        "ana-continuite"
       ],
       "summary": "Graphes, lignes de niveau, limites et continuité en dimension supérieure, et pourquoi l'intuition 1D trompe.",
       "objectives": [
@@ -1324,7 +1324,7 @@
       ]
     },
     {
-      "id": "cd-dérivées-partielles",
+      "id": "cd-derivees-partielles",
       "title": "Dérivées partielles, gradient, différentielle",
       "domain": "calcul_diff",
       "level": 2,
@@ -1352,7 +1352,7 @@
       "domain": "calcul_diff",
       "level": 2,
       "prereqs": [
-        "cd-dérivées-partielles"
+        "cd-derivees-partielles"
       ],
       "summary": "Composition de fonctions vectorielles, matrice jacobienne, règle de la chaîne : la base mathématique de la rétropropagation.",
       "objectives": [
@@ -1503,7 +1503,7 @@
       "level": 4,
       "prereqs": [
         "ens-cardinalite",
-        "ana-séries"
+        "ana-series"
       ],
       "summary": "Pourquoi on ne peut pas mesurer tous les ensembles, tribus, mesures, et le premier contact avec la mesure de Lebesgue.",
       "objectives": [
@@ -1692,7 +1692,7 @@
       ]
     },
     {
-      "id": "pro-espérance",
+      "id": "pro-esperance",
       "title": "Espérance, variance, moments",
       "domain": "probabilites",
       "level": 2,
@@ -1718,7 +1718,7 @@
       "domain": "probabilites",
       "level": 2,
       "prereqs": [
-        "pro-espérance",
+        "pro-esperance",
         "ana-integrales-gen"
       ],
       "summary": "Densité, fonction de répartition, lois uniforme, exponentielle, normale, méthode de la fonction de répartition.",
@@ -1807,7 +1807,7 @@
       "domain": "probabilites",
       "level": 3,
       "prereqs": [
-        "pro-espérance"
+        "pro-esperance"
       ],
       "summary": "Markov, Chebyshev, Jensen, Chernoff, Hoeffding, McDiarmid : les outils qui justifient la généralisation en apprentissage.",
       "objectives": [
@@ -1868,7 +1868,7 @@
       ]
     },
     {
-      "id": "pro-espérance-conditionnelle",
+      "id": "pro-esperance-conditionnelle",
       "title": "Espérance conditionnelle",
       "domain": "probabilites",
       "level": 4,
@@ -1895,7 +1895,7 @@
       "domain": "probabilites",
       "level": 5,
       "prereqs": [
-        "pro-espérance-conditionnelle"
+        "pro-esperance-conditionnelle"
       ],
       "summary": "Filtration, martingale, temps d'arrêt, théorème d'arrêt, convergence des martingales.",
       "objectives": [
@@ -1916,8 +1916,8 @@
       "domain": "probabilites",
       "level": 4,
       "prereqs": [
-        "pro-espérance-conditionnelle",
-        "al-réduction"
+        "pro-esperance-conditionnelle",
+        "al-reduction"
       ],
       "summary": "Matrice de transition, classification des états, mesure invariante, théorème ergodique, et le lien avec MCMC.",
       "objectives": [
@@ -1960,7 +1960,7 @@
       "domain": "statistiques",
       "level": 1,
       "prereqs": [
-        "pro-espérance"
+        "pro-esperance"
       ],
       "summary": "Moyenne, variance empiriques, quantiles, visualisation, et ce que veut dire 'échantillon i.i.d.'.",
       "objectives": [
@@ -2108,7 +2108,7 @@
       ]
     },
     {
-      "id": "sta-régression",
+      "id": "sta-regression",
       "title": "Régression linéaire",
       "domain": "statistiques",
       "level": 3,
@@ -2246,7 +2246,7 @@
       "prereqs": [
         "opt-ensembles-convexes",
         "cd-hessienne",
-        "ana-convexité-1d"
+        "ana-convexite-1d"
       ],
       "summary": "Caractérisations d'ordre 0, 1 et 2, opérations préservant la convexité, forte convexité, lissité.",
       "objectives": [
@@ -2263,7 +2263,7 @@
       ]
     },
     {
-      "id": "opt-sous-différentiel",
+      "id": "opt-sous-differentiel",
       "title": "Sous-différentiel",
       "domain": "optimisation",
       "level": 4,
@@ -2284,12 +2284,12 @@
       ]
     },
     {
-      "id": "opt-conjuguée",
+      "id": "opt-conjuguee",
       "title": "Conjuguée de Fenchel et dualité convexe",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
-        "opt-sous-différentiel"
+        "opt-sous-differentiel"
       ],
       "summary": "Transformée de Legendre-Fenchel, biconjuguée, dualité de Fenchel, interprétation géométrique par les hyperplans d'appui.",
       "objectives": [
@@ -2306,12 +2306,12 @@
       ]
     },
     {
-      "id": "opt-dualité-kkt",
+      "id": "opt-dualite-kkt",
       "title": "Dualité lagrangienne et conditions KKT",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
-        "opt-conjuguée",
+        "opt-conjuguee",
         "cd-lagrange"
       ],
       "summary": "Lagrangien, fonction duale, dualité faible et forte, Slater, KKT : le cœur du cours de remise à niveau.",
@@ -2350,7 +2350,7 @@
       ]
     },
     {
-      "id": "opt-accélération",
+      "id": "opt-acceleration",
       "title": "Momentum et gradient accéléré de Nesterov",
       "domain": "optimisation",
       "level": 4,
@@ -2376,8 +2376,8 @@
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
-        "opt-sous-différentiel",
-        "opt-accélération"
+        "opt-sous-differentiel",
+        "opt-acceleration"
       ],
       "summary": "Opérateur proximal, gradient proximal, seuillage doux, splitting : traiter les objectifs composites.",
       "objectives": [
@@ -2444,7 +2444,7 @@
       "domain": "optimisation",
       "level": 5,
       "prereqs": [
-        "opt-dualité-kkt",
+        "opt-dualite-kkt",
         "opt-second-ordre"
       ],
       "summary": "Barrière logarithmique, chemin central, méthode primale-duale et complexité polynomiale.",
@@ -2466,7 +2466,7 @@
       "domain": "optimisation",
       "level": 5,
       "prereqs": [
-        "opt-dualité-kkt"
+        "opt-dualite-kkt"
       ],
       "summary": "Simplexe, dualité en LP, cônes du second ordre, programmation semi-définie et relaxations convexes.",
       "objectives": [
@@ -2504,7 +2504,7 @@
       ]
     },
     {
-      "id": "fou-séries",
+      "id": "fou-series",
       "title": "Séries de Fourier",
       "domain": "fourier",
       "level": 3,
@@ -2619,7 +2619,7 @@
       "domain": "fourier",
       "level": 3,
       "prereqs": [
-        "fou-séries",
+        "fou-series",
         "al-hermitien"
       ],
       "summary": "TFD comme changement de base unitaire, algorithme de Cooley-Tukey, coût en n log n, repliement.",
@@ -2897,12 +2897,12 @@
       ]
     },
     {
-      "id": "num-linéaire",
+      "id": "num-lineaire",
       "title": "Résolution numérique de systèmes linéaires",
       "domain": "numerique",
       "level": 3,
       "prereqs": [
-        "al-systèmes",
+        "al-systemes",
         "num-flottants"
       ],
       "summary": "Factorisations LU, Cholesky, QR : ce que fait vraiment un solveur, et à quel coût.",
@@ -2920,12 +2920,12 @@
       ]
     },
     {
-      "id": "num-itératif",
+      "id": "num-iteratif",
       "title": "Méthodes itératives et gradient conjugué",
       "domain": "numerique",
       "level": 4,
       "prereqs": [
-        "num-linéaire",
+        "num-lineaire",
         "opt-gradient"
       ],
       "summary": "Jacobi, Gauss-Seidel, gradient conjugué, préconditionnement : indispensable en grande dimension.",
@@ -2947,7 +2947,7 @@
       "domain": "numerique",
       "level": 4,
       "prereqs": [
-        "num-linéaire",
+        "num-lineaire",
         "al-svd"
       ],
       "summary": "Méthode de la puissance, algorithme QR, Lanczos, calcul pratique de la SVD.",
@@ -2991,7 +2991,7 @@
       "domain": "ml",
       "level": 3,
       "prereqs": [
-        "pro-espérance",
+        "pro-esperance",
         "sta-estimation"
       ],
       "summary": "Risque, risque empirique, généralisation, sur-apprentissage, compromis biais-variance.",
@@ -3009,12 +3009,12 @@
       ]
     },
     {
-      "id": "ml-linéaires",
+      "id": "ml-lineaires",
       "title": "Modèles linéaires et régularisation",
       "domain": "ml",
       "level": 3,
       "prereqs": [
-        "sta-régression",
+        "sta-regression",
         "opt-fonctions-convexes"
       ],
       "summary": "Régression ridge, lasso, régression logistique : formulation, géométrie de la régularisation, résolution.",
@@ -3037,7 +3037,7 @@
       "domain": "ml",
       "level": 3,
       "prereqs": [
-        "pro-espérance"
+        "pro-esperance"
       ],
       "summary": "Entropie, entropie croisée, divergence de Kullback-Leibler, information mutuelle, et pourquoi la cross-entropy est la bonne perte.",
       "objectives": [
@@ -3081,8 +3081,8 @@
       "domain": "ml",
       "level": 4,
       "prereqs": [
-        "ml-linéaires",
-        "opt-dualité-kkt"
+        "ml-lineaires",
+        "opt-dualite-kkt"
       ],
       "summary": "Astuce du noyau, SVM à marge maximale, formulation duale, noyaux usuels.",
       "objectives": [
@@ -3166,7 +3166,7 @@
       ]
     },
     {
-      "id": "ml-génératifs",
+      "id": "ml-generatifs",
       "title": "Modèles génératifs probabilistes",
       "domain": "ml",
       "level": 5,
@@ -3241,7 +3241,7 @@
       "level": 4,
       "prereqs": [
         "alg-groupes",
-        "ari-polynômes"
+        "ari-polynomes"
       ],
       "summary": "Anneaux, idéaux, anneaux quotients, anneaux principaux et factoriels.",
       "objectives": [
