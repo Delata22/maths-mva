@@ -31,7 +31,7 @@ class GenerationCancelled(RuntimeError):
 
 def _check(cancel: CancelCb) -> None:
     if cancel():
-        raise GenerationCancelled("Generation annulee.")
+        raise GenerationCancelled("Génération annulée.")
 
 
 def generate_plan(syl: Syllabus, course_id: str, model: str,
@@ -50,7 +50,7 @@ def generate_plan(syl: Syllabus, course_id: str, model: str,
     )
     sections = plan.get("sections") or []
     if not sections:
-        raise cc.ClaudeError("Le plan renvoye ne contient aucune section.")
+        raise cc.ClaudeError("Le plan renvoyé ne contient aucune section.")
     plan.setdefault("proved_in_course", [])
     plan.setdefault("left_as_exercise", [])
     plan["_cost"] = res.cost_usd
@@ -103,10 +103,10 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
         partial = sum(min(1.0, chars.get(i, 0) / 9000.0) for i in todo if parts[i] is None)
         frac = 0.10 + 0.72 * (done_count + partial) / max(1, n)
         running = [titles[i] for i in todo if parts[i] is None and chars.get(i)]
-        label = ("Section %d/%d - %s" % (done_count + 1, n, running[0])
+        label = ("Section %d/%d — %s" % (done_count + 1, n, running[0])
                  if running else "Sections %d/%d" % (done_count, n))
         if len(running) > 1:
-            label += "  (+%d en parallele)" % (len(running) - 1)
+            label += "  (+%d en parallèle)" % (len(running) - 1)
         on_progress(label, frac)
 
     if done_count:
@@ -162,7 +162,7 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
                        on_progress: ProgressCb = _noop,
                        cancel: CancelCb = _never) -> tuple[dict, float]:
     course = syl.get(course_id)
-    on_progress("QCM et demonstrations", 0.86)
+    on_progress("QCM et démonstrations", 0.86)
     data, res = cc.run_json(
         prompts.exercises_prompt(syl, course, plan, content.digest(course_id)),
         model=model,
@@ -174,7 +174,7 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
     qcm = data.get("qcm") or []
     proofs = data.get("proofs") or []
     if not qcm:
-        raise cc.ClaudeError("Aucune question renvoyee.")
+        raise cc.ClaudeError("Aucune question renvoyée.")
     for i, q in enumerate(qcm):
         q.setdefault("id", "q%d" % (i + 1))
         q["difficulty"] = int(q.get("difficulty") or 1)
@@ -236,7 +236,7 @@ def generate_course(course_id: str,
     }
     content.write_json(course_id, content.META, meta)
     store.mark_generated(course_id, model_course, cost, duration)
-    on_progress("Termine", 1.0)
+    on_progress("Terminé", 1.0)
     return meta
 
 
@@ -247,11 +247,11 @@ def regenerate_exercises(course_id: str,
     syl = syl or load_syllabus()
     plan = content.read_plan(course_id)
     if plan is None:
-        raise ValueError("Le cours doit etre genere avant ses exercices.")
+        raise ValueError("Le cours doit être généré avant ses exercices.")
     data, cost = generate_exercises(
         syl, course_id, plan, str(settings.get("model/exercises")), on_progress, cancel)
     meta = content.read_meta(course_id)
     meta["cost_usd"] = round(float(meta.get("cost_usd") or 0) + cost, 4)
     content.write_json(course_id, content.META, meta)
-    on_progress("Termine", 1.0)
+    on_progress("Terminé", 1.0)
     return data

@@ -98,7 +98,7 @@
       var sum = d.querySelector('summary');
       if (!sum) {
         sum = document.createElement('summary');
-        sum.textContent = 'Demonstration';
+        sum.textContent = 'Démonstration';
         d.insertBefore(sum, d.firstChild);
       }
       if (d.querySelector('.proof-help')) return;
@@ -106,7 +106,7 @@
       bar.className = 'proof-help';
       var btn = document.createElement('button');
       btn.className = 'mviz-play';
-      btn.textContent = 'Decortiquer avec Claude';
+      btn.textContent = 'Décortiquer avec Claude';
       btn.addEventListener('click', function (ev) {
         ev.preventDefault();
         var heading = d.getAttribute('data-of') || nearestHeading(d);
@@ -134,7 +134,7 @@
   function setupAsk() {
     var btn = document.createElement('button');
     btn.id = 'ask-bubble';
-    btn.textContent = 'Demander a Claude';
+    btn.textContent = 'Demander à Claude';
     document.body.appendChild(btn);
     var pending = '';
 

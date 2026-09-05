@@ -30,6 +30,7 @@ def main() -> int:
     parser.add_argument("course_id")
     parser.add_argument("--out", default=None)
     parser.add_argument("--theme", default="light", choices=["light", "dark"])
+    parser.add_argument("--view", default="course", choices=["course", "quiz", "proofs"])
     parser.add_argument("--scroll", type=float, default=0.0,
                         help="nombre d'ecrans a faire defiler avant la capture")
     parser.add_argument("--anchor", default=None,
@@ -51,7 +52,22 @@ def main() -> int:
     view.show()
 
     out = pathlib.Path(args.out or ("/tmp/%s.png" % args.course_id))
-    path = content.render_course_page(args.course_id, course.title, args.theme)
+    if args.view == "course":
+        path = content.render_course_page(args.course_id, course.title, args.theme)
+    else:
+        import json
+        from mathsapp import store
+        from mathsapp.paths import ASSETS_DIR, library_dir
+        data = content.read_exercises(args.course_id) or {}
+        tpl = (ASSETS_DIR / ("%s.html" % args.view)).read_text(encoding="utf-8")
+        page = (tpl.replace("__THEME__", args.theme)
+                   .replace("__ASSETS__", content.assets_url())
+                   .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+                   .replace("__STATUS__", json.dumps(store.proof_statuses(args.course_id))))
+        d = library_dir() / "_views"
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / ("shot_%s_%s.html" % (args.view, args.course_id))
+        path.write_text(page, encoding="utf-8")
 
     def after_load(ok: bool) -> None:
         if not ok:

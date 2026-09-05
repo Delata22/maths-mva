@@ -68,11 +68,11 @@ class Dashboard(QWidget):
         mastered = sum(1 for s in statuses.values() if s.mastered)
         generated = sum(1 for s in statuses.values() if s.generated)
 
-        title = QLabel("Remise a niveau M2 MVA")
+        title = QLabel("Remise à niveau M2 MVA")
         title.setObjectName("H1")
         self.root.addWidget(title)
 
-        sub = QLabel("%d cours sur %d maitrises  ·  %d generes  ·  seuil de maitrise : %d %%"
+        sub = QLabel("%d cours sur %d maîtrisés  ·  %d générés  ·  seuil de maîtrise : %d %%"
                      % (mastered, total, generated, st_mod.threshold()))
         sub.setObjectName("Muted")
         self.root.addWidget(sub)
@@ -102,7 +102,7 @@ class Dashboard(QWidget):
         self.root.addWidget(host)
 
     def _tracks(self, statuses: Dict[str, Status], pal: dict) -> None:
-        self._section_title("Les cours de remise a niveau de l'ENS",
+        self._section_title("Les cours de remise à niveau de l'ENS",
                             "chaque parcours = le cours cible et tout ce qu'il faut avant")
         grid = QGridLayout()
         grid.setSpacing(12)
@@ -115,7 +115,7 @@ class Dashboard(QWidget):
             name.setObjectName("H2")
             name.setWordWrap(True)
             card.lay.addWidget(name)
-            info = QLabel("%d cours  ·  %d maitrises  ·  %d generes" % (len(path), done, gen))
+            info = QLabel("%d cours  ·  %d maîtrisés  ·  %d générés" % (len(path), done, gen))
             info.setObjectName("Muted")
             card.lay.addWidget(info)
             card.lay.addWidget(_bar(done, len(path), pal["ok"] if done else pal["accent"]))
@@ -127,7 +127,7 @@ class Dashboard(QWidget):
             row.addWidget(btn)
             todo = [c for c in path if not statuses[c].generated]
             if todo:
-                gen_btn = QPushButton("Generer les %d manquants" % len(todo))
+                gen_btn = QPushButton("Générer les %d manquants" % len(todo))
                 gen_btn.setProperty("flat", True)
                 gen_btn.clicked.connect(lambda _=False, ids=todo: self.generate_requested.emit(ids))
                 row.addWidget(gen_btn)
@@ -171,12 +171,12 @@ class Dashboard(QWidget):
                                 % (pal["ok"] if s.mastered else pal["warn"]))
             row.addWidget(score)
         elif not s.generated:
-            btn = QPushButton("Generer")
+            btn = QPushButton("Générer")
             btn.setProperty("flat", True)
             btn.clicked.connect(lambda _=False, c=cid: self.generate_requested.emit([c]))
             row.addWidget(btn)
         else:
-            tag = QLabel("a etudier")
+            tag = QLabel("à étudier")
             tag.setObjectName("Muted")
             row.addWidget(tag)
 
@@ -188,7 +188,7 @@ class Dashboard(QWidget):
         ids = st_mod.next_recommended(self.syl, statuses, 8)
         if not ids:
             return
-        self._section_title("A faire ensuite", "prerequis satisfaits, du plus simple au plus avance")
+        self._section_title("À faire ensuite", "prérequis satisfaits, du plus simple au plus avancé")
         card = Card()
         for cid in ids:
             card.lay.addWidget(self._course_row(cid, statuses, pal))
@@ -200,7 +200,7 @@ class Dashboard(QWidget):
         if not ids:
             return
         ids.sort(key=lambda c: statuses[c].best_pct or 0)
-        self._section_title("A reviser", "QCM sous le seuil de maitrise")
+        self._section_title("À réviser", "QCM sous le seuil de maîtrise")
         card = Card()
         for cid in ids[:8]:
             card.lay.addWidget(self._course_row(cid, statuses, pal))

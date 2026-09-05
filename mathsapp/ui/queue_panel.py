@@ -28,11 +28,11 @@ class QueuePanel(QWidget):
         bl = QHBoxLayout(bar)
         bl.setContentsMargins(12, 8, 12, 8)
         bl.setSpacing(8)
-        self.summary = QLabel("Aucune generation en cours")
+        self.summary = QLabel("Aucune génération en cours")
         self.summary.setObjectName("Muted")
         bl.addWidget(self.summary)
         bl.addStretch(1)
-        btn_clear = QPushButton("Effacer les terminees")
+        btn_clear = QPushButton("Effacer les terminées")
         btn_clear.setProperty("flat", True)
         btn_clear.clicked.connect(self.queue.clear_finished)
         bl.addWidget(btn_clear)
@@ -44,7 +44,7 @@ class QueuePanel(QWidget):
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(4)
-        self.tree.setHeaderLabels(["Cours", "Type", "Etape", "Avancement"])
+        self.tree.setHeaderLabels(["Cours", "Type", "Étape", "Avancement"])
         self.tree.setRootIsDecorated(False)
         self.tree.itemDoubleClicked.connect(
             lambda item, _c: self.course_opened.emit(item.data(0, Qt.ItemDataRole.UserRole)))
@@ -83,12 +83,12 @@ class QueuePanel(QWidget):
                 bar.setFixedHeight(6)
                 self.tree.setItemWidget(item, 3, bar)
             else:
-                labels = {DONE: "termine", ERROR: "echec", CANCELLED: "annule", QUEUED: "en attente"}
+                labels = {DONE: "terminé", ERROR: "échec", CANCELLED: "annulé", QUEUED: "en attente"}
                 item.setText(3, labels.get(job.state, ""))
                 item.setForeground(3, QColor(pal["muted"]))
 
         active = self.queue.active_count()
-        self.summary.setText("Aucune generation en cours" if not active
-                             else "%d generation%s en cours ou en attente"
+        self.summary.setText("Aucune génération en cours" if not active
+                             else "%d génération%s en cours ou en attente"
                                   % (active, "s" if active > 1 else ""))
         self.btn_cancel.setEnabled(active > 0)

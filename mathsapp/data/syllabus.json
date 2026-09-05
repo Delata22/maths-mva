@@ -4,97 +4,97 @@
     {
       "id": "logique",
       "name": "Logique & fondements",
-      "description": "Le langage dans lequel tout le reste s'ecrit.",
+      "description": "Le langage dans lequel tout le reste s'écrit.",
       "color": "#8b5cf6"
     },
     {
       "id": "ensembles",
       "name": "Ensembles & structures",
-      "description": "Ensembles, applications, denombrement, structures de base.",
+      "description": "Ensembles, applications, dénombrement, structures de base.",
       "color": "#a855f7"
     },
     {
       "id": "arithmetique",
-      "name": "Nombres & polynomes",
-      "description": "R, C, arithmetique entiere, polynomes.",
+      "name": "Nombres & polynômes",
+      "description": "R, C, arithmétique entière, polynômes.",
       "color": "#ec4899"
     },
     {
       "id": "analyse",
-      "name": "Analyse reelle",
-      "description": "Suites, series, continuite, derivation, integration a une variable.",
+      "name": "Analyse réelle",
+      "description": "Suites, séries, continuité, dérivation, intégration à une variable.",
       "color": "#ef4444"
     },
     {
-      "id": "algebre_lineaire",
-      "name": "Algebre lineaire",
-      "description": "Le socle absolu de l'IA : vecteurs, matrices, reduction, SVD.",
+      "id": "algebre_linéaire",
+      "name": "Algèbre linéaire",
+      "description": "Le socle absolu de l'IA : vecteurs, matrices, réduction, SVD.",
       "color": "#f97316"
     },
     {
       "id": "topologie",
-      "name": "Topologie & espaces normes",
-      "description": "Ouverts, convergence, completude, compacite.",
+      "name": "Topologie & espaces normés",
+      "description": "Ouverts, convergence, complétude, compacité.",
       "color": "#eab308"
     },
     {
       "id": "calcul_diff",
-      "name": "Calcul differentiel",
+      "name": "Calcul différentiel",
       "description": "Gradients, hessiennes, extrema : le langage de l'optimisation.",
       "color": "#84cc16"
     },
     {
       "id": "mesure",
-      "name": "Mesure & integration",
+      "name": "Mesure & intégration",
       "description": "Tribus, Lebesgue, espaces L^p.",
       "color": "#22c55e"
     },
     {
       "id": "probabilites",
-      "name": "Probabilites",
-      "description": "Du de a six faces aux martingales.",
+      "name": "Probabilités",
+      "description": "Du dé à six faces aux martingales.",
       "color": "#14b8a6"
     },
     {
       "id": "statistiques",
       "name": "Statistiques",
-      "description": "Estimer, tester, apprendre a partir de donnees.",
+      "description": "Estimer, tester, apprendre à partir de données.",
       "color": "#06b6d4"
     },
     {
       "id": "optimisation",
       "name": "Optimisation convexe",
-      "description": "Cours de remise a niveau MVA.",
+      "description": "Cours de remise à niveau MVA.",
       "color": "#3b82f6"
     },
     {
       "id": "fourier",
       "name": "Analyse de Fourier",
-      "description": "Cours de remise a niveau MVA.",
+      "description": "Cours de remise à niveau MVA.",
       "color": "#6366f1"
     },
     {
       "id": "analyse_fonc",
       "name": "Analyse fonctionnelle",
-      "description": "Cours de remise a niveau MVA.",
+      "description": "Cours de remise à niveau MVA.",
       "color": "#0ea5e9"
     },
     {
       "id": "numerique",
-      "name": "Calcul numerique",
+      "name": "Calcul numérique",
       "description": "Ce qui se passe vraiment quand la machine calcule.",
       "color": "#64748b"
     },
     {
       "id": "ml",
       "name": "Fondements ML / Deep Learning",
-      "description": "Le point d'arrivee : les maths de l'apprentissage.",
+      "description": "Le point d'arrivée : les maths de l'apprentissage.",
       "color": "#f43f5e"
     },
     {
       "id": "algebre",
-      "name": "Algebre generale",
-      "description": "Groupes, anneaux, corps. Reportable : peu utile pour l'IA a court terme.",
+      "name": "Algèbre générale",
+      "description": "Groupes, anneaux, corps. Reportable : peu utile pour l'IA à court terme.",
       "color": "#94a3b8"
     }
   ],
@@ -123,27 +123,27 @@
   "tracks": [
     {
       "id": "mva-proba",
-      "title": "Remise a niveau - Probabilites",
+      "title": "Remise à niveau - Probabilités",
       "goal": "pro-lgn-tcl",
       "extra": [
-        "pro-esperance-conditionnelle",
+        "pro-espérance-conditionnelle",
         "pro-markov"
       ]
     },
     {
       "id": "mva-optimisation",
-      "title": "Remise a niveau - Optimisation convexe",
-      "goal": "opt-dualite-kkt",
+      "title": "Remise à niveau - Optimisation convexe",
+      "goal": "opt-dualité-kkt",
       "extra": [
         "opt-gradient",
-        "opt-acceleration",
+        "opt-accélération",
         "opt-stochastique",
         "opt-proximal"
       ]
     },
     {
       "id": "mva-analyse-fonc",
-      "title": "Remise a niveau - Analyse fonctionnelle",
+      "title": "Remise à niveau - Analyse fonctionnelle",
       "goal": "af-compacts-spectral",
       "extra": [
         "af-hahn-banach",
@@ -152,7 +152,7 @@
     },
     {
       "id": "mva-stats",
-      "title": "Remise a niveau - Statistiques",
+      "title": "Remise à niveau - Statistiques",
       "goal": "sta-tests",
       "extra": [
         "sta-fisher",
@@ -162,7 +162,7 @@
     },
     {
       "id": "mva-fourier",
-      "title": "Remise a niveau - Analyse de Fourier",
+      "title": "Remise à niveau - Analyse de Fourier",
       "goal": "fou-plancherel",
       "extra": [
         "fou-tfd-fft",
@@ -187,104 +187,104 @@
       "domain": "logique",
       "level": 1,
       "prereqs": [],
-      "summary": "Ce qu'est une proposition, les connecteurs, les tables de verite, et pourquoi 'implique' ne veut pas dire ce qu'on croit.",
+      "summary": "Ce qu'est une proposition, les connecteurs, les tables de vérité, et pourquoi 'implique' ne veut pas dire ce qu'on croit.",
       "objectives": [
-        "Manipuler et, ou, non, implique, equivaut",
-        "Construire une table de verite",
-        "Reconnaitre tautologie et contradiction",
-        "Comprendre la contraposee et sa difference avec la reciproque"
+        "Manipuler et, ou, non, implique, équivaut",
+        "Construire une table de vérité",
+        "Reconnaître tautologie et contradiction",
+        "Comprendre la contraposée et sa différence avec la réciproque"
       ],
       "keywords": [
         "proposition",
         "connecteur",
-        "table de verite",
-        "contraposee",
+        "table de vérité",
+        "contraposée",
         "tautologie"
       ]
     },
     {
-      "id": "log-predicats",
-      "title": "Quantificateurs et predicats",
+      "id": "log-prédicats",
+      "title": "Quantificateurs et prédicats",
       "domain": "logique",
       "level": 1,
       "prereqs": [
         "log-propositions"
       ],
-      "summary": "Pour tout, il existe : l'ordre des quantificateurs, leur negation, et les pieges classiques.",
+      "summary": "Pour tout, il existe : l'ordre des quantificateurs, leur négation, et les pièges classiques.",
       "objectives": [
-        "Ecrire un enonce mathematique avec quantificateurs",
-        "Nier proprement une phrase quantifiee",
+        "Écrire un énoncé mathématique avec quantificateurs",
+        "Nier proprement une phrase quantifiée",
         "Comprendre pourquoi l'ordre des quantificateurs change tout"
       ],
       "keywords": [
         "quantificateur",
-        "predicat",
-        "negation",
+        "prédicat",
+        "négation",
         "uniforme"
       ]
     },
     {
       "id": "log-raisonnement",
-      "title": "Types de raisonnement et redaction d'une preuve",
+      "title": "Types de raisonnement et rédaction d'une preuve",
       "domain": "logique",
       "level": 1,
       "prereqs": [
-        "log-predicats"
+        "log-prédicats"
       ],
-      "summary": "Direct, contrapose, absurde, disjonction de cas, analyse-synthese, contre-exemple : quand utiliser quoi, et comment rediger.",
+      "summary": "Direct, contraposé, absurde, disjonction de cas, analyse-synthèse, contre-exemple : quand utiliser quoi, et comment rédiger.",
       "objectives": [
         "Choisir le bon type de raisonnement",
-        "Rediger une demonstration lisible",
-        "Reperer une preuve fausse"
+        "Rédiger une démonstration lisible",
+        "Repérer une preuve fausse"
       ],
       "keywords": [
-        "demonstration",
+        "démonstration",
         "absurde",
-        "contrapose",
+        "contraposé",
         "contre-exemple",
-        "analyse-synthese"
+        "analyse-synthèse"
       ]
     },
     {
-      "id": "log-recurrence",
-      "title": "Recurrence",
+      "id": "log-récurrence",
+      "title": "Récurrence",
       "domain": "logique",
       "level": 1,
       "prereqs": [
         "log-raisonnement"
       ],
-      "summary": "Recurrence simple, double, forte, et recurrence sur des structures. Le principe et ses variantes.",
+      "summary": "Récurrence simple, double, forte, et récurrence sur des structures. Le principe et ses variantes.",
       "objectives": [
-        "Rediger une recurrence rigoureuse",
-        "Choisir entre recurrence simple et forte",
-        "Reperer une recurrence mal initialisee"
+        "Rédiger une récurrence rigoureuse",
+        "Choisir entre récurrence simple et forte",
+        "Repérer une récurrence mal initialisée"
       ],
       "keywords": [
-        "recurrence",
-        "heredite",
+        "récurrence",
+        "hérédité",
         "initialisation",
-        "recurrence forte"
+        "récurrence forte"
       ]
     },
     {
       "id": "ens-bases",
-      "title": "Ensembles et operations",
+      "title": "Ensembles et opérations",
       "domain": "ensembles",
       "level": 1,
       "prereqs": [
-        "log-predicats"
+        "log-prédicats"
       ],
-      "summary": "Appartenance, inclusion, union, intersection, complementaire, produit cartesien, parties d'un ensemble.",
+      "summary": "Appartenance, inclusion, union, intersection, complémentaire, produit cartésien, parties d'un ensemble.",
       "objectives": [
-        "Manipuler les operations ensemblistes",
-        "Prouver une egalite d'ensembles par double inclusion",
+        "Manipuler les opérations ensemblistes",
+        "Prouver une égalité d'ensembles par double inclusion",
         "Comprendre P(E) et son cardinal"
       ],
       "keywords": [
         "ensemble",
         "inclusion",
         "union",
-        "produit cartesien",
+        "produit cartésien",
         "parties"
       ]
     },
@@ -296,45 +296,45 @@
       "prereqs": [
         "ens-bases"
       ],
-      "summary": "Image, image reciproque, composition, et les trois proprietes qui reviennent partout.",
+      "summary": "Image, image réciproque, composition, et les trois propriétés qui reviennent partout.",
       "objectives": [
         "Distinguer injectif, surjectif, bijectif",
-        "Manipuler image directe et image reciproque",
-        "Construire une bijection reciproque"
+        "Manipuler image directe et image réciproque",
+        "Construire une bijection réciproque"
       ],
       "keywords": [
         "application",
         "injection",
         "surjection",
         "bijection",
-        "image reciproque"
+        "image réciproque"
       ]
     },
     {
       "id": "ens-relations",
-      "title": "Relations binaires, equivalence et ordre",
+      "title": "Relations binaires, équivalence et ordre",
       "domain": "ensembles",
       "level": 2,
       "prereqs": [
         "ens-applications"
       ],
-      "summary": "Relations d'equivalence, classes, ensemble quotient ; relations d'ordre, majorants, borne superieure.",
+      "summary": "Relations d'équivalence, classes, ensemble quotient ; relations d'ordre, majorants, borne supérieure.",
       "objectives": [
-        "Verifier qu'une relation est une equivalence",
+        "Vérifier qu'une relation est une équivalence",
         "Comprendre le passage au quotient",
         "Manipuler ordres partiels et totaux"
       ],
       "keywords": [
-        "equivalence",
+        "équivalence",
         "classe",
         "quotient",
         "ordre",
-        "borne superieure"
+        "borne supérieure"
       ]
     },
     {
       "id": "ens-denombrement",
-      "title": "Denombrement et combinatoire",
+      "title": "Dénombrement et combinatoire",
       "domain": "ensembles",
       "level": 1,
       "prereqs": [
@@ -342,7 +342,7 @@
       ],
       "summary": "Listes, arrangements, combinaisons, principe des tiroirs, inclusion-exclusion.",
       "objectives": [
-        "Compter sans se tromper de modele",
+        "Compter sans se tromper de modèle",
         "Utiliser les coefficients binomiaux",
         "Appliquer inclusion-exclusion"
       ],
@@ -356,21 +356,21 @@
     },
     {
       "id": "ens-cardinalite",
-      "title": "Cardinalite : fini, denombrable, continu",
+      "title": "Cardinalité : fini, dénombrable, continu",
       "domain": "ensembles",
       "level": 2,
       "prereqs": [
         "ens-relations",
         "ens-denombrement"
       ],
-      "summary": "Comparer des infinis. Denombrabilite de Q, argument diagonal de Cantor, non-denombrabilite de R.",
+      "summary": "Comparer des infinis. Dénombrabilité de Q, argument diagonal de Cantor, non-dénombrabilité de R.",
       "objectives": [
-        "Prouver qu'un ensemble est denombrable",
+        "Prouver qu'un ensemble est dénombrable",
         "Comprendre l'argument diagonal",
         "Situer card(N) < card(R)"
       ],
       "keywords": [
-        "denombrable",
+        "dénombrable",
         "Cantor",
         "diagonal",
         "cardinal"
@@ -378,7 +378,7 @@
     },
     {
       "id": "ens-structures",
-      "title": "Structures algebriques : premier contact",
+      "title": "Structures algébriques : premier contact",
       "domain": "ensembles",
       "level": 2,
       "prereqs": [
@@ -386,7 +386,7 @@
       ],
       "summary": "Loi de composition interne, groupe, anneau, corps : juste ce qu'il faut pour lire le reste du syllabus.",
       "objectives": [
-        "Reconnaitre un groupe, un anneau, un corps",
+        "Reconnaître un groupe, un anneau, un corps",
         "Comprendre pourquoi ces structures sont utiles",
         "Manipuler les exemples classiques"
       ],
@@ -400,45 +400,45 @@
     },
     {
       "id": "ari-entiers",
-      "title": "Arithmetique dans Z",
+      "title": "Arithmétique dans Z",
       "domain": "arithmetique",
       "level": 1,
       "prereqs": [
-        "log-recurrence"
+        "log-récurrence"
       ],
-      "summary": "Division euclidienne, PGCD, Bezout, Gauss, nombres premiers, congruences.",
+      "summary": "Division euclidienne, PGCD, Bézout, Gauss, nombres premiers, congruences.",
       "objectives": [
         "Appliquer l'algorithme d'Euclide",
-        "Utiliser Bezout",
+        "Utiliser Bézout",
         "Calculer modulo n"
       ],
       "keywords": [
         "division euclidienne",
         "PGCD",
-        "Bezout",
+        "Bézout",
         "congruence",
         "premier"
       ]
     },
     {
       "id": "ari-reels",
-      "title": "Le corps des reels et la borne superieure",
+      "title": "Le corps des réels et la borne supérieure",
       "domain": "arithmetique",
       "level": 2,
       "prereqs": [
         "ens-relations"
       ],
-      "summary": "Ce qui distingue vraiment R de Q : la propriete de la borne superieure, et tout ce qui en decoule.",
+      "summary": "Ce qui distingué vraiment R de Q : la propriété de la borne supérieure, et tout ce qui en découle.",
       "objectives": [
         "Manipuler sup et inf rigoureusement",
-        "Comprendre l'axiome de la borne superieure",
-        "Utiliser la densite de Q dans R"
+        "Comprendre l'axiome de la borne supérieure",
+        "Utiliser la densité de Q dans R"
       ],
       "keywords": [
-        "borne superieure",
+        "borne supérieure",
         "complet",
-        "densite",
-        "archimedien"
+        "densité",
+        "archimédien"
       ]
     },
     {
@@ -449,10 +449,10 @@
       "prereqs": [
         "ari-reels"
       ],
-      "summary": "Forme algebrique, conjugue, module, argument, forme exponentielle, interpretation geometrique.",
+      "summary": "Forme algébrique, conjugué, module, argument, forme exponentielle, interprétation géométrique.",
       "objectives": [
-        "Passer entre formes algebrique et exponentielle",
-        "Interpreter geometriquement produit et conjugaison",
+        "Passer entre formes algébrique et exponentielle",
+        "Interpréter géométriquement produit et conjugaison",
         "Utiliser les formules de Moivre et d'Euler"
       ],
       "keywords": [
@@ -465,60 +465,60 @@
     },
     {
       "id": "ari-complexes-avance",
-      "title": "Complexes : racines n-iemes et transformations",
+      "title": "Complexes : racines n-ièmes et transformations",
       "domain": "arithmetique",
       "level": 2,
       "prereqs": [
         "ari-complexes"
       ],
-      "summary": "Racines n-iemes de l'unite, resolution d'equations, similitudes du plan, premiers pas vers Fourier.",
+      "summary": "Racines n-ièmes de l'unité, résolution d'équations, similitudes du plan, premiers pas vers Fourier.",
       "objectives": [
-        "Resoudre z^n = a",
-        "Utiliser les racines de l'unite",
+        "Résoudre z^n = a",
+        "Utiliser les racines de l'unité",
         "Voir la multiplication complexe comme une similitude"
       ],
       "keywords": [
-        "racine de l'unite",
+        "racine de l'unité",
         "similitude",
-        "equation complexe"
+        "équation complexe"
       ]
     },
     {
-      "id": "ari-polynomes",
-      "title": "Polynomes",
+      "id": "ari-polynômes",
+      "title": "Polynômes",
       "domain": "arithmetique",
       "level": 2,
       "prereqs": [
         "ari-complexes",
         "ens-structures"
       ],
-      "summary": "Degre, division euclidienne, racines, multiplicite, factorisation dans R[X] et C[X], theoreme de d'Alembert-Gauss.",
+      "summary": "Degré, division euclidienne, racines, multiplicité, factorisation dans R[X] et C[X], théorème de d'Alembert-Gauss.",
       "objectives": [
         "Factoriser dans R et dans C",
         "Utiliser la relation racines-coefficients",
-        "Manipuler la division euclidienne de polynomes"
+        "Manipuler la division euclidienne de polynômes"
       ],
       "keywords": [
-        "polynome",
+        "polynôme",
         "racine",
-        "multiplicite",
+        "multiplicité",
         "factorisation",
         "d'Alembert"
       ]
     },
     {
       "id": "ana-suites",
-      "title": "Suites numeriques et limites",
+      "title": "Suites numériques et limites",
       "domain": "analyse",
       "level": 1,
       "prereqs": [
         "ari-reels"
       ],
-      "summary": "La definition epsilon-N, enfin expliquee pour de bon. Monotonie, suites adjacentes, limites usuelles.",
+      "summary": "La définition epsilon-N, enfin expliquée pour de bon. Monotonie, suites adjacentes, limites usuelles.",
       "objectives": [
-        "Ecrire et utiliser la definition d'une limite",
-        "Prouver la convergence d'une suite monotone bornee",
-        "Manipuler les operations sur les limites"
+        "Écrire et utiliser la définition d'une limite",
+        "Prouver la convergence d'une suite monotone bornée",
+        "Manipuler les opérations sur les limites"
       ],
       "keywords": [
         "limite",
@@ -530,17 +530,17 @@
     },
     {
       "id": "ana-suites-avance",
-      "title": "Cauchy, Bolzano-Weierstrass, suites recurrentes",
+      "title": "Cauchy, Bolzano-Weierstrass, suites récurrentes",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-suites"
       ],
-      "summary": "Les theoremes structurels sur R, et l'etude des suites definies par u_{n+1} = f(u_n).",
+      "summary": "Les théorèmes structurels sur R, et l'étude des suites définies par u_{n+1} = f(u_n).",
       "objectives": [
-        "Utiliser le critere de Cauchy",
+        "Utiliser le critère de Cauchy",
         "Appliquer Bolzano-Weierstrass",
-        "Etudier une suite recurrente avec un point fixe"
+        "Étudier une suite récurrente avec un point fixe"
       ],
       "keywords": [
         "Cauchy",
@@ -550,62 +550,62 @@
       ]
     },
     {
-      "id": "ana-series",
-      "title": "Series numeriques",
+      "id": "ana-séries",
+      "title": "Séries numériques",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-suites-avance"
       ],
-      "summary": "Convergence, criteres de comparaison, d'Alembert, Cauchy, series alternees, convergence absolue.",
+      "summary": "Convergence, critères de comparaison, d'Alembert, Cauchy, séries alternées, convergence absolue.",
       "objectives": [
-        "Determiner la nature d'une serie",
-        "Utiliser les criteres classiques",
+        "Déterminer la nature d'une série",
+        "Utiliser les critères classiques",
         "Distinguer convergence simple et absolue"
       ],
       "keywords": [
-        "serie",
-        "critere",
+        "série",
+        "critère",
         "absolue",
-        "alternee",
+        "alternée",
         "reste"
       ]
     },
     {
-      "id": "ana-continuite",
-      "title": "Limites et continuite des fonctions",
+      "id": "ana-continuité",
+      "title": "Limites et continuité des fonctions",
       "domain": "analyse",
       "level": 1,
       "prereqs": [
         "ana-suites"
       ],
-      "summary": "Limite en un point, continuite, caracterisation sequentielle, prolongement par continuite.",
+      "summary": "Limite en un point, continuité, caractérisation séquentielle, prolongement par continuité.",
       "objectives": [
-        "Manipuler la definition epsilon-delta",
-        "Utiliser la caracterisation sequentielle",
-        "Etudier la continuite d'une fonction par morceaux"
+        "Manipuler la définition epsilon-delta",
+        "Utiliser la caractérisation séquentielle",
+        "Étudier la continuité d'une fonction par morceaux"
       ],
       "keywords": [
-        "continuite",
+        "continuité",
         "epsilon-delta",
         "limite",
-        "sequentielle"
+        "séquentielle"
       ]
     },
     {
       "id": "ana-tvi",
-      "title": "Theoremes fondamentaux de continuite",
+      "title": "Théorèmes fondamentaux de continuité",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
-        "ana-continuite",
+        "ana-continuité",
         "ana-suites-avance"
       ],
-      "summary": "Theoreme des valeurs intermediaires, image d'un segment, theoreme de Heine et continuite uniforme.",
+      "summary": "Théorème des valeurs intermédiaires, image d'un segment, théorème de Heine et continuité uniforme.",
       "objectives": [
         "Appliquer le TVI",
         "Comprendre pourquoi un segment donne un segment",
-        "Distinguer continuite et continuite uniforme"
+        "Distinguer continuité et continuité uniforme"
       ],
       "keywords": [
         "TVI",
@@ -616,20 +616,20 @@
     },
     {
       "id": "ana-derivation",
-      "title": "Derivation et accroissements finis",
+      "title": "Dérivation et accroissements finis",
       "domain": "analyse",
       "level": 1,
       "prereqs": [
-        "ana-continuite"
+        "ana-continuité"
       ],
-      "summary": "Derivee comme limite et comme approximation affine, Rolle, theoreme des accroissements finis, variations.",
+      "summary": "Dérivée comme limite et comme approximation affine, Rolle, théorème des accroissements finis, variations.",
       "objectives": [
-        "Interpreter la derivee comme meilleure approximation lineaire",
+        "Interpréter la dérivée comme meilleure approximation linéaire",
         "Appliquer Rolle et le TAF",
-        "Utiliser le TAF pour majorer un ecart"
+        "Utiliser le TAF pour majorer un écart"
       ],
       "keywords": [
-        "derivee",
+        "dérivée",
         "Rolle",
         "accroissements finis",
         "tangente"
@@ -637,59 +637,59 @@
     },
     {
       "id": "ana-taylor",
-      "title": "Developpements limites et formules de Taylor",
+      "title": "Développements limités et formules de Taylor",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-derivation"
       ],
-      "summary": "Taylor-Young, Taylor-Lagrange, reste integral, DL usuels et calculs de limites.",
+      "summary": "Taylor-Young, Taylor-Lagrange, reste intégral, DL usuels et calculs de limites.",
       "objectives": [
-        "Calculer un DL a l'ordre n",
+        "Calculer un DL à l'ordre n",
         "Choisir la bonne forme du reste",
-        "Utiliser un DL pour lever une indetermination"
+        "Utiliser un DL pour lever une indétermination"
       ],
       "keywords": [
         "Taylor",
-        "developpement limite",
+        "développement limité",
         "reste",
-        "negligeable"
+        "négligeable"
       ]
     },
     {
-      "id": "ana-convexite-1d",
-      "title": "Convexite en une variable",
+      "id": "ana-convexité-1d",
+      "title": "Convexité en une variable",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-derivation"
       ],
-      "summary": "Definition par les cordes, caracterisations par la derivee premiere et seconde, inegalites de convexite.",
+      "summary": "Définition par les cordes, caractérisations par la dérivée première et seconde, inégalités de convexité.",
       "objectives": [
-        "Prouver la convexite d'une fonction",
-        "Utiliser l'inegalite des pentes",
-        "Demontrer une inegalite par convexite (Jensen)"
+        "Prouver la convexité d'une fonction",
+        "Utiliser l'inégalité des pentes",
+        "Démontrer une inégalité par convexité (Jensen)"
       ],
       "keywords": [
-        "convexite",
+        "convexité",
         "corde",
         "Jensen",
-        "epigraphe"
+        "épigraphe"
       ]
     },
     {
       "id": "ana-integrale",
-      "title": "Integrale de Riemann",
+      "title": "Intégrale de Riemann",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-tvi"
       ],
-      "summary": "Sommes de Darboux, integrabilite, theoreme fondamental de l'analyse, techniques de calcul.",
+      "summary": "Sommes de Darboux, intégrabilité, théorème fondamental de l'analyse, techniques de calcul.",
       "objectives": [
-        "Comprendre la construction de l'integrale",
-        "Utiliser le theoreme fondamental",
-        "Maitriser IPP et changement de variable"
+        "Comprendre la construction de l'intégrale",
+        "Utiliser le théorème fondamental",
+        "Maîtriser IPP et changement de variable"
       ],
       "keywords": [
         "Riemann",
@@ -700,18 +700,18 @@
     },
     {
       "id": "ana-integrales-gen",
-      "title": "Integrales generalisees",
+      "title": "Intégrales généralisées",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-integrale",
-        "ana-series"
+        "ana-séries"
       ],
-      "summary": "Convergence en une borne infinie ou en un point singulier, criteres, integrales de reference.",
+      "summary": "Convergence en une borne infinie ou en un point singulier, critères, intégrales de référence.",
       "objectives": [
-        "Determiner la convergence d'une integrale impropre",
-        "Utiliser la comparaison serie-integrale",
-        "Connaitre les integrales de Riemann et de Bertrand"
+        "Déterminer la convergence d'une intégrale impropre",
+        "Utiliser la comparaison série-intégrale",
+        "Connaître les intégrales de Riemann et de Bertrand"
       ],
       "keywords": [
         "impropre",
@@ -722,18 +722,18 @@
     },
     {
       "id": "ana-suites-fonctions",
-      "title": "Suites et series de fonctions",
+      "title": "Suites et séries de fonctions",
       "domain": "analyse",
       "level": 3,
       "prereqs": [
-        "ana-series",
+        "ana-séries",
         "ana-integrale"
       ],
-      "summary": "Convergence simple contre convergence uniforme : le point ou l'analyse devient serieuse.",
+      "summary": "Convergence simple contre convergence uniforme : le point où l'analyse devient sérieuse.",
       "objectives": [
         "Distinguer convergence simple et uniforme",
         "Utiliser la norme infinie",
-        "Appliquer les theoremes d'interversion limite-integrale"
+        "Appliquer les théorèmes d'interversion limite-intégrale"
       ],
       "keywords": [
         "convergence uniforme",
@@ -743,86 +743,86 @@
       ]
     },
     {
-      "id": "ana-series-entieres",
-      "title": "Series entieres",
+      "id": "ana-séries-entieres",
+      "title": "Séries entières",
       "domain": "analyse",
       "level": 3,
       "prereqs": [
         "ana-suites-fonctions"
       ],
-      "summary": "Rayon de convergence, operations, developpement en serie entiere, fonctions analytiques.",
+      "summary": "Rayon de convergence, opérations, développement en série entière, fonctions analytiques.",
       "objectives": [
         "Calculer un rayon de convergence",
-        "Developper une fonction en serie entiere",
-        "Deriver et integrer terme a terme"
+        "Développer une fonction en série entière",
+        "Dériver et intégrer terme à terme"
       ],
       "keywords": [
         "rayon de convergence",
         "analytique",
         "Abel",
-        "developpement"
+        "développement"
       ]
     },
     {
       "id": "ana-edo",
-      "title": "Equations differentielles ordinaires",
+      "title": "Équations différentielles ordinaires",
       "domain": "analyse",
       "level": 2,
       "prereqs": [
         "ana-derivation",
         "ana-integrale"
       ],
-      "summary": "EDO lineaires d'ordre 1 et 2, systemes lineaires, Cauchy-Lipschitz, lecture qualitative.",
+      "summary": "EDO linéaires d'ordre 1 et 2, systèmes linéaires, Cauchy-Lipschitz, lecture qualitative.",
       "objectives": [
-        "Resoudre une EDO lineaire",
-        "Comprendre l'enonce de Cauchy-Lipschitz",
+        "Résoudre une EDO linéaire",
+        "Comprendre l'énoncé de Cauchy-Lipschitz",
         "Lire un portrait de phase"
       ],
       "keywords": [
         "EDO",
         "Cauchy-Lipschitz",
-        "lineaire",
+        "linéaire",
         "portrait de phase"
       ]
     },
     {
       "id": "al-espaces",
       "title": "Espaces vectoriels et sous-espaces",
-      "domain": "algebre_lineaire",
+      "domain": "algebre_linéaire",
       "level": 1,
       "prereqs": [
         "ens-structures"
       ],
       "summary": "Ce qu'est un espace vectoriel, pourquoi cette abstraction est rentable, sous-espaces, somme et somme directe.",
       "objectives": [
-        "Verifier qu'un ensemble est un sous-espace",
+        "Vérifier qu'un ensemble est un sous-espace",
         "Manipuler somme et somme directe",
-        "Reconnaitre des espaces vectoriels non evidents (fonctions, polynomes, matrices)"
+        "Reconnaître des espaces vectoriels non évidents (fonctions, polynômes, matrices)"
       ],
       "keywords": [
         "espace vectoriel",
         "sous-espace",
         "somme directe",
-        "combinaison lineaire"
+        "combinaison linéaire"
       ]
     },
     {
       "id": "al-bases",
-      "title": "Familles libres, generatrices, bases et dimension",
-      "domain": "algebre_lineaire",
+      "title": "Familles libres, génératrices, bases et dimension",
+      "domain": "algebre_linéaire",
       "level": 1,
       "prereqs": [
         "al-espaces"
       ],
-      "summary": "Independance lineaire, base, theoreme de la dimension, coordonnees.",
+      "summary": "Indépendance linéaire, base, théorème de la dimension, coordonnées.",
       "objectives": [
-        "Extraire une base d'une famille generatrice",
+        "Extraire une base d'une famille génératrice",
         "Calculer une dimension",
-        "Passer d'un vecteur a ses coordonnees"
+        "Passer d'un vecteur à ses coordonnées"
       ],
       "keywords": [
         "libre",
-        "generatrice",
+        "génératrice",
         "base",
         "dimension",
         "rang"
@@ -830,79 +830,79 @@
     },
     {
       "id": "al-applications",
-      "title": "Applications lineaires, noyau, image, rang",
-      "domain": "algebre_lineaire",
+      "title": "Applications linéaires, noyau, image, rang",
+      "domain": "algebre_linéaire",
       "level": 2,
       "prereqs": [
         "al-bases"
       ],
-      "summary": "Le theoreme du rang et sa signification geometrique.",
+      "summary": "Le théorème du rang et sa signification géométrique.",
       "objectives": [
         "Calculer noyau et image",
-        "Appliquer le theoreme du rang",
-        "Relier injectivite et noyau"
+        "Appliquer le théorème du rang",
+        "Relier injectivité et noyau"
       ],
       "keywords": [
-        "application lineaire",
+        "application linéaire",
         "noyau",
         "image",
-        "theoreme du rang"
+        "théorème du rang"
       ]
     },
     {
       "id": "al-matrices",
       "title": "Matrices et calcul matriciel",
-      "domain": "algebre_lineaire",
+      "domain": "algebre_linéaire",
       "level": 1,
       "prereqs": [
         "al-applications"
       ],
-      "summary": "La matrice comme representation d'une application lineaire, produit matriciel et sa vraie signification, inverse, transposee, blocs.",
+      "summary": "La matrice comme représentation d'une application linéaire, produit matriciel et sa vraie signification, inverse, transposée, blocs.",
       "objectives": [
-        "Interpreter le produit matriciel de quatre facons differentes",
-        "Passer d'une application lineaire a sa matrice",
+        "Interpréter le produit matriciel de quatre façons différentes",
+        "Passer d'une application linéaire à sa matrice",
         "Manipuler les matrices par blocs"
       ],
       "keywords": [
         "matrice",
         "produit",
         "inverse",
-        "transposee",
+        "transposée",
         "blocs"
       ]
     },
     {
-      "id": "al-systemes",
-      "title": "Systemes lineaires et pivot de Gauss",
-      "domain": "algebre_lineaire",
+      "id": "al-systèmes",
+      "title": "Systèmes linéaires et pivot de Gauss",
+      "domain": "algebre_linéaire",
       "level": 1,
       "prereqs": [
         "al-matrices"
       ],
-      "summary": "Resolution, echelonnement, structure de l'ensemble des solutions, interpretation geometrique.",
+      "summary": "Résolution, échelonnement, structure de l'ensemble des solutions, interprétation géométrique.",
       "objectives": [
-        "Executer un pivot de Gauss proprement",
-        "Decrire l'ensemble des solutions",
+        "Exécuter un pivot de Gauss proprement",
+        "Décrire l'ensemble des solutions",
         "Relier rang et nombre de solutions"
       ],
       "keywords": [
         "Gauss",
-        "echelonne",
+        "échelonné",
         "pivot",
-        "systeme"
+        "système"
       ]
     },
     {
       "id": "al-changement-base",
       "title": "Changement de base et matrices semblables",
-      "domain": "algebre_lineaire",
+      "domain": "algebre_linéaire",
       "level": 2,
       "prereqs": [
         "al-matrices"
       ],
       "summary": "Matrice de passage, formules de changement de base, relation de similitude, invariants.",
       "objectives": [
-        "Ecrire une matrice de passage",
+        "Écrire une matrice de passage",
         "Changer de base sans se tromper de sens",
         "Comprendre ce qu'est un invariant de similitude"
       ],
@@ -914,30 +914,30 @@
       ]
     },
     {
-      "id": "al-determinant",
-      "title": "Determinants",
-      "domain": "algebre_lineaire",
+      "id": "al-déterminant",
+      "title": "Déterminants",
+      "domain": "algebre_linéaire",
       "level": 2,
       "prereqs": [
         "al-changement-base"
       ],
-      "summary": "Le determinant comme volume oriente, formes multilineaires alternees, developpement, proprietes.",
+      "summary": "Le déterminant comme volume orienté, formes multilinéaires alternées, développement, propriétés.",
       "objectives": [
-        "Interpreter le determinant comme un volume",
-        "Calculer un determinant efficacement",
-        "Relier determinant et inversibilite"
+        "Interpréter le déterminant comme un volume",
+        "Calculer un déterminant efficacement",
+        "Relier déterminant et inversibilité"
       ],
       "keywords": [
-        "determinant",
+        "déterminant",
         "volume",
-        "multilineaire",
+        "multilinéaire",
         "cofacteur"
       ]
     },
     {
-      "id": "al-dualite",
-      "title": "Dualite et formes lineaires",
-      "domain": "algebre_lineaire",
+      "id": "al-dualité",
+      "title": "Dualité et formes linéaires",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
         "al-bases"
@@ -945,163 +945,163 @@
       "summary": "Espace dual, base duale, hyperplans, transposition.",
       "objectives": [
         "Manipuler la base duale",
-        "Voir un hyperplan comme noyau d'une forme lineaire",
-        "Comprendre la transposee comme application duale"
+        "Voir un hyperplan comme noyau d'une forme linéaire",
+        "Comprendre la transposée comme application duale"
       ],
       "keywords": [
         "dual",
-        "forme lineaire",
+        "forme linéaire",
         "hyperplan",
-        "transposee"
+        "transposée"
       ]
     },
     {
-      "id": "al-reduction",
+      "id": "al-réduction",
       "title": "Valeurs propres, vecteurs propres, diagonalisation",
-      "domain": "algebre_lineaire",
+      "domain": "algebre_linéaire",
       "level": 2,
       "prereqs": [
-        "al-determinant"
+        "al-déterminant"
       ],
-      "summary": "Le coeur de l'algebre lineaire appliquee : trouver la base ou l'application devient triviale.",
+      "summary": "Le cœur de l'algèbre linéaire appliquée : trouver la base où l'application devient triviale.",
       "objectives": [
-        "Calculer un polynome caracteristique",
+        "Calculer un polynôme caractéristique",
         "Diagonaliser une matrice",
-        "Reconnaitre une matrice non diagonalisable"
+        "Reconnaître une matrice non diagonalisable"
       ],
       "keywords": [
         "valeur propre",
         "diagonalisation",
-        "polynome caracteristique",
+        "polynôme caractéristique",
         "spectre"
       ]
     },
     {
       "id": "al-trigonalisation",
-      "title": "Trigonalisation, Cayley-Hamilton, reduction de Jordan",
-      "domain": "algebre_lineaire",
+      "title": "Trigonalisation, Cayley-Hamilton, réduction de Jordan",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
-        "al-reduction",
-        "ari-polynomes"
+        "al-réduction",
+        "ari-polynômes"
       ],
-      "summary": "Quand la diagonalisation echoue : polynome minimal, sous-espaces caracteristiques, forme de Jordan.",
+      "summary": "Quand la diagonalisation échoue : polynôme minimal, sous-espaces caractéristiques, forme de Jordan.",
       "objectives": [
-        "Utiliser le polynome minimal",
+        "Utiliser le polynôme minimal",
         "Appliquer Cayley-Hamilton",
-        "Construire une reduite de Jordan"
+        "Construire une réduite de Jordan"
       ],
       "keywords": [
         "trigonalisation",
         "Jordan",
-        "polynome minimal",
+        "polynôme minimal",
         "Cayley-Hamilton",
         "nilpotent"
       ]
     },
     {
       "id": "al-euclidien",
-      "title": "Espaces euclidiens : produit scalaire et orthogonalite",
-      "domain": "algebre_lineaire",
+      "title": "Espaces euclidiens : produit scalaire et orthogonalité",
+      "domain": "algebre_linéaire",
       "level": 2,
       "prereqs": [
         "al-bases"
       ],
-      "summary": "Produit scalaire, norme, Cauchy-Schwarz, orthogonalite, bases orthonormees.",
+      "summary": "Produit scalaire, norme, Cauchy-Schwarz, orthogonalité, bases orthonormées.",
       "objectives": [
-        "Verifier qu'une forme est un produit scalaire",
+        "Vérifier qu'une forme est un produit scalaire",
         "Utiliser Cauchy-Schwarz",
-        "Construire une base orthonormee"
+        "Construire une base orthonormée"
       ],
       "keywords": [
         "produit scalaire",
         "orthogonal",
         "Cauchy-Schwarz",
-        "orthonorme"
+        "orthonormé"
       ]
     },
     {
       "id": "al-projections",
-      "title": "Projections orthogonales, Gram-Schmidt et moindres carres",
-      "domain": "algebre_lineaire",
+      "title": "Projections orthogonales, Gram-Schmidt et moindres carrés",
+      "domain": "algebre_linéaire",
       "level": 2,
       "prereqs": [
         "al-euclidien"
       ],
-      "summary": "Projeter, c'est approcher au mieux. Le lien direct avec la regression lineaire.",
+      "summary": "Projeter, c'est approcher au mieux. Le lien direct avec la régression linéaire.",
       "objectives": [
         "Calculer une projection orthogonale",
         "Appliquer Gram-Schmidt",
-        "Deriver les equations normales des moindres carres"
+        "Dériver les équations normales des moindres carrés"
       ],
       "keywords": [
         "projection",
         "Gram-Schmidt",
-        "moindres carres",
-        "equations normales",
+        "moindres carrés",
+        "équations normales",
         "QR"
       ]
     },
     {
       "id": "al-spectral",
-      "title": "Theoreme spectral pour les matrices symetriques",
-      "domain": "algebre_lineaire",
+      "title": "Théorème spectral pour les matrices symétriques",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
-        "al-reduction",
+        "al-réduction",
         "al-euclidien"
       ],
-      "summary": "Toute matrice symetrique reelle est diagonalisable en base orthonormee. Le theoreme le plus utile du ML.",
+      "summary": "Toute matrice symétrique réelle est diagonalisable en base orthonormée. Le théorème le plus utile du ML.",
       "objectives": [
-        "Enoncer et demontrer le theoreme spectral",
-        "Diagonaliser une matrice symetrique en base orthonormee",
+        "Énoncer et démontrer le théorème spectral",
+        "Diagonaliser une matrice symétrique en base orthonormée",
         "Utiliser le quotient de Rayleigh"
       ],
       "keywords": [
         "spectral",
-        "symetrique",
-        "orthonorme",
+        "symétrique",
+        "orthonormé",
         "Rayleigh"
       ]
     },
     {
       "id": "al-quadratiques",
-      "title": "Formes quadratiques et matrices definies positives",
-      "domain": "algebre_lineaire",
+      "title": "Formes quadratiques et matrices définies positives",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
         "al-spectral"
       ],
-      "summary": "Signature, loi d'inertie de Sylvester, caracterisations des matrices SDP : la notion qui gouverne la convexite.",
+      "summary": "Signature, loi d'inertie de Sylvester, caractérisations des matrices SDP : la notion qui gouverne la convexité.",
       "objectives": [
-        "Reduire une forme quadratique",
-        "Caracteriser une matrice definie positive de plusieurs facons",
+        "Réduire une forme quadratique",
+        "Caractériser une matrice définie positive de plusieurs façons",
         "Relier valeurs propres et signe de la forme"
       ],
       "keywords": [
         "forme quadratique",
-        "definie positive",
+        "définie positive",
         "Sylvester",
         "signature"
       ]
     },
     {
       "id": "al-svd",
-      "title": "Decomposition en valeurs singulieres (SVD)",
-      "domain": "algebre_lineaire",
+      "title": "Décomposition en valeurs singulières (SVD)",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
         "al-spectral"
       ],
-      "summary": "La generalisation du theoreme spectral a toutes les matrices. Approximation de rang faible, pseudo-inverse, ACP.",
+      "summary": "La généralisation du théorème spectral à toutes les matrices. Approximation de rang faible, pseudo-inverse, ACP.",
       "objectives": [
         "Construire la SVD d'une matrice",
         "Utiliser Eckart-Young pour l'approximation de rang faible",
-        "Relier SVD, pseudo-inverse et moindres carres"
+        "Relier SVD, pseudo-inverse et moindres carrés"
       ],
       "keywords": [
         "SVD",
-        "valeur singuliere",
+        "valeur singulière",
         "rang faible",
         "Eckart-Young",
         "pseudo-inverse"
@@ -1110,15 +1110,15 @@
     {
       "id": "al-normes-matricielles",
       "title": "Normes matricielles et conditionnement",
-      "domain": "algebre_lineaire",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
         "al-svd"
       ],
-      "summary": "Norme d'operateur, norme de Frobenius, rayon spectral, conditionnement et stabilite numerique.",
+      "summary": "Norme d'opérateur, norme de Frobenius, rayon spectral, conditionnement et stabilité numérique.",
       "objectives": [
-        "Calculer une norme d'operateur",
-        "Relier conditionnement et sensibilite d'un systeme",
+        "Calculer une norme d'opérateur",
+        "Relier conditionnement et sensibilité d'un système",
         "Distinguer rayon spectral et norme"
       ],
       "keywords": [
@@ -1131,17 +1131,17 @@
     {
       "id": "al-hermitien",
       "title": "Espaces hermitiens et matrices complexes",
-      "domain": "algebre_lineaire",
+      "domain": "algebre_linéaire",
       "level": 3,
       "prereqs": [
         "al-euclidien",
         "ari-complexes"
       ],
-      "summary": "Produit scalaire hermitien, matrices unitaires, normales, hermitiennes. Prerequis pour Fourier.",
+      "summary": "Produit scalaire hermitien, matrices unitaires, normales, hermitiennes. Prérequis pour Fourier.",
       "objectives": [
         "Manipuler un produit hermitien",
-        "Reconnaitre une matrice unitaire",
-        "Enoncer le theoreme spectral hermitien"
+        "Reconnaître une matrice unitaire",
+        "Énoncer le théorème spectral hermitien"
       ],
       "keywords": [
         "hermitien",
@@ -1152,105 +1152,105 @@
     },
     {
       "id": "al-tenseurs",
-      "title": "Produit tensoriel et calcul multilineaire",
-      "domain": "algebre_lineaire",
+      "title": "Produit tensoriel et calcul multilinéaire",
+      "domain": "algebre_linéaire",
       "level": 4,
       "prereqs": [
-        "al-dualite",
+        "al-dualité",
         "al-matrices"
       ],
-      "summary": "Produit de Kronecker, vectorisation, tenseurs : le vocabulaire des couches de reseaux profonds.",
+      "summary": "Produit de Kronecker, vectorisation, tenseurs : le vocabulaire des couches de réseaux profonds.",
       "objectives": [
         "Manipuler le produit de Kronecker",
-        "Utiliser l'operateur vec",
-        "Lire une expression tensorielle a plusieurs indices"
+        "Utiliser l'opérateur vec",
+        "Lire une expression tensorielle à plusieurs indices"
       ],
       "keywords": [
         "tenseur",
         "Kronecker",
         "vec",
-        "multilineaire"
+        "multilinéaire"
       ]
     },
     {
       "id": "top-metriques",
-      "title": "Espaces metriques",
+      "title": "Espaces métriques",
       "domain": "topologie",
       "level": 2,
       "prereqs": [
         "ana-suites-avance",
         "ens-bases"
       ],
-      "summary": "Distance, boules, ouverts, fermes, adherence, interieur : la geometrie sans coordonnees.",
+      "summary": "Distance, boules, ouverts, fermés, adhérence, intérieur : la géométrie sans coordonnées.",
       "objectives": [
-        "Manipuler ouverts et fermes",
-        "Calculer adherence et interieur",
-        "Comprendre la convergence dans un espace metrique"
+        "Manipuler ouverts et fermés",
+        "Calculer adhérence et intérieur",
+        "Comprendre la convergence dans un espace métrique"
       ],
       "keywords": [
         "distance",
         "ouvert",
-        "ferme",
-        "adherence",
+        "fermé",
+        "adhérence",
         "voisinage"
       ]
     },
     {
       "id": "top-normes",
-      "title": "Espaces vectoriels normes",
+      "title": "Espaces vectoriels normés",
       "domain": "topologie",
       "level": 2,
       "prereqs": [
         "top-metriques",
         "al-espaces"
       ],
-      "summary": "Normes usuelles, equivalence des normes en dimension finie, normes p et leurs boules unite.",
+      "summary": "Normes usuelles, équivalence des normes en dimension finie, normes p et leurs boules unité.",
       "objectives": [
-        "Verifier qu'une application est une norme",
+        "Vérifier qu'une application est une norme",
         "Comparer des normes",
-        "Visualiser les boules unite des normes p"
+        "Visualiser les boules unité des normes p"
       ],
       "keywords": [
         "norme",
-        "equivalence",
+        "équivalence",
         "norme p",
-        "boule unite"
+        "boule unité"
       ]
     },
     {
-      "id": "top-continuite",
-      "title": "Continuite et topologie",
+      "id": "top-continuité",
+      "title": "Continuité et topologie",
       "domain": "topologie",
       "level": 2,
       "prereqs": [
         "top-metriques"
       ],
-      "summary": "Caracterisation de la continuite par les ouverts, applications lipschitziennes, homeomorphismes.",
+      "summary": "Caractérisation de la continuité par les ouverts, applications lipschitziennes, homéomorphismes.",
       "objectives": [
-        "Utiliser la caracterisation topologique de la continuite",
+        "Utiliser la caractérisation topologique de la continuité",
         "Manipuler les applications lipschitziennes",
-        "Reconnaitre un homeomorphisme"
+        "Reconnaître un homéomorphisme"
       ],
       "keywords": [
-        "continuite",
+        "continuité",
         "lipschitzien",
-        "homeomorphisme",
-        "image reciproque"
+        "homéomorphisme",
+        "image réciproque"
       ]
     },
     {
       "id": "top-completude",
-      "title": "Completude et point fixe de Banach",
+      "title": "Complétude et point fixe de Banach",
       "domain": "topologie",
       "level": 3,
       "prereqs": [
         "top-normes"
       ],
-      "summary": "Suites de Cauchy, espaces complets, theoreme du point fixe contractant et ses applications.",
+      "summary": "Suites de Cauchy, espaces complets, théorème du point fixe contractant et ses applications.",
       "objectives": [
         "Prouver qu'un espace est complet",
-        "Appliquer le theoreme du point fixe",
-        "Voir le lien avec les algorithmes iteratifs"
+        "Appliquer le théorème du point fixe",
+        "Voir le lien avec les algorithmes itératifs"
       ],
       "keywords": [
         "complet",
@@ -1262,17 +1262,17 @@
     },
     {
       "id": "top-compacite",
-      "title": "Compacite",
+      "title": "Compacité",
       "domain": "topologie",
       "level": 3,
       "prereqs": [
         "top-completude"
       ],
-      "summary": "Borel-Lebesgue, sequentielle compacite, Heine-Borel, et pourquoi la compacite garantit l'existence d'un minimum.",
+      "summary": "Borel-Lebesgue, séquentielle compacité, Heine-Borel, et pourquoi la compacité garantit l'existence d'un minimum.",
       "objectives": [
-        "Manipuler les deux definitions de la compacite",
-        "Appliquer le theoreme de Weierstrass",
-        "Comprendre l'echec en dimension infinie"
+        "Manipuler les deux définitions de la compacité",
+        "Appliquer le théorème de Weierstrass",
+        "Comprendre l'échec en dimension infinie"
       ],
       "keywords": [
         "compact",
@@ -1283,17 +1283,17 @@
     },
     {
       "id": "top-connexite",
-      "title": "Connexite",
+      "title": "Connexité",
       "domain": "topologie",
       "level": 3,
       "prereqs": [
-        "top-continuite"
+        "top-continuité"
       ],
-      "summary": "Connexite, connexite par arcs, composantes connexes, generalisation du TVI.",
+      "summary": "Connexité, connexité par arcs, composantes connexes, généralisation du TVI.",
       "objectives": [
         "Prouver qu'un ensemble est connexe",
-        "Distinguer connexite et connexite par arcs",
-        "Generaliser le TVI"
+        "Distinguer connexité et connexité par arcs",
+        "Généraliser le TVI"
       ],
       "keywords": [
         "connexe",
@@ -1308,78 +1308,78 @@
       "level": 2,
       "prereqs": [
         "top-normes",
-        "ana-continuite"
+        "ana-continuité"
       ],
-      "summary": "Graphes, lignes de niveau, limites et continuite en dimension superieure, et pourquoi l'intuition 1D trompe.",
+      "summary": "Graphes, lignes de niveau, limites et continuité en dimension supérieure, et pourquoi l'intuition 1D trompe.",
       "objectives": [
         "Lire des lignes de niveau",
-        "Etudier une limite en plusieurs variables",
+        "Étudier une limite en plusieurs variables",
         "Construire un contre-exemple aux limites directionnelles"
       ],
       "keywords": [
         "ligne de niveau",
         "limite",
-        "continuite",
+        "continuité",
         "surface"
       ]
     },
     {
-      "id": "cd-derivees-partielles",
-      "title": "Derivees partielles, gradient, differentielle",
+      "id": "cd-dérivées-partielles",
+      "title": "Dérivées partielles, gradient, différentielle",
       "domain": "calcul_diff",
       "level": 2,
       "prereqs": [
         "cd-plusieurs-variables",
         "ana-derivation"
       ],
-      "summary": "Derivee directionnelle, gradient comme direction de plus forte pente, differentiabilite au sens de Frechet.",
+      "summary": "Dérivée directionnelle, gradient comme direction de plus forte pente, différentiabilité au sens de Fréchet.",
       "objectives": [
         "Calculer un gradient",
-        "Distinguer derivees partielles et differentiabilite",
-        "Interpreter geometriquement le gradient"
+        "Distinguer dérivées partielles et différentiabilité",
+        "Interpréter géométriquement le gradient"
       ],
       "keywords": [
         "gradient",
-        "derivee partielle",
-        "differentielle",
-        "Frechet",
+        "dérivée partielle",
+        "différentielle",
+        "Fréchet",
         "directionnelle"
       ]
     },
     {
       "id": "cd-jacobienne",
-      "title": "Jacobienne et regle de la chaine",
+      "title": "Jacobienne et règle de la chaîne",
       "domain": "calcul_diff",
       "level": 2,
       "prereqs": [
-        "cd-derivees-partielles"
+        "cd-dérivées-partielles"
       ],
-      "summary": "Composition de fonctions vectorielles, matrice jacobienne, regle de la chaine : la base mathematique de la retropropagation.",
+      "summary": "Composition de fonctions vectorielles, matrice jacobienne, règle de la chaîne : la base mathématique de la rétropropagation.",
       "objectives": [
         "Calculer une jacobienne",
-        "Appliquer la regle de la chaine multivariee",
-        "Relier chaine et graphe de calcul"
+        "Appliquer la règle de la chaîne multivariée",
+        "Relier chaîne et graphe de calcul"
       ],
       "keywords": [
         "jacobienne",
-        "regle de la chaine",
+        "règle de la chaîne",
         "composition"
       ]
     },
     {
       "id": "cd-hessienne",
-      "title": "Derivees secondes, hessienne et Taylor multivarie",
+      "title": "Dérivées secondes, hessienne et Taylor multivarié",
       "domain": "calcul_diff",
       "level": 3,
       "prereqs": [
         "cd-jacobienne",
         "ana-taylor"
       ],
-      "summary": "Schwarz, hessienne, developpement de Taylor a l'ordre 2 et lecture geometrique de la courbure.",
+      "summary": "Schwarz, hessienne, développement de Taylor à l'ordre 2 et lecture géométrique de la courbure.",
       "objectives": [
         "Calculer une hessienne",
-        "Ecrire un Taylor d'ordre 2 en dimension n",
-        "Lire la courbure a partir des valeurs propres de la hessienne"
+        "Écrire un Taylor d'ordre 2 en dimension n",
+        "Lire la courbure à partir des valeurs propres de la hessienne"
       ],
       "keywords": [
         "hessienne",
@@ -1397,11 +1397,11 @@
         "cd-hessienne",
         "al-quadratiques"
       ],
-      "summary": "Conditions necessaires du premier ordre, conditions suffisantes du second ordre, points selles.",
+      "summary": "Conditions nécessaires du premier ordre, conditions suffisantes du second ordre, points selles.",
       "objectives": [
         "Trouver les points critiques",
         "Classer un point critique via la hessienne",
-        "Reconnaitre un point selle"
+        "Reconnaître un point selle"
       ],
       "keywords": [
         "extremum",
@@ -1418,17 +1418,17 @@
       "prereqs": [
         "cd-extrema"
       ],
-      "summary": "L'intuition geometrique des gradients paralleles, le lagrangien, et le pont vers la dualite.",
+      "summary": "L'intuition géométrique des gradients parallèles, le lagrangien, et le pont vers la dualité.",
       "objectives": [
         "Poser un lagrangien",
-        "Resoudre un probleme sous contrainte d'egalite",
-        "Interpreter le multiplicateur"
+        "Résoudre un problème sous contrainte d'égalité",
+        "Interpréter le multiplicateur"
       ],
       "keywords": [
         "Lagrange",
         "contrainte",
         "multiplicateur",
-        "gradient parallele"
+        "gradient parallèle"
       ]
     },
     {
@@ -1440,30 +1440,30 @@
         "cd-jacobienne",
         "top-completude"
       ],
-      "summary": "Deux theoremes structurels et leur demonstration par point fixe.",
+      "summary": "Deux théorèmes structurels et leur démonstration par point fixe.",
       "objectives": [
-        "Enoncer le theoreme d'inversion locale",
-        "Appliquer le theoreme des fonctions implicites",
+        "Énoncer le théorème d'inversion locale",
+        "Appliquer le théorème des fonctions implicites",
         "Comprendre la preuve par point fixe"
       ],
       "keywords": [
         "inversion locale",
         "fonctions implicites",
-        "diffeomorphisme"
+        "difféomorphisme"
       ]
     },
     {
       "id": "cd-integrales-multiples",
-      "title": "Integrales multiples",
+      "title": "Intégrales multiples",
       "domain": "calcul_diff",
       "level": 3,
       "prereqs": [
         "ana-integrale",
         "cd-jacobienne"
       ],
-      "summary": "Fubini, changement de variables, jacobien, coordonnees polaires et spheriques.",
+      "summary": "Fubini, changement de variables, jacobien, coordonnées polaires et sphériques.",
       "objectives": [
-        "Calculer une integrale double",
+        "Calculer une intégrale double",
         "Appliquer un changement de variables",
         "Utiliser le jacobien comme facteur de volume"
       ],
@@ -1476,24 +1476,24 @@
     },
     {
       "id": "cd-matrix-calculus",
-      "title": "Calcul differentiel matriciel pour le ML",
+      "title": "Calcul différentiel matriciel pour le ML",
       "domain": "calcul_diff",
       "level": 4,
       "prereqs": [
         "cd-jacobienne",
         "al-tenseurs"
       ],
-      "summary": "Deriver par rapport a un vecteur ou une matrice sans paniquer : conventions, identites utiles, differentielle comme forme lineaire.",
+      "summary": "Dériver par rapport à un vecteur ou une matrice sans paniquer : conventions, identités utiles, différentielle comme forme linéaire.",
       "objectives": [
-        "Deriver une forme quadratique matricielle",
-        "Utiliser la methode de la differentielle",
+        "Dériver une forme quadratique matricielle",
+        "Utiliser la méthode de la différentielle",
         "Retrouver les gradients des couches usuelles"
       ],
       "keywords": [
-        "derivee matricielle",
-        "differentielle",
+        "dérivée matricielle",
+        "différentielle",
         "trace",
-        "identites"
+        "identités"
       ]
     },
     {
@@ -1503,61 +1503,61 @@
       "level": 4,
       "prereqs": [
         "ens-cardinalite",
-        "ana-series"
+        "ana-séries"
       ],
       "summary": "Pourquoi on ne peut pas mesurer tous les ensembles, tribus, mesures, et le premier contact avec la mesure de Lebesgue.",
       "objectives": [
         "Manipuler une tribu",
-        "Comprendre le probleme de Vitali",
-        "Utiliser les proprietes de continuite d'une mesure"
+        "Comprendre le problème de Vitali",
+        "Utiliser les propriétés de continuité d'une mesure"
       ],
       "keywords": [
         "tribu",
         "mesure",
-        "borelien",
+        "borélien",
         "Vitali",
-        "sigma-additivite"
+        "sigma-additivité"
       ]
     },
     {
       "id": "mes-lebesgue",
-      "title": "Mesure de Lebesgue et ensembles negligeables",
+      "title": "Mesure de Lebesgue et ensembles négligeables",
       "domain": "mesure",
       "level": 4,
       "prereqs": [
         "mes-tribus"
       ],
-      "summary": "Construction, ensembles negligeables, presque partout, et l'ensemble de Cantor.",
+      "summary": "Construction, ensembles négligeables, presque partout, et l'ensemble de Cantor.",
       "objectives": [
-        "Reconnaitre un ensemble negligeable",
+        "Reconnaître un ensemble négligeable",
         "Manipuler la notion de presque partout",
         "Comprendre l'ensemble de Cantor"
       ],
       "keywords": [
         "Lebesgue",
-        "negligeable",
+        "négligeable",
         "presque partout",
         "Cantor"
       ]
     },
     {
       "id": "mes-integrale",
-      "title": "Integrale de Lebesgue et theoremes de convergence",
+      "title": "Intégrale de Lebesgue et théorèmes de convergence",
       "domain": "mesure",
       "level": 4,
       "prereqs": [
         "mes-lebesgue",
         "ana-integrale"
       ],
-      "summary": "Fonctions mesurables, construction de l'integrale, convergence monotone, lemme de Fatou, convergence dominee.",
+      "summary": "Fonctions mesurables, construction de l'intégrale, convergence monotone, lemme de Fatou, convergence dominée.",
       "objectives": [
         "Comparer Riemann et Lebesgue",
-        "Appliquer le theoreme de convergence dominee",
-        "Justifier une interversion limite-integrale"
+        "Appliquer le théorème de convergence dominée",
+        "Justifier une interversion limite-intégrale"
       ],
       "keywords": [
         "Lebesgue",
-        "convergence dominee",
+        "convergence dominée",
         "Fatou",
         "mesurable"
       ]
@@ -1571,18 +1571,18 @@
         "mes-integrale",
         "top-normes"
       ],
-      "summary": "Holder, Minkowski, completude (Riesz-Fischer), inclusions, densite des fonctions regulieres.",
+      "summary": "Hölder, Minkowski, complétude (Riesz-Fischer), inclusions, densité des fonctions régulières.",
       "objectives": [
-        "Appliquer Holder et Minkowski",
+        "Appliquer Hölder et Minkowski",
         "Manipuler la norme L^p",
         "Comprendre pourquoi L^2 est particulier"
       ],
       "keywords": [
         "L^p",
-        "Holder",
+        "Hölder",
         "Minkowski",
         "Riesz-Fischer",
-        "densite"
+        "densité"
       ]
     },
     {
@@ -1593,10 +1593,10 @@
       "prereqs": [
         "mes-integrale"
       ],
-      "summary": "Tribu produit, theoremes de Fubini et Tonelli, et les hypotheses qu'on oublie toujours.",
+      "summary": "Tribu produit, théorèmes de Fubini et Tonelli, et les hypothèses qu'on oublie toujours.",
       "objectives": [
         "Appliquer Fubini-Tonelli correctement",
-        "Verifier les hypotheses d'integrabilite",
+        "Vérifier les hypothèses d'intégrabilité",
         "Construire un contre-exemple"
       ],
       "keywords": [
@@ -1608,105 +1608,105 @@
     },
     {
       "id": "mes-radon-nikodym",
-      "title": "Radon-Nikodym et densites",
+      "title": "Radon-Nikodym et densités",
       "domain": "mesure",
       "level": 5,
       "prereqs": [
         "mes-produit"
       ],
-      "summary": "Absolue continuite, densite d'une mesure par rapport a une autre : ce qui donne un sens rigoureux a la notion de densite de probabilite.",
+      "summary": "Absolue continuité, densité d'une mesure par rapport à une autre : ce qui donne un sens rigoureux à la notion de densité de probabilité.",
       "objectives": [
-        "Comprendre l'absolue continuite",
-        "Manipuler une derivee de Radon-Nikodym",
-        "Relier densite et changement de mesure"
+        "Comprendre l'absolue continuité",
+        "Manipuler une dérivée de Radon-Nikodym",
+        "Relier densité et changement de mesure"
       ],
       "keywords": [
         "Radon-Nikodym",
-        "absolue continuite",
-        "densite",
+        "absolue continuité",
+        "densité",
         "changement de mesure"
       ]
     },
     {
       "id": "pro-espaces",
-      "title": "Espaces probabilises",
+      "title": "Espaces probabilisés",
       "domain": "probabilites",
       "level": 1,
       "prereqs": [
         "ens-denombrement"
       ],
-      "summary": "Univers, evenements, axiomes de Kolmogorov, probabilites uniformes et modelisation.",
+      "summary": "Univers, événements, axiomes de Kolmogorov, probabilités uniformes et modélisation.",
       "objectives": [
-        "Modeliser une experience aleatoire",
+        "Modéliser une expérience aléatoire",
         "Utiliser les axiomes",
-        "Calculer une probabilite par denombrement"
+        "Calculer une probabilité par dénombrement"
       ],
       "keywords": [
         "univers",
-        "evenement",
+        "événement",
         "Kolmogorov",
-        "equiprobabilite"
+        "équiprobabilité"
       ]
     },
     {
       "id": "pro-conditionnelle",
-      "title": "Probabilite conditionnelle, independance, Bayes",
+      "title": "Probabilité conditionnelle, indépendance, Bayes",
       "domain": "probabilites",
       "level": 1,
       "prereqs": [
         "pro-espaces"
       ],
-      "summary": "Formule des probabilites totales, theoreme de Bayes, independance, et les paradoxes classiques (Monty Hall, faux positifs).",
+      "summary": "Formule des probabilités totales, théorème de Bayes, indépendance, et les paradoxes classiques (Monty Hall, faux positifs).",
       "objectives": [
         "Appliquer la formule de Bayes",
-        "Distinguer independance et incompatibilite",
-        "Resoudre un probleme de faux positifs"
+        "Distinguer indépendance et incompatibilité",
+        "Résoudre un problème de faux positifs"
       ],
       "keywords": [
         "Bayes",
         "conditionnelle",
-        "independance",
-        "probabilites totales"
+        "indépendance",
+        "probabilités totales"
       ]
     },
     {
       "id": "pro-va-discretes",
-      "title": "Variables aleatoires discretes",
+      "title": "Variables aléatoires discrètes",
       "domain": "probabilites",
       "level": 1,
       "prereqs": [
         "pro-conditionnelle"
       ],
-      "summary": "Loi, fonction de repartition, lois de Bernoulli, binomiale, geometrique, Poisson.",
+      "summary": "Loi, fonction de répartition, lois de Bernoulli, binomiale, géométrique, Poisson.",
       "objectives": [
-        "Determiner la loi d'une variable discrete",
-        "Reconnaitre les lois usuelles et leurs contextes",
-        "Calculer une fonction de repartition"
+        "Déterminer la loi d'une variable discrète",
+        "Reconnaître les lois usuelles et leurs contextes",
+        "Calculer une fonction de répartition"
       ],
       "keywords": [
-        "variable aleatoire",
+        "variable aléatoire",
         "loi",
         "binomiale",
         "Poisson",
-        "geometrique"
+        "géométrique"
       ]
     },
     {
-      "id": "pro-esperance",
-      "title": "Esperance, variance, moments",
+      "id": "pro-espérance",
+      "title": "Espérance, variance, moments",
       "domain": "probabilites",
       "level": 2,
       "prereqs": [
         "pro-va-discretes"
       ],
-      "summary": "Linearite de l'esperance, theoreme de transfert, variance, ecart-type, et interpretation.",
+      "summary": "Linéarité de l'espérance, théorème de transfert, variance, écart-type, et interprétation.",
       "objectives": [
-        "Utiliser la linearite de l'esperance",
-        "Appliquer le theoreme de transfert",
+        "Utiliser la linéarité de l'espérance",
+        "Appliquer le théorème de transfert",
         "Calculer une variance efficacement"
       ],
       "keywords": [
-        "esperance",
+        "espérance",
         "variance",
         "moment",
         "transfert"
@@ -1714,22 +1714,22 @@
     },
     {
       "id": "pro-va-continues",
-      "title": "Variables aleatoires a densite",
+      "title": "Variables aléatoires à densité",
       "domain": "probabilites",
       "level": 2,
       "prereqs": [
-        "pro-esperance",
+        "pro-espérance",
         "ana-integrales-gen"
       ],
-      "summary": "Densite, fonction de repartition, lois uniforme, exponentielle, normale, methode de la fonction de repartition.",
+      "summary": "Densité, fonction de répartition, lois uniforme, exponentielle, normale, méthode de la fonction de répartition.",
       "objectives": [
-        "Manipuler une densite",
-        "Calculer la loi d'une transformee",
-        "Connaitre les lois continues usuelles"
+        "Manipuler une densité",
+        "Calculer la loi d'une transformée",
+        "Connaître les lois continues usuelles"
       ],
       "keywords": [
-        "densite",
-        "repartition",
+        "densité",
+        "répartition",
         "normale",
         "exponentielle",
         "quantile"
@@ -1737,82 +1737,82 @@
     },
     {
       "id": "pro-vecteurs",
-      "title": "Vecteurs aleatoires et covariance",
+      "title": "Vecteurs aléatoires et covariance",
       "domain": "probabilites",
       "level": 2,
       "prereqs": [
         "pro-va-continues"
       ],
-      "summary": "Lois jointes, marginales, conditionnelles, independance, covariance et matrice de covariance.",
+      "summary": "Lois jointes, marginales, conditionnelles, indépendance, covariance et matrice de covariance.",
       "objectives": [
         "Calculer une loi marginale",
         "Manipuler une matrice de covariance",
-        "Distinguer correlation nulle et independance"
+        "Distinguer corrélation nulle et indépendance"
       ],
       "keywords": [
         "loi jointe",
         "marginale",
         "covariance",
-        "correlation"
+        "corrélation"
       ]
     },
     {
       "id": "pro-gaussien",
-      "title": "Vecteur gaussien et loi normale multivariee",
+      "title": "Vecteur gaussien et loi normale multivariée",
       "domain": "probabilites",
       "level": 3,
       "prereqs": [
         "pro-vecteurs",
         "al-spectral"
       ],
-      "summary": "La loi centrale du ML : definition, stabilite par transformation affine, conditionnement gaussien, geometrie des ellipsoides.",
+      "summary": "La loi centrale du ML : définition, stabilité par transformation affine, conditionnement gaussien, géométrie des ellipsoïdes.",
       "objectives": [
-        "Caracteriser un vecteur gaussien",
+        "Caractériser un vecteur gaussien",
         "Calculer une loi conditionnelle gaussienne",
-        "Visualiser une gaussienne multivariee via sa covariance"
+        "Visualiser une gaussienne multivariée via sa covariance"
       ],
       "keywords": [
         "gaussien",
-        "normale multivariee",
+        "normale multivariée",
         "covariance",
         "conditionnement",
-        "ellipsoide"
+        "ellipsoïde"
       ]
     },
     {
       "id": "pro-transformees",
-      "title": "Fonctions generatrices et caracteristiques",
+      "title": "Fonctions génératrices et caractéristiques",
       "domain": "probabilites",
       "level": 3,
       "prereqs": [
         "pro-va-continues",
         "fou-transformee"
       ],
-      "summary": "Fonction generatrice des moments, fonction caracteristique, theoreme d'injectivite, theoreme de Levy.",
+      "summary": "Fonction génératrice des moments, fonction caractéristique, théorème d'injectivité, théorème de Lévy.",
       "objectives": [
-        "Calculer une fonction caracteristique",
-        "Utiliser l'injectivite pour identifier une loi",
-        "Manipuler les sommes de variables independantes"
+        "Calculer une fonction caractéristique",
+        "Utiliser l'injectivité pour identifier une loi",
+        "Manipuler les sommes de variables indépendantes"
       ],
       "keywords": [
-        "fonction caracteristique",
-        "generatrice",
-        "Levy",
-        "injectivite"
+        "fonction caractéristique",
+        "génératrice",
+        "Lévy",
+        "injectivité"
       ]
     },
     {
       "id": "pro-inegalites",
-      "title": "Inegalites de concentration",
+      "title": "Inégalités de concentration",
       "domain": "probabilites",
       "level": 3,
       "prereqs": [
-        "pro-esperance"
+        "pro-espérance"
       ],
-      "summary": "Markov, Chebyshev, Jensen, Chernoff, Hoeffding, McDiarmid : les outils qui justifient la generalisation en apprentissage.",
+      "summary": "Markov, Chebyshev, Jensen, Chernoff, Hoeffding, McDiarmid : les outils qui justifient la généralisation en apprentissage.",
       "objectives": [
         "Appliquer Markov et Chebyshev",
-        "Deriver une borne de Chernoff",
+        "Dériver une borne de Chernoff",
         "Utiliser Hoeffding pour borner une moyenne empirique"
       ],
       "keywords": [
@@ -1825,14 +1825,14 @@
     },
     {
       "id": "pro-convergences",
-      "title": "Modes de convergence des variables aleatoires",
+      "title": "Modes de convergence des variables aléatoires",
       "domain": "probabilites",
       "level": 3,
       "prereqs": [
         "pro-inegalites",
         "mes-integrale"
       ],
-      "summary": "Convergence presque sure, en probabilite, en loi, dans L^p : le diagramme des implications et les contre-exemples.",
+      "summary": "Convergence presque sûre, en probabilité, en loi, dans L^p : le diagramme des implications et les contre-exemples.",
       "objectives": [
         "Situer les quatre modes de convergence",
         "Construire les contre-exemples classiques",
@@ -1840,50 +1840,50 @@
       ],
       "keywords": [
         "convergence en loi",
-        "presque sure",
+        "presque sûre",
         "Borel-Cantelli",
         "Slutsky"
       ]
     },
     {
       "id": "pro-lgn-tcl",
-      "title": "Loi des grands nombres et theoreme central limite",
+      "title": "Loi des grands nombres et théorème central limite",
       "domain": "probabilites",
       "level": 3,
       "prereqs": [
         "pro-convergences",
         "pro-transformees"
       ],
-      "summary": "Les deux theoremes qui fondent la statistique, avec leur demonstration et leurs limites.",
+      "summary": "Les deux théorèmes qui fondent la statistique, avec leur démonstration et leurs limites.",
       "objectives": [
         "Distinguer LGN faible et forte",
-        "Demontrer le TCL par fonctions caracteristiques",
+        "Démontrer le TCL par fonctions caractéristiques",
         "Utiliser le TCL pour un intervalle de confiance"
       ],
       "keywords": [
         "LGN",
         "TCL",
-        "Levy",
+        "Lévy",
         "normalisation"
       ]
     },
     {
-      "id": "pro-esperance-conditionnelle",
-      "title": "Esperance conditionnelle",
+      "id": "pro-espérance-conditionnelle",
+      "title": "Espérance conditionnelle",
       "domain": "probabilites",
       "level": 4,
       "prereqs": [
         "pro-convergences",
         "mes-radon-nikodym"
       ],
-      "summary": "La definition par projection dans L^2 et par la propriete caracteristique : la vraie definition, enfin comprehensible.",
+      "summary": "La définition par projection dans L^2 et par la propriété caractéristique : la vraie définition, enfin compréhensible.",
       "objectives": [
-        "Comprendre l'esperance conditionnelle comme projection",
-        "Utiliser la propriete de tour",
-        "Calculer une esperance conditionnelle gaussienne"
+        "Comprendre l'espérance conditionnelle comme projection",
+        "Utiliser la propriété de tour",
+        "Calculer une espérance conditionnelle gaussienne"
       ],
       "keywords": [
-        "esperance conditionnelle",
+        "espérance conditionnelle",
         "projection",
         "tribu",
         "tour"
@@ -1891,39 +1891,39 @@
     },
     {
       "id": "pro-martingales",
-      "title": "Martingales a temps discret",
+      "title": "Martingales à temps discret",
       "domain": "probabilites",
       "level": 5,
       "prereqs": [
-        "pro-esperance-conditionnelle"
+        "pro-espérance-conditionnelle"
       ],
-      "summary": "Filtration, martingale, temps d'arret, theoreme d'arret, convergence des martingales.",
+      "summary": "Filtration, martingale, temps d'arrêt, théorème d'arrêt, convergence des martingales.",
       "objectives": [
-        "Verifier qu'un processus est une martingale",
-        "Appliquer le theoreme d'arret",
-        "Utiliser le theoreme de convergence"
+        "Vérifier qu'un processus est une martingale",
+        "Appliquer le théorème d'arrêt",
+        "Utiliser le théorème de convergence"
       ],
       "keywords": [
         "martingale",
         "filtration",
-        "temps d'arret",
+        "temps d'arrêt",
         "Doob"
       ]
     },
     {
       "id": "pro-markov",
-      "title": "Chaines de Markov",
+      "title": "Chaînes de Markov",
       "domain": "probabilites",
       "level": 4,
       "prereqs": [
-        "pro-esperance-conditionnelle",
-        "al-reduction"
+        "pro-espérance-conditionnelle",
+        "al-réduction"
       ],
-      "summary": "Matrice de transition, classification des etats, mesure invariante, theoreme ergodique, et le lien avec MCMC.",
+      "summary": "Matrice de transition, classification des états, mesure invariante, théorème ergodique, et le lien avec MCMC.",
       "objectives": [
         "Manipuler une matrice de transition",
         "Trouver une mesure invariante",
-        "Comprendre l'idee de MCMC"
+        "Comprendre l'idée de MCMC"
       ],
       "keywords": [
         "Markov",
@@ -1941,10 +1941,10 @@
       "prereqs": [
         "pro-martingales"
       ],
-      "summary": "Construction, proprietes trajectorielles, et premier contact avec le calcul stochastique (utile pour les modeles de diffusion).",
+      "summary": "Construction, propriétés trajectorielles, et premier contact avec le calcul stochastique (utile pour les modèles de diffusion).",
       "objectives": [
-        "Enoncer les proprietes du mouvement brownien",
-        "Comprendre la non-derivabilite des trajectoires",
+        "Énoncer les propriétés du mouvement brownien",
+        "Comprendre la non-dérivabilité des trajectoires",
         "Lire une EDS simple"
       ],
       "keywords": [
@@ -1956,20 +1956,20 @@
     },
     {
       "id": "sta-descriptive",
-      "title": "Statistique descriptive et echantillonnage",
+      "title": "Statistique descriptive et échantillonnage",
       "domain": "statistiques",
       "level": 1,
       "prereqs": [
-        "pro-esperance"
+        "pro-espérance"
       ],
-      "summary": "Moyenne, variance empiriques, quantiles, visualisation, et ce que veut dire 'echantillon i.i.d.'.",
+      "summary": "Moyenne, variance empiriques, quantiles, visualisation, et ce que veut dire 'échantillon i.i.d.'.",
       "objectives": [
         "Calculer des statistiques descriptives",
-        "Comprendre le modele i.i.d.",
+        "Comprendre le modèle i.i.d.",
         "Lire un histogramme et un boxplot"
       ],
       "keywords": [
-        "echantillon",
+        "échantillon",
         "iid",
         "empirique",
         "quantile"
@@ -1984,10 +1984,10 @@
         "sta-descriptive",
         "pro-convergences"
       ],
-      "summary": "Estimateur, biais, variance, erreur quadratique moyenne, et la decomposition biais-variance qui structure tout le ML.",
+      "summary": "Estimateur, biais, variance, erreur quadratique moyenne, et la décomposition biais-variance qui structure tout le ML.",
       "objectives": [
         "Calculer le biais et la variance d'un estimateur",
-        "Decomposer l'EQM",
+        "Décomposer l'EQM",
         "Discuter convergence et consistance"
       ],
       "keywords": [
@@ -2006,11 +2006,11 @@
       "prereqs": [
         "sta-estimation"
       ],
-      "summary": "Vraisemblance, log-vraisemblance, proprietes asymptotiques, et le lien direct avec la minimisation d'une perte.",
+      "summary": "Vraisemblance, log-vraisemblance, propriétés asymptotiques, et le lien direct avec la minimisation d'une perte.",
       "objectives": [
-        "Ecrire une vraisemblance",
+        "Écrire une vraisemblance",
         "Calculer un estimateur du maximum de vraisemblance",
-        "Relier MV et entropie croisee"
+        "Relier MV et entropie croisée"
       ],
       "keywords": [
         "vraisemblance",
@@ -2021,23 +2021,23 @@
     },
     {
       "id": "sta-fisher",
-      "title": "Information de Fisher et borne de Cramer-Rao",
+      "title": "Information de Fisher et borne de Cramér-Rao",
       "domain": "statistiques",
       "level": 4,
       "prereqs": [
         "sta-mv"
       ],
-      "summary": "Score, information de Fisher, borne inferieure sur la variance, efficacite, geometrie de l'information.",
+      "summary": "Score, information de Fisher, borne inférieure sur la variance, efficacité, géométrie de l'information.",
       "objectives": [
         "Calculer une information de Fisher",
-        "Appliquer Cramer-Rao",
-        "Interpreter l'information comme courbure"
+        "Appliquer Cramér-Rao",
+        "Interpréter l'information comme courbure"
       ],
       "keywords": [
         "Fisher",
-        "Cramer-Rao",
+        "Cramér-Rao",
         "score",
-        "efficacite"
+        "efficacité"
       ]
     },
     {
@@ -2049,10 +2049,10 @@
         "sta-mv",
         "pro-lgn-tcl"
       ],
-      "summary": "Construction exacte et asymptotique, interpretation correcte (et l'interpretation fausse qu'on entend partout).",
+      "summary": "Construction exacte et asymptotique, interprétation correcte (et l'interprétation fausse qu'on entend partout).",
       "objectives": [
         "Construire un IC asymptotique",
-        "Interpreter correctement un niveau de confiance",
+        "Interpréter correctement un niveau de confiance",
         "Utiliser les lois de Student et du chi-deux"
       ],
       "keywords": [
@@ -2064,16 +2064,16 @@
     },
     {
       "id": "sta-tests",
-      "title": "Tests d'hypotheses",
+      "title": "Tests d'hypothèses",
       "domain": "statistiques",
       "level": 3,
       "prereqs": [
         "sta-intervalles"
       ],
-      "summary": "Erreurs de premiere et deuxieme espece, p-valeur, puissance, lemme de Neyman-Pearson.",
+      "summary": "Erreurs de première et deuxième espèce, p-valeur, puissance, lemme de Neyman-Pearson.",
       "objectives": [
         "Construire un test",
-        "Interpreter une p-valeur sans se tromper",
+        "Interpréter une p-valeur sans se tromper",
         "Appliquer Neyman-Pearson"
       ],
       "keywords": [
@@ -2086,127 +2086,127 @@
     },
     {
       "id": "sta-bayes",
-      "title": "Statistique bayesienne",
+      "title": "Statistique bayésienne",
       "domain": "statistiques",
       "level": 4,
       "prereqs": [
         "sta-mv",
         "pro-vecteurs"
       ],
-      "summary": "Prior, vraisemblance, posterior, conjugaison, estimation MAP, et le lien avec la regularisation.",
+      "summary": "Prior, vraisemblance, posterior, conjugaison, estimation MAP, et le lien avec la régularisation.",
       "objectives": [
         "Calculer un posterior",
-        "Utiliser des priors conjugues",
-        "Relier MAP et regularisation"
+        "Utiliser des priors conjugués",
+        "Relier MAP et régularisation"
       ],
       "keywords": [
-        "bayesien",
+        "bayésien",
         "prior",
         "posterior",
-        "conjugue",
+        "conjugué",
         "MAP"
       ]
     },
     {
-      "id": "sta-regression",
-      "title": "Regression lineaire",
+      "id": "sta-régression",
+      "title": "Régression linéaire",
       "domain": "statistiques",
       "level": 3,
       "prereqs": [
         "al-projections",
         "sta-estimation"
       ],
-      "summary": "Moindres carres, interpretation geometrique, Gauss-Markov, diagnostics, et le pont vers le ML.",
+      "summary": "Moindres carrés, interprétation géométrique, Gauss-Markov, diagnostics, et le pont vers le ML.",
       "objectives": [
-        "Deriver l'estimateur des moindres carres",
-        "Interpreter la regression comme une projection",
-        "Enoncer Gauss-Markov"
+        "Dériver l'estimateur des moindres carrés",
+        "Interpréter la régression comme une projection",
+        "Énoncer Gauss-Markov"
       ],
       "keywords": [
-        "regression",
-        "moindres carres",
+        "régression",
+        "moindres carrés",
         "Gauss-Markov",
-        "residus"
+        "résidus"
       ]
     },
     {
       "id": "sta-nonparam",
-      "title": "Statistique non parametrique",
+      "title": "Statistique non paramétrique",
       "domain": "statistiques",
       "level": 4,
       "prereqs": [
         "sta-estimation"
       ],
-      "summary": "Estimation de densite par noyau, choix de la fenetre, compromis biais-variance, fleau de la dimension.",
+      "summary": "Estimation de densité par noyau, choix de la fenêtre, compromis biais-variance, fléau de la dimension.",
       "objectives": [
-        "Construire un estimateur a noyau",
-        "Choisir une fenetre",
-        "Comprendre le fleau de la dimension"
+        "Construire un estimateur à noyau",
+        "Choisir une fenêtre",
+        "Comprendre le fléau de la dimension"
       ],
       "keywords": [
         "noyau",
-        "densite",
-        "fenetre",
-        "non parametrique"
+        "densité",
+        "fenêtre",
+        "non paramétrique"
       ]
     },
     {
       "id": "sta-bootstrap",
-      "title": "Reechantillonnage et tests multiples",
+      "title": "Rééchantillonnage et tests multiples",
       "domain": "statistiques",
       "level": 4,
       "prereqs": [
         "sta-tests"
       ],
-      "summary": "Bootstrap, validation croisee, correction de Bonferroni, FDR.",
+      "summary": "Bootstrap, validation croisée, correction de Bonferroni, FDR.",
       "objectives": [
         "Mettre en place un bootstrap",
-        "Comprendre la validation croisee comme estimation du risque",
+        "Comprendre la validation croisée comme estimation du risque",
         "Corriger pour tests multiples"
       ],
       "keywords": [
         "bootstrap",
-        "validation croisee",
+        "validation croisée",
         "Bonferroni",
         "FDR"
       ]
     },
     {
       "id": "sta-apprentissage",
-      "title": "Theorie de l'apprentissage statistique",
+      "title": "Théorie de l'apprentissage statistique",
       "domain": "statistiques",
       "level": 5,
       "prereqs": [
         "sta-estimation",
         "pro-inegalites"
       ],
-      "summary": "Risque empirique, sur-apprentissage, VC-dimension, complexite de Rademacher, bornes de generalisation.",
+      "summary": "Risque empirique, sur-apprentissage, VC-dimension, complexité de Rademacher, bornes de généralisation.",
       "objectives": [
         "Formaliser le risque et le risque empirique",
         "Calculer une VC-dimension simple",
-        "Lire une borne de generalisation"
+        "Lire une borne de généralisation"
       ],
       "keywords": [
         "VC-dimension",
         "Rademacher",
-        "generalisation",
+        "généralisation",
         "risque empirique",
         "PAC"
       ]
     },
     {
       "id": "opt-formulation",
-      "title": "Formuler un probleme d'optimisation",
+      "title": "Formuler un problème d'optimisation",
       "domain": "optimisation",
       "level": 2,
       "prereqs": [
         "cd-plusieurs-variables"
       ],
-      "summary": "Objectif, contraintes, faisabilite, minimum local et global, existence d'une solution.",
+      "summary": "Objectif, contraintes, faisabilité, minimum local et global, existence d'une solution.",
       "objectives": [
-        "Formaliser un probleme concret",
+        "Formaliser un problème concret",
         "Distinguer minimum local et global",
-        "Utiliser la compacite pour l'existence"
+        "Utiliser la compacité pour l'existence"
       ],
       "keywords": [
         "objectif",
@@ -2224,17 +2224,17 @@
         "opt-formulation",
         "top-normes"
       ],
-      "summary": "Convexite, enveloppe convexe, cones, projection sur un convexe, hyperplans separateurs.",
+      "summary": "Convexité, enveloppe convexe, cônes, projection sur un convexe, hyperplans séparateurs.",
       "objectives": [
-        "Prouver la convexite d'un ensemble",
-        "Utiliser la projection sur un convexe ferme",
-        "Appliquer un theoreme de separation"
+        "Prouver la convexité d'un ensemble",
+        "Utiliser la projection sur un convexe fermé",
+        "Appliquer un théorème de séparation"
       ],
       "keywords": [
         "convexe",
         "enveloppe",
-        "cone",
-        "separation",
+        "cône",
+        "séparation",
         "projection"
       ]
     },
@@ -2246,86 +2246,86 @@
       "prereqs": [
         "opt-ensembles-convexes",
         "cd-hessienne",
-        "ana-convexite-1d"
+        "ana-convexité-1d"
       ],
-      "summary": "Caracterisations d'ordre 0, 1 et 2, operations preservant la convexite, forte convexite, lissite.",
+      "summary": "Caractérisations d'ordre 0, 1 et 2, opérations préservant la convexité, forte convexité, lissité.",
       "objectives": [
-        "Prouver la convexite d'une fonction de plusieurs variables",
-        "Utiliser la caracterisation par la hessienne",
-        "Manipuler forte convexite et L-lissite"
+        "Prouver la convexité d'une fonction de plusieurs variables",
+        "Utiliser la caractérisation par la hessienne",
+        "Manipuler forte convexité et L-lissité"
       ],
       "keywords": [
         "convexe",
-        "epigraphe",
-        "forte convexite",
+        "épigraphe",
+        "forte convexité",
         "L-lisse",
         "Jensen"
       ]
     },
     {
-      "id": "opt-sous-differentiel",
-      "title": "Sous-differentiel",
+      "id": "opt-sous-différentiel",
+      "title": "Sous-différentiel",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
         "opt-fonctions-convexes"
       ],
-      "summary": "Deriver ce qui n'est pas derivable : sous-gradient, sous-differentiel, regles de calcul, conditions d'optimalite.",
+      "summary": "Dériver ce qui n'est pas dérivable : sous-gradient, sous-différentiel, règles de calcul, conditions d'optimalité.",
       "objectives": [
-        "Calculer un sous-differentiel",
-        "Ecrire la condition d'optimalite non lisse",
+        "Calculer un sous-différentiel",
+        "Écrire la condition d'optimalité non lisse",
         "Traiter le cas de la norme 1"
       ],
       "keywords": [
         "sous-gradient",
-        "sous-differentiel",
+        "sous-différentiel",
         "non lisse",
-        "optimalite"
+        "optimalité"
       ]
     },
     {
-      "id": "opt-conjuguee",
-      "title": "Conjuguee de Fenchel et dualite convexe",
+      "id": "opt-conjuguée",
+      "title": "Conjuguée de Fenchel et dualité convexe",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
-        "opt-sous-differentiel"
+        "opt-sous-différentiel"
       ],
-      "summary": "Transformee de Legendre-Fenchel, biconjuguee, dualite de Fenchel, interpretation geometrique par les hyperplans d'appui.",
+      "summary": "Transformée de Legendre-Fenchel, biconjuguée, dualité de Fenchel, interprétation géométrique par les hyperplans d'appui.",
       "objectives": [
-        "Calculer une conjuguee",
-        "Interpreter geometriquement la conjugaison",
-        "Utiliser l'inegalite de Fenchel-Young"
+        "Calculer une conjuguée",
+        "Interpréter géométriquement la conjugaison",
+        "Utiliser l'inégalité de Fenchel-Young"
       ],
       "keywords": [
         "Fenchel",
         "Legendre",
-        "conjuguee",
-        "biconjuguee",
+        "conjuguée",
+        "biconjuguée",
         "Young"
       ]
     },
     {
-      "id": "opt-dualite-kkt",
-      "title": "Dualite lagrangienne et conditions KKT",
+      "id": "opt-dualité-kkt",
+      "title": "Dualité lagrangienne et conditions KKT",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
-        "opt-conjuguee",
+        "opt-conjuguée",
         "cd-lagrange"
       ],
-      "summary": "Lagrangien, fonction duale, dualite faible et forte, Slater, KKT : le coeur du cours de remise a niveau.",
+      "summary": "Lagrangien, fonction duale, dualité faible et forte, Slater, KKT : le cœur du cours de remise à niveau.",
       "objectives": [
-        "Ecrire le dual d'un probleme",
-        "Verifier la qualification de Slater",
-        "Appliquer et interpreter les conditions KKT"
+        "Écrire le dual d'un problème",
+        "Vérifier la qualification de Slater",
+        "Appliquer et interpréter les conditions KKT"
       ],
       "keywords": [
-        "dualite",
+        "dualité",
         "KKT",
         "Slater",
         "lagrangien",
-        "saut de dualite"
+        "saut de dualité"
       ]
     },
     {
@@ -2336,11 +2336,11 @@
       "prereqs": [
         "opt-fonctions-convexes"
       ],
-      "summary": "L'algorithme et son analyse : pas fixe, recherche lineaire, taux de convergence selon les hypotheses.",
+      "summary": "L'algorithme et son analyse : pas fixe, recherche linéaire, taux de convergence selon les hypothèses.",
       "objectives": [
-        "Implementer une descente de gradient",
-        "Demontrer la convergence sous L-lissite",
-        "Comparer les taux selon la forte convexite"
+        "Implémenter une descente de gradient",
+        "Démontrer la convergence sous L-lissité",
+        "Comparer les taux selon la forte convexité"
       ],
       "keywords": [
         "descente de gradient",
@@ -2350,39 +2350,39 @@
       ]
     },
     {
-      "id": "opt-acceleration",
-      "title": "Momentum et gradient accelere de Nesterov",
+      "id": "opt-accélération",
+      "title": "Momentum et gradient accéléré de Nesterov",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
         "opt-gradient"
       ],
-      "summary": "Pourquoi accelerer, la borne inferieure de Nemirovski-Yudin, le schema de Nesterov et son analyse.",
+      "summary": "Pourquoi accélérer, la borne inférieure de Nemirovski-Yudin, le schéma de Nesterov et son analyse.",
       "objectives": [
-        "Comprendre l'origine de l'acceleration",
-        "Ecrire le schema de Nesterov",
+        "Comprendre l'origine de l'accélération",
+        "Écrire le schéma de Nesterov",
         "Situer les taux optimaux"
       ],
       "keywords": [
         "Nesterov",
         "momentum",
-        "acceleration",
-        "borne inferieure"
+        "accélération",
+        "borne inférieure"
       ]
     },
     {
       "id": "opt-proximal",
-      "title": "Methodes proximales : ISTA, FISTA, ADMM",
+      "title": "Méthodes proximales : ISTA, FISTA, ADMM",
       "domain": "optimisation",
       "level": 4,
       "prereqs": [
-        "opt-sous-differentiel",
-        "opt-acceleration"
+        "opt-sous-différentiel",
+        "opt-accélération"
       ],
-      "summary": "Operateur proximal, gradient proximal, seuillage doux, splitting : traiter les objectifs composites.",
+      "summary": "Opérateur proximal, gradient proximal, seuillage doux, splitting : traiter les objectifs composites.",
       "objectives": [
-        "Calculer un operateur proximal",
-        "Deriver ISTA pour le lasso",
+        "Calculer un opérateur proximal",
+        "Dériver ISTA pour le lasso",
         "Comprendre le principe du splitting"
       ],
       "keywords": [
@@ -2402,10 +2402,10 @@
         "opt-gradient",
         "pro-inegalites"
       ],
-      "summary": "Gradient stochastique, variance, pas decroissant, mini-batch, et les optimiseurs utilises en deep learning.",
+      "summary": "Gradient stochastique, variance, pas décroissant, mini-batch, et les optimiseurs utilisés en deep learning.",
       "objectives": [
         "Analyser la convergence du SGD",
-        "Comprendre le role du pas et de la variance",
+        "Comprendre le rôle du pas et de la variance",
         "Situer Adam, RMSProp et leurs heuristiques"
       ],
       "keywords": [
@@ -2413,7 +2413,7 @@
         "mini-batch",
         "variance",
         "Adam",
-        "pas decroissant"
+        "pas décroissant"
       ]
     },
     {
@@ -2425,11 +2425,11 @@
         "opt-gradient",
         "cd-hessienne"
       ],
-      "summary": "Methode de Newton, convergence quadratique, Newton amorti, BFGS et L-BFGS.",
+      "summary": "Méthode de Newton, convergence quadratique, Newton amorti, BFGS et L-BFGS.",
       "objectives": [
         "Analyser la convergence de Newton",
-        "Comprendre l'interet du quasi-Newton",
-        "Comparer cout et vitesse"
+        "Comprendre l'intérêt du quasi-Newton",
+        "Comparer coût et vitesse"
       ],
       "keywords": [
         "Newton",
@@ -2440,38 +2440,38 @@
     },
     {
       "id": "opt-interieurs",
-      "title": "Methodes de points interieurs",
+      "title": "Méthodes de points intérieurs",
       "domain": "optimisation",
       "level": 5,
       "prereqs": [
-        "opt-dualite-kkt",
+        "opt-dualité-kkt",
         "opt-second-ordre"
       ],
-      "summary": "Barriere logarithmique, chemin central, methode primale-duale et complexite polynomiale.",
+      "summary": "Barrière logarithmique, chemin central, méthode primale-duale et complexité polynomiale.",
       "objectives": [
-        "Construire une barriere",
+        "Construire une barrière",
         "Suivre le chemin central",
-        "Comprendre la complexite en 1/racine(t)"
+        "Comprendre la complexité en 1/racine(t)"
       ],
       "keywords": [
-        "points interieurs",
-        "barriere",
+        "points intérieurs",
+        "barrière",
         "chemin central",
         "primal-dual"
       ]
     },
     {
       "id": "opt-lp-sdp",
-      "title": "Programmation lineaire, conique et SDP",
+      "title": "Programmation linéaire, conique et SDP",
       "domain": "optimisation",
       "level": 5,
       "prereqs": [
-        "opt-dualite-kkt"
+        "opt-dualité-kkt"
       ],
-      "summary": "Simplexe, dualite en LP, cones du second ordre, programmation semi-definie et relaxations convexes.",
+      "summary": "Simplexe, dualité en LP, cônes du second ordre, programmation semi-définie et relaxations convexes.",
       "objectives": [
-        "Ecrire le dual d'un LP",
-        "Reconnaitre un probleme SOCP ou SDP",
+        "Écrire le dual d'un LP",
+        "Reconnaître un problème SOCP ou SDP",
         "Comprendre une relaxation convexe"
       ],
       "keywords": [
@@ -2490,36 +2490,36 @@
       "prereqs": [
         "opt-stochastique"
       ],
-      "summary": "Points selles, conditions du second ordre, geometrie des paysages en deep learning, et pourquoi ca marche quand meme.",
+      "summary": "Points selles, conditions du second ordre, géométrie des paysages en deep learning, et pourquoi ça marche quand même.",
       "objectives": [
-        "Caracteriser un point selle",
-        "Comprendre l'echappement des selles par le bruit",
-        "Situer les resultats sur les reseaux surparametres"
+        "Caractériser un point selle",
+        "Comprendre l'échappement des selles par le bruit",
+        "Situer les résultats sur les réseaux surparamétrés"
       ],
       "keywords": [
         "non convexe",
         "point selle",
         "paysage",
-        "surparametrisation"
+        "surparamétrisation"
       ]
     },
     {
-      "id": "fou-series",
-      "title": "Series de Fourier",
+      "id": "fou-séries",
+      "title": "Séries de Fourier",
       "domain": "fourier",
       "level": 3,
       "prereqs": [
         "ana-suites-fonctions",
         "al-euclidien"
       ],
-      "summary": "Decomposer un signal periodique. Coefficients, convergence (Dirichlet, Fejer), Parseval, phenomene de Gibbs.",
+      "summary": "Décomposer un signal périodique. Coefficients, convergence (Dirichlet, Fejér), Parseval, phénomène de Gibbs.",
       "objectives": [
         "Calculer des coefficients de Fourier",
         "Distinguer les modes de convergence",
         "Appliquer Parseval"
       ],
       "keywords": [
-        "serie de Fourier",
+        "série de Fourier",
         "Parseval",
         "Dirichlet",
         "Gibbs",
@@ -2528,42 +2528,42 @@
     },
     {
       "id": "fou-convolution",
-      "title": "Convolution et approximations de l'identite",
+      "title": "Convolution et approximations de l'identité",
       "domain": "fourier",
       "level": 4,
       "prereqs": [
         "mes-lp"
       ],
-      "summary": "Produit de convolution, regularisation, noyaux, unites approchees : l'operation centrale des CNN.",
+      "summary": "Produit de convolution, régularisation, noyaux, unités approchées : l'opération centrale des CNN.",
       "objectives": [
         "Calculer une convolution",
-        "Comprendre la regularisation par convolution",
+        "Comprendre la régularisation par convolution",
         "Relier convolution et filtrage"
       ],
       "keywords": [
         "convolution",
         "noyau",
-        "regularisation",
-        "identite approchee",
+        "régularisation",
+        "identité approchée",
         "filtre"
       ]
     },
     {
       "id": "fou-transformee",
-      "title": "Transformee de Fourier sur L^1",
+      "title": "Transformée de Fourier sur L^1",
       "domain": "fourier",
       "level": 4,
       "prereqs": [
         "fou-convolution"
       ],
-      "summary": "Definition, proprietes, echange convolution-produit, lemme de Riemann-Lebesgue, formule d'inversion.",
+      "summary": "Définition, propriétés, échange convolution-produit, lemme de Riemann-Lebesgue, formule d'inversion.",
       "objectives": [
-        "Calculer une transformee de Fourier",
-        "Utiliser l'echange convolution-produit",
+        "Calculer une transformée de Fourier",
+        "Utiliser l'échange convolution-produit",
         "Appliquer la formule d'inversion"
       ],
       "keywords": [
-        "transformee de Fourier",
+        "transformée de Fourier",
         "inversion",
         "Riemann-Lebesgue",
         "L^1"
@@ -2571,22 +2571,22 @@
     },
     {
       "id": "fou-plancherel",
-      "title": "Fourier sur L^2 et theoreme de Plancherel",
+      "title": "Fourier sur L^2 et théorème de Plancherel",
       "domain": "fourier",
       "level": 4,
       "prereqs": [
         "fou-transformee",
         "af-hilbert"
       ],
-      "summary": "Extension a L^2, isometrie de Plancherel, principe d'incertitude.",
+      "summary": "Extension à L^2, isométrie de Plancherel, principe d'incertitude.",
       "objectives": [
-        "Enoncer Plancherel",
-        "Comprendre l'extension par densite",
-        "Interpreter le principe d'incertitude"
+        "Énoncer Plancherel",
+        "Comprendre l'extension par densité",
+        "Interpréter le principe d'incertitude"
       ],
       "keywords": [
         "Plancherel",
-        "isometrie",
+        "isométrie",
         "L^2",
         "incertitude"
       ]
@@ -2600,33 +2600,33 @@
         "fou-plancherel",
         "af-operateurs"
       ],
-      "summary": "Fonctions test, distributions, derivation au sens des distributions, Dirac, transformee de Fourier des distributions temperees.",
+      "summary": "Fonctions test, distributions, dérivation au sens des distributions, Dirac, transformée de Fourier des distributions tempérées.",
       "objectives": [
         "Manipuler la masse de Dirac",
-        "Deriver au sens des distributions",
-        "Transformer une distribution temperee"
+        "Dériver au sens des distributions",
+        "Transformer une distribution tempérée"
       ],
       "keywords": [
         "distribution",
         "Dirac",
-        "temperee",
+        "tempérée",
         "fonction test"
       ]
     },
     {
       "id": "fou-tfd-fft",
-      "title": "Transformee de Fourier discrete et FFT",
+      "title": "Transformée de Fourier discrète et FFT",
       "domain": "fourier",
       "level": 3,
       "prereqs": [
-        "fou-series",
+        "fou-séries",
         "al-hermitien"
       ],
-      "summary": "TFD comme changement de base unitaire, algorithme de Cooley-Tukey, cout en n log n, repliement.",
+      "summary": "TFD comme changement de base unitaire, algorithme de Cooley-Tukey, coût en n log n, repliement.",
       "objectives": [
-        "Ecrire la TFD comme produit matriciel",
-        "Comprendre la recursion de la FFT",
-        "Reconnaitre un repliement spectral"
+        "Écrire la TFD comme produit matriciel",
+        "Comprendre la récursion de la FFT",
+        "Reconnaître un repliement spectral"
       ],
       "keywords": [
         "TFD",
@@ -2637,44 +2637,44 @@
     },
     {
       "id": "fou-shannon",
-      "title": "Echantillonnage et theoreme de Shannon",
+      "title": "Échantillonnage et théorème de Shannon",
       "domain": "fourier",
       "level": 4,
       "prereqs": [
         "fou-plancherel",
         "fou-tfd-fft"
       ],
-      "summary": "Peigne de Dirac, spectre d'un signal echantillonne, frequence de Nyquist, reconstruction.",
+      "summary": "Peigne de Dirac, spectre d'un signal échantillonné, fréquence de Nyquist, reconstruction.",
       "objectives": [
-        "Enoncer le theoreme d'echantillonnage",
+        "Énoncer le théorème d'échantillonnage",
         "Expliquer l'aliasing",
-        "Reconstruire un signal a bande limitee"
+        "Reconstruire un signal à bande limitée"
       ],
       "keywords": [
         "Shannon",
         "Nyquist",
         "aliasing",
-        "echantillonnage"
+        "échantillonnage"
       ]
     },
     {
       "id": "fou-ondelettes",
-      "title": "Ondelettes et analyse multiresolution",
+      "title": "Ondelettes et analyse multirésolution",
       "domain": "fourier",
       "level": 5,
       "prereqs": [
         "fou-shannon"
       ],
-      "summary": "Limites de Fourier en temps-frequence, transformee en ondelettes, analyse multiresolution, compression.",
+      "summary": "Limites de Fourier en temps-fréquence, transformée en ondelettes, analyse multirésolution, compression.",
       "objectives": [
-        "Comprendre le compromis temps-frequence",
-        "Lire une decomposition en ondelettes",
-        "Situer l'analyse multiresolution"
+        "Comprendre le compromis temps-fréquence",
+        "Lire une décomposition en ondelettes",
+        "Situer l'analyse multirésolution"
       ],
       "keywords": [
         "ondelette",
-        "multiresolution",
-        "temps-frequence",
+        "multirésolution",
+        "temps-fréquence",
         "Haar"
       ]
     },
@@ -2687,9 +2687,9 @@
         "top-completude",
         "mes-lp"
       ],
-      "summary": "Espaces vectoriels normes complets, series normalement convergentes, exemples fondamentaux et dimension infinie.",
+      "summary": "Espaces vectoriels normés complets, séries normalement convergentes, exemples fondamentaux et dimension infinie.",
       "objectives": [
-        "Prouver la completude d'un espace de fonctions",
+        "Prouver la complétude d'un espace de fonctions",
         "Manipuler la convergence normale",
         "Comprendre ce qui change en dimension infinie"
       ],
@@ -2709,10 +2709,10 @@
         "af-banach",
         "al-euclidien"
       ],
-      "summary": "Produit scalaire en dimension infinie, theoreme de projection, Riesz, bases hilbertiennes, Parseval.",
+      "summary": "Produit scalaire en dimension infinie, théorème de projection, Riesz, bases hilbertiennes, Parseval.",
       "objectives": [
-        "Appliquer le theoreme de projection",
-        "Utiliser le theoreme de representation de Riesz",
+        "Appliquer le théorème de projection",
+        "Utiliser le théorème de représentation de Riesz",
         "Manipuler une base hilbertienne"
       ],
       "keywords": [
@@ -2725,43 +2725,43 @@
     },
     {
       "id": "af-operateurs",
-      "title": "Operateurs lineaires bornes et dual topologique",
+      "title": "Opérateurs linéaires bornés et dual topologique",
       "domain": "analyse_fonc",
       "level": 4,
       "prereqs": [
         "af-banach"
       ],
-      "summary": "Continuite equivalente a la bornitude, norme d'operateur, adjoint, dual topologique.",
+      "summary": "Continuité équivalente à la bornitude, norme d'opérateur, adjoint, dual topologique.",
       "objectives": [
-        "Calculer une norme d'operateur",
+        "Calculer une norme d'opérateur",
         "Manipuler l'adjoint",
         "Identifier le dual d'un espace usuel"
       ],
       "keywords": [
-        "operateur borne",
-        "norme d'operateur",
+        "opérateur borné",
+        "norme d'opérateur",
         "adjoint",
         "dual"
       ]
     },
     {
       "id": "af-hahn-banach",
-      "title": "Theoreme de Hahn-Banach",
+      "title": "Théorème de Hahn-Banach",
       "domain": "analyse_fonc",
       "level": 5,
       "prereqs": [
         "af-operateurs",
         "opt-ensembles-convexes"
       ],
-      "summary": "Forme analytique et formes geometriques, separation des convexes, consequences.",
+      "summary": "Forme analytique et formes géométriques, séparation des convexes, conséquences.",
       "objectives": [
-        "Enoncer Hahn-Banach sous ses deux formes",
-        "Appliquer la separation des convexes",
-        "Comprendre le lien avec la dualite convexe"
+        "Énoncer Hahn-Banach sous ses deux formes",
+        "Appliquer la séparation des convexes",
+        "Comprendre le lien avec la dualité convexe"
       ],
       "keywords": [
         "Hahn-Banach",
-        "separation",
+        "séparation",
         "prolongement",
         "convexe"
       ]
@@ -2774,53 +2774,53 @@
       "prereqs": [
         "af-operateurs"
       ],
-      "summary": "Le lemme de Baire et les trois grands theoremes qui en decoulent.",
+      "summary": "Le lemme de Baire et les trois grands théorèmes qui en découlent.",
       "objectives": [
         "Utiliser le lemme de Baire",
         "Appliquer Banach-Steinhaus",
-        "Enoncer le theoreme du graphe ferme"
+        "Énoncer le théorème du graphe fermé"
       ],
       "keywords": [
         "Baire",
         "Banach-Steinhaus",
         "application ouverte",
-        "graphe ferme"
+        "graphe fermé"
       ]
     },
     {
       "id": "af-topologies-faibles",
-      "title": "Topologies faibles et compacite faible",
+      "title": "Topologies faibles et compacité faible",
       "domain": "analyse_fonc",
       "level": 5,
       "prereqs": [
         "af-hahn-banach"
       ],
-      "summary": "Convergence faible, Banach-Alaoglu, reflexivite, et pourquoi c'est indispensable en optimisation en dimension infinie.",
+      "summary": "Convergence faible, Banach-Alaoglu, réflexivité, et pourquoi c'est indispensable en optimisation en dimension infinie.",
       "objectives": [
         "Manipuler la convergence faible",
-        "Enoncer Banach-Alaoglu",
+        "Énoncer Banach-Alaoglu",
         "Comprendre l'usage en calcul des variations"
       ],
       "keywords": [
         "topologie faible",
         "Alaoglu",
-        "reflexif",
-        "semi-continuite"
+        "réflexif",
+        "semi-continuité"
       ]
     },
     {
       "id": "af-compacts-spectral",
-      "title": "Operateurs compacts et theorie spectrale",
+      "title": "Opérateurs compacts et théorie spectrale",
       "domain": "analyse_fonc",
       "level": 5,
       "prereqs": [
         "af-hilbert",
         "af-baire"
       ],
-      "summary": "Spectre d'un operateur, operateurs compacts, theoreme spectral pour les operateurs autoadjoints compacts, Fredholm.",
+      "summary": "Spectre d'un opérateur, opérateurs compacts, théorème spectral pour les opérateurs autoadjoints compacts, Fredholm.",
       "objectives": [
         "Calculer un spectre simple",
-        "Enoncer le theoreme spectral en dimension infinie",
+        "Énoncer le théorème spectral en dimension infinie",
         "Comprendre l'alternative de Fredholm"
       ],
       "keywords": [
@@ -2839,33 +2839,33 @@
         "fou-distributions",
         "af-hilbert"
       ],
-      "summary": "Derivee faible, espaces H^k, injections de Sobolev, traces, et applications aux EDP.",
+      "summary": "Dérivée faible, espaces H^k, injections de Sobolev, traces, et applications aux EDP.",
       "objectives": [
-        "Manipuler une derivee faible",
+        "Manipuler une dérivée faible",
         "Situer les injections de Sobolev",
         "Comprendre la formulation variationnelle d'une EDP"
       ],
       "keywords": [
         "Sobolev",
-        "derivee faible",
+        "dérivée faible",
         "injection",
         "variationnelle"
       ]
     },
     {
       "id": "af-rkhs",
-      "title": "Espaces de Hilbert a noyau reproduisant (RKHS)",
+      "title": "Espaces de Hilbert à noyau reproduisant (RKHS)",
       "domain": "analyse_fonc",
       "level": 5,
       "prereqs": [
         "af-hilbert",
         "ml-noyaux"
       ],
-      "summary": "Noyau defini positif, theoreme de Moore-Aronszajn, theoreme de representation : le fondement des methodes a noyaux.",
+      "summary": "Noyau défini positif, théorème de Moore-Aronszajn, théorème de représentation : le fondement des méthodes à noyaux.",
       "objectives": [
-        "Verifier qu'un noyau est defini positif",
+        "Vérifier qu'un noyau est défini positif",
         "Comprendre la correspondance noyau-espace",
-        "Appliquer le theoreme de representation"
+        "Appliquer le théorème de représentation"
       ],
       "keywords": [
         "RKHS",
@@ -2876,107 +2876,107 @@
     },
     {
       "id": "num-flottants",
-      "title": "Arithmetique flottante et erreurs numeriques",
+      "title": "Arithmétique flottante et erreurs numériques",
       "domain": "numerique",
       "level": 2,
       "prereqs": [
         "ari-reels"
       ],
-      "summary": "IEEE 754, epsilon machine, annulation catastrophique, stabilite : pourquoi votre code donne NaN.",
+      "summary": "IEEE 754, epsilon machine, annulation catastrophique, stabilité : pourquoi votre code donne NaN.",
       "objectives": [
-        "Comprendre la representation flottante",
-        "Reperer une annulation catastrophique",
-        "Distinguer erreur d'arrondi et instabilite"
+        "Comprendre la représentation flottante",
+        "Repérer une annulation catastrophique",
+        "Distinguer erreur d'arrondi et instabilité"
       ],
       "keywords": [
         "IEEE 754",
         "epsilon machine",
         "arrondi",
-        "stabilite",
+        "stabilité",
         "NaN"
       ]
     },
     {
-      "id": "num-lineaire",
-      "title": "Resolution numerique de systemes lineaires",
+      "id": "num-linéaire",
+      "title": "Résolution numérique de systèmes linéaires",
       "domain": "numerique",
       "level": 3,
       "prereqs": [
-        "al-systemes",
+        "al-systèmes",
         "num-flottants"
       ],
-      "summary": "Factorisations LU, Cholesky, QR : ce que fait vraiment un solveur, et a quel cout.",
+      "summary": "Factorisations LU, Cholesky, QR : ce que fait vraiment un solveur, et à quel coût.",
       "objectives": [
         "Construire une factorisation LU et Cholesky",
         "Choisir la bonne factorisation",
-        "Evaluer la complexite"
+        "Évaluer la complexité"
       ],
       "keywords": [
         "LU",
         "Cholesky",
         "QR",
         "pivotage",
-        "complexite"
+        "complexité"
       ]
     },
     {
-      "id": "num-iteratif",
-      "title": "Methodes iteratives et gradient conjugue",
+      "id": "num-itératif",
+      "title": "Méthodes itératives et gradient conjugué",
       "domain": "numerique",
       "level": 4,
       "prereqs": [
-        "num-lineaire",
+        "num-linéaire",
         "opt-gradient"
       ],
-      "summary": "Jacobi, Gauss-Seidel, gradient conjugue, preconditionnement : indispensable en grande dimension.",
+      "summary": "Jacobi, Gauss-Seidel, gradient conjugué, préconditionnement : indispensable en grande dimension.",
       "objectives": [
-        "Analyser la convergence d'une methode iterative",
-        "Comprendre le gradient conjugue",
-        "Expliquer l'interet du preconditionnement"
+        "Analyser la convergence d'une méthode itérative",
+        "Comprendre le gradient conjugué",
+        "Expliquer l'intérêt du préconditionnement"
       ],
       "keywords": [
-        "iteratif",
-        "gradient conjugue",
-        "preconditionneur",
+        "itératif",
+        "gradient conjugué",
+        "préconditionneur",
         "Krylov"
       ]
     },
     {
       "id": "num-valeurs-propres",
-      "title": "Calcul numerique de valeurs propres",
+      "title": "Calcul numérique de valeurs propres",
       "domain": "numerique",
       "level": 4,
       "prereqs": [
-        "num-lineaire",
+        "num-linéaire",
         "al-svd"
       ],
-      "summary": "Methode de la puissance, algorithme QR, Lanczos, calcul pratique de la SVD.",
+      "summary": "Méthode de la puissance, algorithme QR, Lanczos, calcul pratique de la SVD.",
       "objectives": [
-        "Implementer la methode de la puissance",
+        "Implémenter la méthode de la puissance",
         "Comprendre le principe de l'algorithme QR",
-        "Calculer une SVD tronquee"
+        "Calculer une SVD tronquée"
       ],
       "keywords": [
         "puissance",
         "algorithme QR",
         "Lanczos",
-        "SVD tronquee"
+        "SVD tronquée"
       ]
     },
     {
       "id": "num-autodiff",
-      "title": "Differentiation automatique",
+      "title": "Différentiation automatique",
       "domain": "numerique",
       "level": 4,
       "prereqs": [
         "cd-jacobienne",
         "cd-matrix-calculus"
       ],
-      "summary": "Modes direct et inverse, graphe de calcul, cout memoire, et ce que fait PyTorch quand vous appelez backward().",
+      "summary": "Modes direct et inverse, graphe de calcul, coût mémoire, et ce que fait PyTorch quand vous appelez backward().",
       "objectives": [
         "Distinguer mode direct et mode inverse",
-        "Derouler la retropropagation sur un graphe",
-        "Estimer le cout memoire"
+        "Dérouler la rétropropagation sur un graphe",
+        "Estimer le coût mémoire"
       ],
       "keywords": [
         "autodiff",
@@ -2987,63 +2987,63 @@
     },
     {
       "id": "ml-cadre",
-      "title": "Cadre de l'apprentissage supervise",
+      "title": "Cadre de l'apprentissage supervisé",
       "domain": "ml",
       "level": 3,
       "prereqs": [
-        "pro-esperance",
+        "pro-espérance",
         "sta-estimation"
       ],
-      "summary": "Risque, risque empirique, generalisation, sur-apprentissage, compromis biais-variance.",
+      "summary": "Risque, risque empirique, généralisation, sur-apprentissage, compromis biais-variance.",
       "objectives": [
-        "Formaliser un probleme d'apprentissage",
+        "Formaliser un problème d'apprentissage",
         "Distinguer risque et risque empirique",
         "Analyser le compromis biais-variance"
       ],
       "keywords": [
         "risque",
-        "generalisation",
+        "généralisation",
         "sur-apprentissage",
         "biais-variance",
         "ERM"
       ]
     },
     {
-      "id": "ml-lineaires",
-      "title": "Modeles lineaires et regularisation",
+      "id": "ml-linéaires",
+      "title": "Modèles linéaires et régularisation",
       "domain": "ml",
       "level": 3,
       "prereqs": [
-        "sta-regression",
+        "sta-régression",
         "opt-fonctions-convexes"
       ],
-      "summary": "Regression ridge, lasso, regression logistique : formulation, geometrie de la regularisation, resolution.",
+      "summary": "Régression ridge, lasso, régression logistique : formulation, géométrie de la régularisation, résolution.",
       "objectives": [
-        "Deriver la solution ridge",
-        "Expliquer geometriquement la parcimonie du lasso",
-        "Poser la regression logistique comme probleme convexe"
+        "Dériver la solution ridge",
+        "Expliquer géométriquement la parcimonie du lasso",
+        "Poser la régression logistique comme problème convexe"
       ],
       "keywords": [
         "ridge",
         "lasso",
         "logistique",
-        "regularisation",
+        "régularisation",
         "parcimonie"
       ]
     },
     {
       "id": "ml-info",
-      "title": "Theorie de l'information pour le ML",
+      "title": "Théorie de l'information pour le ML",
       "domain": "ml",
       "level": 3,
       "prereqs": [
-        "pro-esperance"
+        "pro-espérance"
       ],
-      "summary": "Entropie, entropie croisee, divergence de Kullback-Leibler, information mutuelle, et pourquoi la cross-entropy est la bonne perte.",
+      "summary": "Entropie, entropie croisée, divergence de Kullback-Leibler, information mutuelle, et pourquoi la cross-entropy est la bonne perte.",
       "objectives": [
         "Calculer une entropie et une KL",
-        "Relier maximum de vraisemblance et entropie croisee",
-        "Interpreter l'information mutuelle"
+        "Relier maximum de vraisemblance et entropie croisée",
+        "Interpréter l'information mutuelle"
       ],
       "keywords": [
         "entropie",
@@ -3054,39 +3054,39 @@
     },
     {
       "id": "ml-acp",
-      "title": "ACP et reduction de dimension",
+      "title": "ACP et réduction de dimension",
       "domain": "ml",
       "level": 3,
       "prereqs": [
         "al-svd",
         "pro-vecteurs"
       ],
-      "summary": "ACP par diagonalisation de la covariance et par SVD, variance expliquee, et ouverture vers les methodes non lineaires.",
+      "summary": "ACP par diagonalisation de la covariance et par SVD, variance expliquée, et ouverture vers les méthodes non linéaires.",
       "objectives": [
-        "Deriver l'ACP de deux facons",
+        "Dériver l'ACP de deux façons",
         "Choisir le nombre de composantes",
-        "Interpreter les axes principaux"
+        "Interpréter les axes principaux"
       ],
       "keywords": [
         "ACP",
         "PCA",
         "SVD",
-        "variance expliquee",
-        "reduction"
+        "variance expliquée",
+        "réduction"
       ]
     },
     {
       "id": "ml-noyaux",
-      "title": "Methodes a noyaux et SVM",
+      "title": "Méthodes à noyaux et SVM",
       "domain": "ml",
       "level": 4,
       "prereqs": [
-        "ml-lineaires",
-        "opt-dualite-kkt"
+        "ml-linéaires",
+        "opt-dualité-kkt"
       ],
-      "summary": "Astuce du noyau, SVM a marge maximale, formulation duale, noyaux usuels.",
+      "summary": "Astuce du noyau, SVM à marge maximale, formulation duale, noyaux usuels.",
       "objectives": [
-        "Deriver le dual de la SVM",
+        "Dériver le dual de la SVM",
         "Appliquer l'astuce du noyau",
         "Choisir un noyau"
       ],
@@ -3100,18 +3100,18 @@
     },
     {
       "id": "ml-reseaux",
-      "title": "Reseaux de neurones : architecture et expressivite",
+      "title": "Réseaux de neurones : architecture et expressivité",
       "domain": "ml",
       "level": 3,
       "prereqs": [
         "cd-jacobienne",
         "ml-cadre"
       ],
-      "summary": "Perceptron, couches, fonctions d'activation, theoreme d'approximation universelle, profondeur contre largeur.",
+      "summary": "Perceptron, couches, fonctions d'activation, théorème d'approximation universelle, profondeur contre largeur.",
       "objectives": [
-        "Ecrire un reseau comme composition de fonctions",
-        "Enoncer le theoreme d'approximation universelle",
-        "Discuter profondeur et expressivite"
+        "Écrire un réseau comme composition de fonctions",
+        "Énoncer le théorème d'approximation universelle",
+        "Discuter profondeur et expressivité"
       ],
       "keywords": [
         "perceptron",
@@ -3122,21 +3122,21 @@
     },
     {
       "id": "ml-backprop",
-      "title": "Retropropagation et graphes de calcul",
+      "title": "Rétropropagation et graphes de calcul",
       "domain": "ml",
       "level": 3,
       "prereqs": [
         "ml-reseaux",
         "num-autodiff"
       ],
-      "summary": "Deriver la retropropagation proprement a partir de la regle de la chaine, couche par couche.",
+      "summary": "Dériver la rétropropagation proprement à partir de la règle de la chaîne, couche par couche.",
       "objectives": [
-        "Deriver les equations de la retropropagation",
+        "Dériver les équations de la rétropropagation",
         "Calculer les gradients d'une couche dense",
         "Relier backprop et mode inverse de l'autodiff"
       ],
       "keywords": [
-        "retropropagation",
+        "rétropropagation",
         "backprop",
         "graphe de calcul",
         "gradient"
@@ -3144,7 +3144,7 @@
     },
     {
       "id": "ml-entrainement",
-      "title": "Entrainer un reseau profond",
+      "title": "Entraîner un réseau profond",
       "domain": "ml",
       "level": 4,
       "prereqs": [
@@ -3154,8 +3154,8 @@
       "summary": "Initialisation, normalisation, gradients qui explosent ou disparaissent, dropout, planification du pas.",
       "objectives": [
         "Justifier une initialisation type He ou Glorot",
-        "Expliquer le role de la batch normalization",
-        "Diagnostiquer un probleme de gradient"
+        "Expliquer le rôle de la batch normalization",
+        "Diagnostiquer un problème de gradient"
       ],
       "keywords": [
         "initialisation",
@@ -3166,8 +3166,8 @@
       ]
     },
     {
-      "id": "ml-generatifs",
-      "title": "Modeles generatifs probabilistes",
+      "id": "ml-génératifs",
+      "title": "Modèles génératifs probabilistes",
       "domain": "ml",
       "level": 5,
       "prereqs": [
@@ -3175,18 +3175,18 @@
         "pro-brownien",
         "sta-bayes"
       ],
-      "summary": "Maximum de vraisemblance latent, borne variationnelle (ELBO), VAE, et principes des modeles de diffusion.",
+      "summary": "Maximum de vraisemblance latent, borne variationnelle (ELBO), VAE, et principes des modèles de diffusion.",
       "objectives": [
-        "Deriver l'ELBO",
-        "Comprendre le reparametrage",
-        "Situer les modeles de diffusion comme debruitage progressif"
+        "Dériver l'ELBO",
+        "Comprendre le reparamétrage",
+        "Situer les modèles de diffusion comme débruitage progressif"
       ],
       "keywords": [
         "VAE",
         "ELBO",
         "variationnel",
         "diffusion",
-        "generatif"
+        "génératif"
       ]
     },
     {
@@ -3198,17 +3198,17 @@
         "ens-structures",
         "ari-entiers"
       ],
-      "summary": "Groupes, ordre, groupes cycliques, morphismes, groupe symetrique.",
+      "summary": "Groupes, ordre, groupes cycliques, morphismes, groupe symétrique.",
       "objectives": [
         "Manipuler la structure de groupe",
-        "Etudier le groupe symetrique",
-        "Utiliser le theoreme de Lagrange"
+        "Étudier le groupe symétrique",
+        "Utiliser le théorème de Lagrange"
       ],
       "keywords": [
         "groupe",
         "morphisme",
         "Lagrange",
-        "symetrique",
+        "symétrique",
         "cyclique"
       ]
     },
@@ -3220,15 +3220,15 @@
       "prereqs": [
         "alg-groupes"
       ],
-      "summary": "Sous-groupes distingues, quotients, theoremes d'isomorphisme, actions, orbites et stabilisateurs.",
+      "summary": "Sous-groupes distingués, quotients, théorèmes d'isomorphisme, actions, orbites et stabilisateurs.",
       "objectives": [
         "Construire un groupe quotient",
-        "Appliquer les theoremes d'isomorphisme",
+        "Appliquer les théorèmes d'isomorphisme",
         "Utiliser la formule des classes"
       ],
       "keywords": [
         "quotient",
-        "distingue",
+        "distingué",
         "action",
         "orbite",
         "stabilisateur"
@@ -3236,22 +3236,22 @@
     },
     {
       "id": "alg-anneaux",
-      "title": "Anneaux, ideaux, quotients",
+      "title": "Anneaux, idéaux, quotients",
       "domain": "algebre",
       "level": 4,
       "prereqs": [
         "alg-groupes",
-        "ari-polynomes"
+        "ari-polynômes"
       ],
-      "summary": "Anneaux, ideaux, anneaux quotients, anneaux principaux et factoriels.",
+      "summary": "Anneaux, idéaux, anneaux quotients, anneaux principaux et factoriels.",
       "objectives": [
-        "Manipuler un ideal",
+        "Manipuler un idéal",
         "Construire un anneau quotient",
-        "Reconnaitre un anneau principal"
+        "Reconnaître un anneau principal"
       ],
       "keywords": [
         "anneau",
-        "ideal",
+        "idéal",
         "quotient",
         "principal",
         "factoriel"
@@ -3265,16 +3265,16 @@
       "prereqs": [
         "alg-anneaux"
       ],
-      "summary": "Extensions de corps, degre, elements algebriques, corps finis, ouverture sur la theorie de Galois.",
+      "summary": "Extensions de corps, degré, éléments algébriques, corps finis, ouverture sur la théorie de Galois.",
       "objectives": [
-        "Calculer un degre d'extension",
-        "Manipuler un element algebrique",
-        "Decrire un corps fini"
+        "Calculer un degré d'extension",
+        "Manipuler un élément algébrique",
+        "Décrire un corps fini"
       ],
       "keywords": [
         "extension",
-        "degre",
-        "algebrique",
+        "degré",
+        "algébrique",
         "corps fini",
         "Galois"
       ]

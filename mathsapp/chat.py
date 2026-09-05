@@ -66,7 +66,7 @@ class ChatSession:
         course_id = course.id if course else None
         row = store.find_thread(course_id, context_key)
         if row is None:
-            title = course.title if course else "Discussion generale"
+            title = course.title if course else "Discussion générale"
             self.thread_id = store.create_thread(course_id, context_key, title)
             self.session_id: Optional[str] = None
         else:

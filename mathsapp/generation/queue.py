@@ -48,7 +48,7 @@ class _Task(QRunnable):
     def run(self) -> None:
         job = self.job
         if job.cancel_requested:
-            self.signals.finished.emit(job.course_id, job.kind, False, "Annule")
+            self.signals.finished.emit(job.course_id, job.kind, False, "Annulé")
             return
         job.state = RUNNING
 
@@ -64,14 +64,14 @@ class _Task(QRunnable):
             syl = load_syllabus()
             if job.kind == "exercises":
                 pipeline.regenerate_exercises(job.course_id, on_progress, cancel, syl)
-                msg = "Exercices regeneres"
+                msg = "Exercices régénérés"
             else:
                 meta = pipeline.generate_course(job.course_id, on_progress, cancel, True, syl)
-                msg = "Genere en %s (%.2f $)" % (
+                msg = "Généré en %s (%.2f $)" % (
                     _fmt_duration(meta.get("duration_s", 0)), meta.get("cost_usd", 0))
             self.signals.finished.emit(job.course_id, job.kind, True, msg)
         except pipeline.GenerationCancelled:
-            self.signals.finished.emit(job.course_id, job.kind, False, "Annule")
+            self.signals.finished.emit(job.course_id, job.kind, False, "Annulé")
         except ClaudeError as exc:
             self.signals.finished.emit(job.course_id, job.kind, False, str(exc))
         except Exception as exc:  # noqa: BLE001 - on veut voir toute erreur dans l'UI
@@ -143,14 +143,14 @@ class GenerationQueue(QObject):
         for j in self.jobs:
             if j.course_id == course_id and j.active and (kind is None or j.kind == kind):
                 j.cancel_requested = True
-                j.label = "Annulation..."
+                j.label = "Annulation…"
         self.changed.emit()
 
     def cancel_all(self) -> None:
         for j in self.jobs:
             if j.active:
                 j.cancel_requested = True
-                j.label = "Annulation..."
+                j.label = "Annulation…"
         self.changed.emit()
 
     def clear_finished(self) -> None:
@@ -170,9 +170,9 @@ class GenerationQueue(QObject):
                 job.state = DONE
                 job.progress = 1.0
                 job.label = message
-            elif message == "Annule":
+            elif message == "Annulé":
                 job.state = CANCELLED
-                job.label = "Annule"
+                job.label = "Annulé"
             else:
                 job.state = ERROR
                 job.error = message

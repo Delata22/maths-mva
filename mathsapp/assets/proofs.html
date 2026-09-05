@@ -82,7 +82,7 @@
 <script src="__ASSETS__/vendor/katex/contrib/auto-render.min.js"></script>
 </head>
 <body>
-<div id="split"><div id="list"></div><div id="pane"><div id="empty">Choisissez une demonstration.</div></div></div>
+<div id="split"><div id="list"></div><div id="pane"><div id="empty">Choisissez une démonstration.</div></div></div>
 <script>
 var DATA = __DATA__;
 var STATUS = __STATUS__;
@@ -115,16 +115,17 @@ function esc(s) { return String(s).replace(/[&<>]/g, function(c){return {'&':'&a
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)); }
 
 function renderList() {
-  var h = '<div class="lt">Demonstrations a faire</div>';
+  var h = '<div class="lt">Démonstrations à faire</div>';
   DATA.proofs.forEach(function (p, i) {
     var s = STATUS[p.id] || 'todo';
     h += '<div class="pitem' + (i === cur ? ' on' : '') + '" data-i="' + i + '">'
-      + '<div class="pt">' + esc(p.title) + '</div>'
+      + '<div class="pt">' + p.title + '</div>'
       + '<div class="pm"><span class="dot ' + (s === 'done' ? 'done' : s === 'wip' ? 'wip' : '') + '"></span>'
       + '<span>' + stars(p.difficulty) + '</span></div></div>';
   });
   var l = document.getElementById('list');
   l.innerHTML = h;
+  typeset(l);
   Array.prototype.forEach.call(l.querySelectorAll('.pitem'), function (el) {
     el.addEventListener('click', function () { open(parseInt(el.getAttribute('data-i'), 10)); });
   });
@@ -135,31 +136,31 @@ function open(i) {
   var p = DATA.proofs[i];
   var s = STATUS[p.id] || 'todo';
   var h = '<div class="inner">';
-  h += '<h2 class="ptitle">' + esc(p.title) + '</h2>';
-  h += '<div class="pmeta">Difficulte ' + stars(p.difficulty) + '</div>';
+  h += '<h2 class="ptitle">' + p.title + '</h2>';
+  h += '<div class="pmeta">Difficulté ' + stars(p.difficulty) + '</div>';
   h += '<div class="stmt">' + p.statement + '</div>';
 
   h += '<div class="sect"><h4>Cherchez d\'abord</h4>'
     + '<p style="color:var(--muted);font-size:.94em">Prenez le temps de chercher avant de reveler '
     + 'quoi que ce soit. Les indices vont du plus vague au plus explicite.</p>'
-    + '<div class="row"><button class="btn" id="hint">Reveler un indice</button>'
+    + '<div class="row"><button class="btn" id="hint">Révéler un indice</button>'
     + '<span id="hintn" style="color:var(--muted);font-size:12.5px"></span></div>'
     + '<div id="hints" style="margin-top:12px"></div></div>';
 
   h += '<div class="sect"><h4>Squelette de la preuve</h4>'
-    + '<div class="row"><button class="btn" id="sk">Afficher les etapes</button>'
-    + '<button class="btn" id="walk">Decortiquer avec Claude</button></div>'
+    + '<div class="row"><button class="btn" id="sk">Afficher les étapes</button>'
+    + '<button class="btn" id="walk">Décortiquer avec Claude</button></div>'
     + '<div id="steps" style="margin-top:14px"></div></div>';
 
-  h += '<div class="sect"><h4>Solution redigee</h4>'
+  h += '<div class="sect"><h4>Solution rédigée</h4>'
     + '<div class="row"><button class="btn" id="sol">Afficher la solution</button></div>'
     + '<div id="solution" style="margin-top:14px"></div></div>';
 
   h += '<div class="statusbar"><div class="row">'
-    + '<span style="color:var(--muted);font-size:12.5px;margin-right:4px">Ou en suis-je ?</span>'
-    + '<button class="btn' + (s === 'todo' ? ' primary' : '') + '" data-st="todo">A faire</button>'
+    + '<span style="color:var(--muted);font-size:12.5px;margin-right:4px">Où en suis-je ?</span>'
+    + '<button class="btn' + (s === 'todo' ? ' primary' : '') + '" data-st="todo">À faire</button>'
     + '<button class="btn' + (s === 'wip' ? ' primary' : '') + '" data-st="wip">En cours</button>'
-    + '<button class="btn' + (s === 'done' ? ' on' : '') + '" data-st="done">Reussie</button>'
+    + '<button class="btn' + (s === 'done' ? ' on' : '') + '" data-st="done">Réussie</button>'
     + '</div></div>';
   h += '</div>';
 
@@ -190,7 +191,7 @@ function open(i) {
 
   document.getElementById('sk').addEventListener('click', function () {
     var box = document.getElementById('steps');
-    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Afficher les etapes'; return; }
+    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Afficher les étapes'; return; }
     var out = '';
     p.steps.forEach(function (st, k) {
       out += '<div class="step"><span class="sl">Etape ' + (k + 1) + ' &mdash; ' + esc(st.title) + '</span>'
@@ -198,7 +199,7 @@ function open(i) {
     });
     box.innerHTML = out || '<p style="color:var(--muted)">Pas de squelette fourni.</p>';
     typeset(box);
-    this.textContent = 'Masquer les etapes';
+    this.textContent = 'Masquer les étapes';
   });
 
   document.getElementById('sol').addEventListener('click', function () {
@@ -212,7 +213,7 @@ function open(i) {
   document.getElementById('walk').addEventListener('click', function () {
     if (!bridge) return;
     var tmp = document.createElement('div');
-    tmp.innerHTML = '<p>Enonce : ' + p.statement + '</p>'
+    tmp.innerHTML = '<p>Énoncé : ' + p.statement + '</p>'
       + p.steps.map(function (st) { return '<p>' + st.title + ' : ' + st.content + '</p>'; }).join('')
       + '<p>Solution : ' + p.solution + '</p>';
     bridge.openProofHelper(p.id, p.title, tmp.innerText.slice(0, 8000));

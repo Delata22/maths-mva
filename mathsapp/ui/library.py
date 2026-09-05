@@ -84,7 +84,7 @@ class LibraryPage(QWidget):
         bl.setSpacing(9)
 
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Rechercher un cours, un mot-cle...")
+        self.search.setPlaceholderText("Rechercher un cours, un mot-clé...")
         self.search.setClearButtonEnabled(True)
         self.search.setMinimumWidth(230)
         self.search.textChanged.connect(self.refresh)
@@ -108,11 +108,11 @@ class LibraryPage(QWidget):
         for label, key in [
             ("Tous les cours", None),
             ("Accessibles maintenant", "unlocked"),
-            ("Non generes", "ungenerated"),
-            ("Generes", "generated"),
-            ("A reviser (< seuil)", "weak"),
-            ("Maitrises", MASTERED),
-            ("Verrouilles", LOCKED),
+            ("Non générés", "ungenerated"),
+            ("Générés", "generated"),
+            ("À réviser (sous le seuil)", "weak"),
+            ("Maîtrisés", MASTERED),
+            ("Verrouillés", LOCKED),
         ]:
             self.f_state.addItem(label, key)
         self.f_state.currentIndexChanged.connect(self.refresh)
@@ -133,7 +133,7 @@ class LibraryPage(QWidget):
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(5)
-        self.tree.setHeaderLabels(["Cours", "Niveau", "Prerequis", "Score QCM", "Etat"])
+        self.tree.setHeaderLabels(["Cours", "Niveau", "Prérequis", "Score QCM", "État"])
         self.tree.setRootIsDecorated(True)
         self.tree.setAlternatingRowColors(False)
         self.tree.setUniformRowHeights(True)
@@ -221,8 +221,8 @@ class LibraryPage(QWidget):
             group = QTreeWidgetItem(self.tree)
             group.setData(0, ROLE_ID, did)
             group.setText(COL_TITLE, self.syl.domain_name(did))
-            group.setText(COL_STATE, "%d/%d maitrises" % (mastered, len(ids)))
-            group.setText(COL_PREREQ, "%d/%d generes" % (generated, len(ids)))
+            group.setText(COL_STATE, "%d/%d maîtrisés" % (mastered, len(ids)))
+            group.setText(COL_PREREQ, "%d/%d générés" % (generated, len(ids)))
             f = group.font(COL_TITLE)
             f.setBold(True)
             group.setFont(COL_TITLE, f)
@@ -271,7 +271,7 @@ class LibraryPage(QWidget):
                 else:
                     extra = ""
                     if s.generated and s.proofs_total:
-                        extra = "  (%d/%d demos)" % (s.proofs_done, s.proofs_total)
+                        extra = "  (%d/%d démos)" % (s.proofs_done, s.proofs_total)
                     item.setText(COL_STATE, s.label + extra)
                     item.setForeground(COL_STATE, QColor(pal[STATE_COLOR[s.state]]))
                 if s.state == LOCKED:
@@ -284,7 +284,7 @@ class LibraryPage(QWidget):
         total = len(visible)
         mastered = sum(1 for c in visible if self.statuses[c].mastered)
         generated = sum(1 for c in visible if self.statuses[c].generated)
-        self.summary.setText("%d cours  ·  %d generes  ·  %d maitrises" % (total, generated, mastered))
+        self.summary.setText("%d cours  ·  %d générés  ·  %d maîtrisés" % (total, generated, mastered))
 
     def select(self, course_id: str) -> None:
         for i in range(self.tree.topLevelItemCount()):
@@ -323,39 +323,39 @@ class LibraryPage(QWidget):
             menu.addSeparator()
 
             if running:
-                act = QAction("Annuler la generation", self)
+                act = QAction("Annuler la génération", self)
                 act.triggered.connect(lambda: self.cancel_requested.emit(cid))
                 menu.addAction(act)
             else:
-                label = "Regenerer le cours" if s.generated else "Generer le cours"
+                label = "Régénérer le cours" if s.generated else "Générer le cours"
                 act = QAction(label, self)
                 act.triggered.connect(lambda: self.generate_requested.emit([cid]))
                 menu.addAction(act)
                 if s.generated:
-                    act = QAction("Regenerer seulement les exercices", self)
+                    act = QAction("Régénérer seulement les exercices", self)
                     act.triggered.connect(lambda: self.exercises_requested.emit(cid))
                     menu.addAction(act)
 
             missing_path = [c for c in self.syl.path_to(cid)
                             if not self.statuses[c].generated]
             if missing_path:
-                act = QAction("Generer tout le chemin de prerequis (%d cours)" % len(missing_path), self)
+                act = QAction("Générer tout le chemin de prérequis (%d cours)" % len(missing_path), self)
                 act.triggered.connect(lambda: self.generate_requested.emit(missing_path))
                 menu.addAction(act)
 
             if s.generated:
                 menu.addSeparator()
-                act = QAction("Supprimer le contenu genere", self)
+                act = QAction("Supprimer le contenu généré", self)
                 act.triggered.connect(lambda: self.delete_requested.emit(cid))
                 menu.addAction(act)
         else:
             ids = [item.child(i).data(0, ROLE_ID) for i in range(item.childCount())]
             todo = [c for c in ids if not self.statuses[c].generated]
             if todo:
-                act = QAction("Generer les %d cours non generes de ce domaine" % len(todo), self)
+                act = QAction("Générer les %d cours non générés de ce domaine" % len(todo), self)
                 act.triggered.connect(lambda: self.generate_requested.emit(todo))
                 menu.addAction(act)
-            act = QAction("Tout deplier", self)
+            act = QAction("Tout déplier", self)
             act.triggered.connect(lambda: item.setExpanded(True))
             menu.addAction(act)
 

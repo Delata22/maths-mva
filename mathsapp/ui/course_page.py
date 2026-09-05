@@ -85,7 +85,7 @@ class EmptyState(QWidget):
         lay.addWidget(self.objectives)
 
         lay.addSpacing(18)
-        self.btn = QPushButton("Generer ce cours")
+        self.btn = QPushButton("Générer ce cours")
         self.btn.setProperty("primary", True)
         self.btn.setFixedWidth(220)
         self.btn.clicked.connect(self.generate.emit)
@@ -120,11 +120,11 @@ class EmptyState(QWidget):
             names = ", ".join(syl.title(m) for m in st.missing[:4])
             more = "" if len(st.missing) <= 4 else " (+%d)" % (len(st.missing) - 4)
             self.note.setText(
-                "<span style='color:%s'>Prerequis non encore maitrises : %s%s. "
-                "Rien n'empeche de generer ce cours, mais il sera plus dur a suivre.</span>"
+                "<span style='color:%s'>Prérequis non encore maîtrisés : %s%s. "
+                "Rien n'empêche de générer ce cours, mais il sera plus dur à suivre.</span>"
                 % (pal["warn"], names, more))
         else:
-            self.note.setText("Genere par le Claude local. Comptez quelques minutes : "
+            self.note.setText("Généré par le Claude local. Comptez quelques minutes : "
                               "plan, puis chaque section, puis les exercices.")
 
     def set_progress(self, running: bool, frac: float = 0.0, label: str = "") -> None:
@@ -178,7 +178,7 @@ class CoursePage(QWidget):
             self.course.id if self.course else "", "", ""))
         line1.addWidget(self.btn_ask)
 
-        self.btn_gen = QPushButton("Generer")
+        self.btn_gen = QPushButton("Générer")
         self.btn_gen.setProperty("primary", True)
         self.btn_gen.clicked.connect(self._on_generate_clicked)
         line1.addWidget(self.btn_gen)
@@ -228,7 +228,7 @@ class CoursePage(QWidget):
         self.notes = QPlainTextEdit()
         self.notes.setPlaceholderText(
             "Vos notes sur ce cours : ce qui coince, les analogies qui marchent, "
-            "les exercices a refaire.")
+            "les exercices à refaire.")
         notes_host = QWidget()
         nv = QVBoxLayout(notes_host)
         nv.setContentsMargins(20, 16, 20, 16)
@@ -241,7 +241,7 @@ class CoursePage(QWidget):
 
         self.tabs.addTab(self.course_holder, "Cours")
         self.tabs.addTab(self.quiz_view, "QCM")
-        self.tabs.addTab(self.proofs_view, "Demonstrations")
+        self.tabs.addTab(self.proofs_view, "Démonstrations")
         self.tabs.addTab(notes_host, "Notes")
 
     # -------------------------------------------------------------- chargement
@@ -271,7 +271,7 @@ class CoursePage(QWidget):
         generated = self.status.generated
         self.empty.setVisible(not generated)
         self.course_view.setVisible(generated)
-        self.btn_gen.setText("Regenerer" if generated else "Generer")
+        self.btn_gen.setText("Régénérer" if generated else "Générer")
         self.tabs.setTabEnabled(TAB_QUIZ, self.status.has_exercises)
         self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
         if not generated:
@@ -292,7 +292,7 @@ class CoursePage(QWidget):
         dom.setEnabled(False)
         self.chips_row.addWidget(dom)
 
-        lvl = Chip("Niveau %d - %s" % (course.level, self.syl.levels.get(course.level, "")))
+        lvl = Chip("Niveau %d — %s" % (course.level, self.syl.levels.get(course.level, "")))
         lvl.setEnabled(False)
         self.chips_row.addWidget(lvl)
 
@@ -312,7 +312,7 @@ class CoursePage(QWidget):
             for pid in course.prereqs:
                 ok = self._statuses[pid].mastered
                 chip = Chip(self.syl.title(pid), "ok" if ok else "warn")
-                chip.setToolTip("Maitrise" if ok else "Pas encore maitrise — cliquez pour l'ouvrir")
+                chip.setToolTip("Maîtrisé" if ok else "Pas encore maitrise — cliquez pour l'ouvrir")
                 chip.clicked.connect(lambda _=False, p=pid: self.open_course.emit(p))
                 self.chips_row.addWidget(chip)
         self.chips_row.addStretch(1)
@@ -370,15 +370,15 @@ class CoursePage(QWidget):
         cid = self.course.id
         menu = QMenu(self)
         if self.status and self.status.generated:
-            act = QAction("Regenerer seulement les exercices", self)
+            act = QAction("Régénérer seulement les exercices", self)
             act.triggered.connect(lambda: self.exercises_requested.emit(cid))
             menu.addAction(act)
         missing = [c for c in self.syl.path_to(cid) if not content.has_course(c)]
         if missing:
-            act = QAction("Generer tout le chemin de prerequis (%d cours)" % len(missing), self)
+            act = QAction("Générer tout le chemin de prérequis (%d cours)" % len(missing), self)
             act.triggered.connect(lambda: self.generate_requested.emit(missing))
             menu.addAction(act)
-        act = QAction("Annuler la generation en cours", self)
+        act = QAction("Annuler la génération en cours", self)
         act.triggered.connect(lambda: self.cancel_requested.emit(cid))
         menu.addAction(act)
         menu.addSeparator()
@@ -396,8 +396,13 @@ class CoursePage(QWidget):
     def set_generation_progress(self, running: bool, frac: float, label: str) -> None:
         self.empty.set_progress(running, frac, label)
         self.btn_gen.setEnabled(not running)
-        self.btn_gen.setText(label if running else
-                             ("Regenerer" if (self.status and self.status.generated) else "Generer"))
+        if running:
+            self.btn_gen.setText("Génération  %d %%" % int(frac * 100))
+            self.btn_gen.setToolTip(label)
+        else:
+            self.btn_gen.setText(
+                "Régénérer" if (self.status and self.status.generated) else "Générer")
+            self.btn_gen.setToolTip("")
 
     def apply_theme(self) -> None:
         for view in (self.course_view, self.quiz_view, self.proofs_view):

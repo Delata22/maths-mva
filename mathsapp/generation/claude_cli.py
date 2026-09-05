@@ -44,7 +44,7 @@ def binary() -> str:
             return candidate
     raise ClaudeError(
         "Le CLI `claude` est introuvable. Installez-le ou renseignez son chemin "
-        "dans Preferences > Modeles."
+        "dans Préférences > Modèles."
     )
 
 
@@ -104,7 +104,7 @@ def run(prompt: str, model: str, system: Optional[str] = None,
         for line in proc.stdout:
             if cancel is not None and cancel():
                 proc.kill()
-                raise ClaudeError("Generation annulee.")
+                raise ClaudeError("Génération annulée.")
             line = line.strip()
             if not line:
                 continue
@@ -126,7 +126,7 @@ def run(prompt: str, model: str, system: Optional[str] = None,
         proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         proc.kill()
-        raise ClaudeError("Delai depasse (%ss)." % timeout) from exc
+        raise ClaudeError("Délai dépassé (%ss)." % timeout) from exc
     finally:
         if proc.poll() is None:
             proc.kill()
@@ -141,7 +141,7 @@ def run(prompt: str, model: str, system: Optional[str] = None,
             % (proc.returncode, (result_obj.get("result") or stderr or "sortie vide")[:600])
         )
     if not text:
-        raise ClaudeError("Le modele n'a rien renvoye. %s" % stderr[:300])
+        raise ClaudeError("Le modèle n'a rien renvoyé. %s" % stderr[:300])
 
     return Result(
         text=text,
@@ -172,7 +172,7 @@ def extract_json(text: str):
                 return json.loads(candidate[start:end + 1])
             except json.JSONDecodeError:
                 continue
-    raise ClaudeError("Reponse JSON illisible : %s" % candidate[:400])
+    raise ClaudeError("Réponse JSON illisible : %s" % candidate[:400])
 
 
 def run_json(prompt: str, model: str, system: Optional[str] = None,
@@ -232,7 +232,7 @@ def chat_stream(prompt: str, model: str, system: Optional[str],
         proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         proc.kill()
-        raise ClaudeError("Delai depasse.") from exc
+        raise ClaudeError("Délai dépassé.") from exc
     finally:
         if proc.poll() is None:
             proc.kill()
@@ -240,7 +240,7 @@ def chat_stream(prompt: str, model: str, system: Optional[str],
     text = "".join(chunks).strip() or (result_obj.get("result") or "").strip()
     if not text:
         stderr = (proc.stderr.read() if proc.stderr else "") or ""
-        raise ClaudeError("Pas de reponse. %s" % stderr[:300])
+        raise ClaudeError("Pas de réponse. %s" % stderr[:300])
     return Result(
         text=text,
         cost_usd=float(result_obj.get("total_cost_usd") or 0.0),

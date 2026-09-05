@@ -128,7 +128,7 @@ function render() {
   h += '<div class="qhead">';
   h += '<span>Question ' + (idx + 1) + ' / ' + DATA.qcm.length + '</span>';
   h += '<span class="bar"><i style="width:' + (100 * idx / DATA.qcm.length) + '%"></i></span>';
-  h += '<span class="diff" title="difficulte">' + stars(q.difficulty) + '</span>';
+  h += '<span class="diff" title="difficulté">' + stars(q.difficulty) + '</span>';
   h += '<span>' + correct + ' bonne' + (correct > 1 ? 's' : '') + '</span>';
   h += '</div>';
   if (q.section) h += '<p style="margin:-10px 0 14px"><span class="badge">' + esc(q.section) + '</span></p>';
@@ -140,7 +140,7 @@ function render() {
   h += '</div><div id="verdict"></div>';
   h += '<div class="actions">';
   h += '<button class="btn primary" id="go" disabled>Valider</button>';
-  h += '<button class="btn ghost" id="ask">Demander a Claude</button>';
+  h += '<button class="btn ghost" id="ask">Demander à Claude</button>';
   h += '</div>';
   shell.innerHTML = h;
   typeset(shell);
@@ -160,7 +160,7 @@ function render() {
     if (!bridge) return;
     var el = document.createElement('div');
     el.innerHTML = q.question;
-    bridge.askAbout('A propos de cette question de QCM :\n\n' + el.innerText.trim()
+    bridge.askAbout('À propos de cette question de QCM :\n\n' + el.innerText.trim()
       + '\n\nPropositions :\n' + q.choices.map(function (c, i) {
         var d = document.createElement('div'); d.innerHTML = c;
         return LETTERS[i] + '. ' + d.innerText.trim();
@@ -183,11 +183,11 @@ function onGo() {
     });
     var v = document.getElementById('verdict');
     v.innerHTML = '<div class="verdict ' + (ok ? 'ok' : 'ko') + '">'
-      + '<div class="vtitle">' + (ok ? 'Correct' : 'Reponse : ' + LETTERS[q.answer]) + '</div>'
+      + '<div class="vtitle">' + (ok ? 'Correct' : 'Réponse : ' + LETTERS[q.answer]) + '</div>'
       + q.explanation + '</div>';
     typeset(v);
     var go = document.getElementById('go');
-    go.textContent = idx + 1 < DATA.qcm.length ? 'Question suivante' : 'Voir le resultat';
+    go.textContent = idx + 1 < DATA.qcm.length ? 'Question suivante' : 'Voir le résultat';
   } else {
     idx++;
     render();
@@ -206,7 +206,7 @@ function renderResult() {
   });
   var h = '<div id="result"><div class="big" style="color:' +
     (pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--pink)') + '">' + pct + ' %</div>';
-  h += '<div class="sub">' + correct + ' bonnes reponses sur ' + total + '</div></div>';
+  h += '<div class="sub">' + correct + ' bonnes réponses sur ' + total + '</div></div>';
   h += '<div class="breakdown">';
   [1, 2, 3, 4, 5].forEach(function (d) {
     var b = byLevel[d];
@@ -219,7 +219,7 @@ function renderResult() {
   var missed = [];
   answers.forEach(function (a, i) { if (a && !a.ok) missed.push(i); });
   if (missed.length) {
-    h += '<div class="breakdown missed"><h4>A revoir</h4>';
+    h += '<div class="breakdown missed"><h4>À revoir</h4>';
     missed.forEach(function (i) {
       var d = document.createElement('div');
       d.innerHTML = DATA.qcm[i].question;
@@ -250,10 +250,10 @@ function renderResult() {
       var q = DATA.qcm[i], d = document.createElement('div');
       d.innerHTML = q.question;
       var mine = answers[i].chosen >= 0 ? LETTERS[answers[i].chosen] : 'aucune';
-      return '- ' + d.innerText.trim() + '  (ma reponse : ' + mine + ', correcte : ' + LETTERS[q.answer] + ')';
+      return '- ' + d.innerText.trim() + '  (ma réponse : ' + mine + ', correcte : ' + LETTERS[q.answer] + ')';
     });
     bridge.askAbout("Je viens de rater ces questions du QCM. Explique-moi ce que je n'ai visiblement "
-      + "pas compris, en allant a la racine de la confusion plutot qu'en corrigeant question par question :\n\n"
+      + "pas compris, en allant à la racine de la confusion plutot qu'en corrigeant question par question :\n\n"
       + lines.join('\n'), 'QCM');
   });
 }

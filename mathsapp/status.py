@@ -14,11 +14,11 @@ STARTED = "started"        # QCM tente, pas au niveau
 MASTERED = "mastered"      # QCM reussi au-dela du seuil
 
 LABELS = {
-    LOCKED: "Verrouille",
+    LOCKED: "Verrouillé",
     AVAILABLE: "Disponible",
-    READY: "A etudier",
+    READY: "À étudier",
     STARTED: "En cours",
-    MASTERED: "Maitrise",
+    MASTERED: "Maîtrisé",
 }
 
 

@@ -27,12 +27,12 @@ def _model_combo(key: str) -> QComboBox:
 class PrefsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Preferences")
+        self.setWindowTitle("Préférences")
         self.setMinimumWidth(460)
         root = QVBoxLayout(self)
         root.setSpacing(14)
 
-        models = QGroupBox("Modeles")
+        models = QGroupBox("Modèles")
         mf = QFormLayout(models)
         self.m_course = _model_combo("model/course")
         self.m_exos = _model_combo("model/exercises")
@@ -42,26 +42,26 @@ class PrefsDialog(QDialog):
         mf.addRow("Chat", self.m_chat)
         root.addWidget(models)
 
-        gen = QGroupBox("Generation")
+        gen = QGroupBox("Génération")
         gf = QFormLayout(gen)
         self.concurrency = QSpinBox()
         self.concurrency.setRange(1, 4)
         self.concurrency.setValue(int(settings.get("gen/concurrency")))
-        self.concurrency.setToolTip("Nombre de cours generes en parallele.")
-        gf.addRow("Generations en parallele", self.concurrency)
+        self.concurrency.setToolTip("Nombre de cours générés en parallèle.")
+        gf.addRow("Générations en parallèle", self.concurrency)
 
         self.section_parallel = QSpinBox()
         self.section_parallel.setRange(1, 6)
         self.section_parallel.setValue(int(settings.get("gen/section_parallel")))
         self.section_parallel.setToolTip(
-            "Sections d'un meme cours redigees en parallele. Accelere nettement "
-            "la generation ; 3 est un bon compromis.")
-        gf.addRow("Sections en parallele", self.section_parallel)
+            "Sections d'un même cours rédigées en parallèle. Accélère nettement "
+            "la génération ; 3 est un bon compromis.")
+        gf.addRow("Sections en parallèle", self.section_parallel)
 
         self.sections = QSpinBox()
         self.sections.setRange(4, 14)
         self.sections.setValue(int(settings.get("gen/max_sections")))
-        self.sections.setToolTip("Plus de sections = cours plus long et plus detaille.")
+        self.sections.setToolTip("Plus de sections = cours plus long et plus détaillé.")
         gf.addRow("Sections maximum par cours", self.sections)
 
         self.timeout = QSpinBox()
@@ -69,7 +69,7 @@ class PrefsDialog(QDialog):
         self.timeout.setSingleStep(60)
         self.timeout.setSuffix(" s")
         self.timeout.setValue(int(settings.get("claude/timeout")))
-        gf.addRow("Delai maximum par appel", self.timeout)
+        gf.addRow("Délai maximum par appel", self.timeout)
 
         self.binary = QLineEdit(str(settings.get("claude/binary")))
         gf.addRow("Binaire claude", self.binary)
@@ -88,15 +88,15 @@ class PrefsDialog(QDialog):
         self.threshold.setRange(50, 100)
         self.threshold.setSuffix(" %")
         self.threshold.setValue(int(settings.get("ui/mastery_threshold")))
-        self.threshold.setToolTip("Score de QCM a partir duquel un cours est considere maitrise "
-                                  "et debloque ses suites.")
-        uf.addRow("Seuil de maitrise", self.threshold)
+        self.threshold.setToolTip("Score de QCM à partir duquel un cours est considéré maîtrisé "
+                                  "et débloque ses suites.")
+        uf.addRow("Seuil de maîtrise", self.threshold)
 
         self.theme = QComboBox()
         self.theme.addItem("Clair", "light")
         self.theme.addItem("Sombre", "dark")
         self.theme.setCurrentIndex(1 if theme.name() == "dark" else 0)
-        uf.addRow("Theme", self.theme)
+        uf.addRow("Thème", self.theme)
         root.addWidget(ui)
 
         buttons = QDialogButtonBox(
@@ -112,7 +112,7 @@ class PrefsDialog(QDialog):
         except cc.ClaudeError as exc:
             self.test_result.setText(str(exc))
         else:
-            self.test_result.setText("CLI detecte : %s" % version)
+            self.test_result.setText("CLI détecté : %s" % version)
 
     def apply(self) -> None:
         settings.put("model/course", self.m_course.currentText().strip())

@@ -20,9 +20,9 @@ from .webview import WebView
 
 EMPTY_GENERAL = (
     "Posez n'importe quelle question de maths.<br>"
-    "Selectionnez un passage d'un cours pour le mettre en contexte."
+    "Sélectionnez un passage d'un cours pour le mettre en contexte."
 )
-EMPTY_COURSE = "Questions sur ce cours. Le contexte du cursus est deja fourni a Claude."
+EMPTY_COURSE = "Questions sur ce cours. Le contexte du cursus est déjà fourni à Claude."
 
 
 class Composer(QPlainTextEdit):
@@ -30,7 +30,7 @@ class Composer(QPlainTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setPlaceholderText("Votre question  (Entree pour envoyer, Maj+Entree pour un saut de ligne)")
+        self.setPlaceholderText("Votre question  (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)")
         self.setFixedHeight(64)
         self.textChanged.connect(self._grow)
 
@@ -70,7 +70,7 @@ class ChatPanel(QWidget):
         hl = QHBoxLayout(head)
         hl.setContentsMargins(12, 7, 8, 7)
         hl.setSpacing(8)
-        self.title = QLabel("Discussion generale")
+        self.title = QLabel("Discussion générale")
         self.title.setObjectName("H2")
         hl.addWidget(self.title)
         hl.addStretch(1)
@@ -81,7 +81,7 @@ class ChatPanel(QWidget):
         hl.addWidget(self.btn_stop)
         self.btn_clear = QPushButton("Effacer")
         self.btn_clear.setProperty("flat", True)
-        self.btn_clear.setToolTip("Oublier cette conversation et repartir de zero")
+        self.btn_clear.setToolTip("Oublier cette conversation et repartir de zéro")
         self.btn_clear.clicked.connect(self.reset)
         hl.addWidget(self.btn_clear)
         root.addWidget(head)
@@ -150,8 +150,8 @@ class ChatPanel(QWidget):
         self.stop()
         self.session = ChatSession(course, self.syl, context_key, proof_mode)
         self._empty_text = EMPTY_COURSE if course else EMPTY_GENERAL
-        self.title.setText(title or (course.title if course else "Discussion generale"))
-        self.hint.setText("modele : %s" % settings.get("model/chat"))
+        self.title.setText(title or (course.title if course else "Discussion générale"))
+        self.hint.setText("modèle : %s" % settings.get("model/chat"))
         self._js("window.chatReset(%s);" % json.dumps(self._empty_text))
         for msg in self.session.history():
             role = msg["role"]

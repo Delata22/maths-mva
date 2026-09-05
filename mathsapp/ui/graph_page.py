@@ -178,7 +178,7 @@ class GraphPage(QWidget):
         self.f_scope.currentIndexChanged.connect(self.rebuild)
         bl.addWidget(self.f_scope)
 
-        self.hide_locked = QCheckBox("Masquer les cours verrouilles")
+        self.hide_locked = QCheckBox("Masquer les cours verrouillés")
         self.hide_locked.stateChanged.connect(self.rebuild)
         bl.addWidget(self.hide_locked)
 
@@ -187,7 +187,7 @@ class GraphPage(QWidget):
         btn_fit.clicked.connect(self.fit)
         bl.addWidget(btn_fit)
 
-        self.btn_gen = QPushButton("Generer ce qui est accessible")
+        self.btn_gen = QPushButton("Générer ce qui est accessible")
         self.btn_gen.setProperty("flat", True)
         self.btn_gen.clicked.connect(self._generate_available)
         bl.addWidget(self.btn_gen)
@@ -204,7 +204,7 @@ class GraphPage(QWidget):
         self.view = GraphView(self.scene, self)
         root.addWidget(self.view, 1)
 
-        self.hint = QLabel("Molette : zoom  ·  glisser : deplacer  ·  survol : chaine de prerequis  "
+        self.hint = QLabel("Molette : zoom  ·  glisser : déplacer  ·  survol : chaîne de prérequis  "
                            "·  double-clic : ouvrir le cours")
         self.hint.setObjectName("Muted")
         self.hint.setContentsMargins(14, 6, 14, 8)

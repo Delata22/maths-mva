@@ -31,7 +31,7 @@ class ProofHelperWindow(QDialog):
 
     def __init__(self, syl: Syllabus, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Demonstration pas a pas")
+        self.setWindowTitle("Démonstration pas à pas")
         self.resize(720, 800)
         self.setWindowFlag(Qt.WindowType.Window, True)
         lay = QVBoxLayout(self)
@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
         self._wire()
         self._shortcuts()
 
-        self.statusBar().showMessage("Pret")
+        self.statusBar().showMessage("Prêt")
         self.status_info = QLabel("")
         self.status_info.setObjectName("Muted")
         self.statusBar().addPermanentWidget(self.status_info)
@@ -82,10 +82,10 @@ class MainWindow(QMainWindow):
 
         self.nav_buttons = {}
         for key, label, tip in [
-            (PAGE_HOME, "Accueil", "Vue d'ensemble et prochaines etapes"),
-            (PAGE_LIBRARY, "Bibliotheque", "Tous les cours, filtrables"),
+            (PAGE_HOME, "Accueil", "Vue d'ensemble et prochaines étapes"),
+            (PAGE_LIBRARY, "Bibliothèque", "Tous les cours, filtrables"),
             (PAGE_COURSE, "Cours", "Le cours ouvert"),
-            (PAGE_GRAPH, "Graphe", "Le cursus comme graphe de prerequis"),
+            (PAGE_GRAPH, "Graphe", "Le cursus comme graphe de prérequis"),
         ]:
             btn = QToolButton()
             btn.setText(label)
@@ -100,25 +100,25 @@ class MainWindow(QMainWindow):
 
         self.btn_chat = QToolButton()
         self.btn_chat.setText("Chat")
-        self.btn_chat.setToolTip("Poser une question a Claude  (Ctrl+K)")
+        self.btn_chat.setToolTip("Poser une question à Claude  (Ctrl+K)")
         self.btn_chat.setCheckable(True)
         self.btn_chat.setAutoRaise(True)
         lay.addWidget(self.btn_chat)
 
         self.btn_queue = QToolButton()
-        self.btn_queue.setText("Generations")
+        self.btn_queue.setText("Générations")
         self.btn_queue.setCheckable(True)
         self.btn_queue.setAutoRaise(True)
         lay.addWidget(self.btn_queue)
 
         self.btn_theme = QToolButton()
-        self.btn_theme.setText("Theme")
+        self.btn_theme.setText("Thème")
         self.btn_theme.setAutoRaise(True)
         self.btn_theme.clicked.connect(self.toggle_theme)
         lay.addWidget(self.btn_theme)
 
         self.btn_prefs = QToolButton()
-        self.btn_prefs.setText("Preferences")
+        self.btn_prefs.setText("Préférences")
         self.btn_prefs.setAutoRaise(True)
         self.btn_prefs.clicked.connect(self.open_prefs)
         lay.addWidget(self.btn_prefs)
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         self.chat.set_context(None, "general")
 
         self.queue_panel = QueuePanel(self.queue)
-        self.queue_dock = QDockWidget("File de generation", self)
+        self.queue_dock = QDockWidget("File de génération", self)
         self.queue_dock.setObjectName("queueDock")
         self.queue_dock.setWidget(self.queue_panel)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.queue_dock)
@@ -187,6 +187,10 @@ class MainWindow(QMainWindow):
         self.dashboard.show_graph.connect(self.show_track)
 
         self.queue_panel.course_opened.connect(self.open_course)
+        self._library_refresh = QTimer(self)
+        self._library_refresh.setSingleShot(True)
+        self._library_refresh.setInterval(1500)
+        self._library_refresh.timeout.connect(self.library.refresh)
         self.queue.changed.connect(self._on_queue_changed)
         self.queue.job_done.connect(self._on_job_done)
 
@@ -250,10 +254,10 @@ class MainWindow(QMainWindow):
                  if cid in self.syl.courses]
         if len(items) > 4:
             answer = QMessageBox.question(
-                self, "Generer plusieurs cours",
-                "Lancer la generation de %d cours ?\n\n"
-                "Comptez quelques minutes par cours. La file tourne en arriere-plan, "
-                "vous pouvez continuer a travailler." % len(items),
+                self, "Générer plusieurs cours",
+                "Lancer la génération de %d cours ?\n\n"
+                "Comptez quelques minutes par cours. La file tourne en arrière-plan, "
+                "vous pouvez continuer à travailler." % len(items),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:
                 return
@@ -261,7 +265,7 @@ class MainWindow(QMainWindow):
         if added:
             self.queue_dock.setVisible(True)
             self.statusBar().showMessage(
-                "%d generation%s ajoutee%s a la file"
+                "%d génération%s ajoutée%s à la file"
                 % (added, "s" if added > 1 else "", "s" if added > 1 else ""), 5000)
 
     def enqueue_exercises(self, course_id: str) -> None:
@@ -271,8 +275,8 @@ class MainWindow(QMainWindow):
     def delete_content(self, course_id: str) -> None:
         answer = QMessageBox.question(
             self, "Supprimer le contenu",
-            "Supprimer le cours genere et ses exercices pour \"%s\" ?\n\n"
-            "Votre progression (scores, notes) est conservee."
+            "Supprimer le cours généré et ses exercices pour \"%s\" ?\n\n"
+            "Votre progression (scores, notes) est conservée."
             % self.syl.title(course_id),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
@@ -288,8 +292,8 @@ class MainWindow(QMainWindow):
         return "%s  %d %%" % (job.label.split(" - ")[0], int(job.progress * 100))
 
     def _on_queue_changed(self) -> None:
-        if self.stack.currentIndex() == PAGE_LIBRARY:
-            self.library.refresh()
+        if self.stack.currentIndex() == PAGE_LIBRARY and not self._library_refresh.isActive():
+            self._library_refresh.start()
         course = self.course_page.course
         if course is not None:
             job = self.queue.job_for(course.id)
@@ -297,12 +301,13 @@ class MainWindow(QMainWindow):
                 job is not None, job.progress if job else 0.0, job.label if job else "")
         active = self.queue.active_count()
         self.status_info.setText(
-            "" if not active else "%d generation%s en cours" % (active, "s" if active > 1 else ""))
+            "" if not active else "%d génération%s en cours" % (active, "s" if active > 1 else ""))
 
     def _on_job_done(self, course_id: str, _kind: str, ok: bool, message: str) -> None:
+        self._library_refresh.stop()
         title = self.syl.title(course_id)
         self.statusBar().showMessage(
-            "%s : %s" % (title, message if ok else "echec - %s" % message), 12000)
+            "%s : %s" % (title, message if ok else "échec — %s" % message), 12000)
         if self.stack.currentIndex() == PAGE_LIBRARY:
             self.library.refresh()
         elif self.stack.currentIndex() == PAGE_HOME:
@@ -321,7 +326,7 @@ class MainWindow(QMainWindow):
             self.chat.composer.setFocus()
             return
         section = (" (section \"%s\")" % heading) if heading else ""
-        prompt = ("A propos de ce passage du cours%s :\n\n« %s »\n\n"
+        prompt = ("À propos de ce passage du cours%s :\n\n« %s »\n\n"
                   "Explique-le moi." % (section, excerpt))
         self.chat.ask(prompt, autosend=False)
         self.chat.composer.setFocus()
@@ -330,9 +335,9 @@ class MainWindow(QMainWindow):
         from ..generation.prompts import proof_walkthrough_prompt
         course = self.syl.get(course_id)
         window = ProofHelperWindow(self.syl, self)
-        window.setWindowTitle("Demonstration : %s" % (title or self.syl.title(course_id)))
+        window.setWindowTitle("Démonstration : %s" % (title or self.syl.title(course_id)))
         window.chat.set_context(course, "proof:%s" % proof_id, proof_mode=True,
-                                title=title or "Demonstration")
+                                title=title or "Démonstration")
         self._proof_windows.append(window)
         window.finished.connect(lambda _=0, w=window: self._proof_windows.remove(w)
                                 if w in self._proof_windows else None)
@@ -340,7 +345,7 @@ class MainWindow(QMainWindow):
         if not window.chat.session.history():
             window.chat.send_hidden(
                 proof_walkthrough_prompt(title or self.syl.title(course_id), text),
-                shown="Explique-moi cette demonstration etape par etape.")
+                shown="Explique-moi cette démonstration étape par étape.")
 
     # ----------------------------------------------------------------- divers
     def toggle_theme(self) -> None:
@@ -371,7 +376,7 @@ class MainWindow(QMainWindow):
                 self.apply_theme()
             else:
                 self.library.refresh()
-            self.chat.hint.setText("modele : %s" % settings.get("model/chat"))
+            self.chat.hint.setText("modèle : %s" % settings.get("model/chat"))
 
     def _check_cli(self) -> None:
         try:
@@ -379,8 +384,8 @@ class MainWindow(QMainWindow):
         except ClaudeError as exc:
             QMessageBox.warning(
                 self, "CLI claude introuvable",
-                "%s\n\nLa lecture des cours deja generes fonctionne, mais aucune "
-                "nouvelle generation ni discussion n'est possible tant que le CLI "
+                "%s\n\nLa lecture des cours déjà générés fonctionne, mais aucune "
+                "nouvelle génération ni discussion n'est possible tant que le CLI "
                 "n'est pas accessible." % exc)
         else:
             self.status_info.setText("claude %s" % version.split()[0])
