@@ -1,0 +1,362 @@
+"""Bibliotheque : liste filtrable de tous les cours avec leur progression."""
+from __future__ import annotations
+
+from typing import Dict, List, Optional
+
+from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtGui import QAction, QColor, QFont, QPainter, QPen
+from PySide6.QtWidgets import (
+    QComboBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu, QStyledItemDelegate,
+    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+)
+
+from .. import status as st_mod
+from ..status import AVAILABLE, LOCKED, MASTERED, READY, STARTED, Status
+from ..syllabus import Syllabus
+from . import theme
+
+ROLE_ID = Qt.ItemDataRole.UserRole
+ROLE_SCORE = Qt.ItemDataRole.UserRole + 1
+ROLE_STATE = Qt.ItemDataRole.UserRole + 2
+
+COL_TITLE, COL_LEVEL, COL_PREREQ, COL_SCORE, COL_STATE = range(5)
+
+STATE_COLOR = {
+    LOCKED: "locked", AVAILABLE: "accent", READY: "fg2",
+    STARTED: "warn", MASTERED: "ok",
+}
+
+
+class ScoreDelegate(QStyledItemDelegate):
+    """Barre de progression compacte dans la colonne score."""
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        score = index.data(ROLE_SCORE)
+        if score is None:
+            super().paint(painter, option, index)
+            return
+        pal = theme.palette()
+        painter.save()
+        if option.state & option.state.__class__.State_Selected:
+            painter.fillRect(option.rect, QColor(pal["accent_soft"]))
+        r = option.rect
+        bar_w, bar_h = 62, 6
+        y = r.center().y() - bar_h // 2
+        x = r.left() + 8
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(pal["bg3"]))
+        painter.drawRoundedRect(QRect(x, y, bar_w, bar_h), 3, 3)
+        thr = st_mod.threshold()
+        col = pal["ok"] if score >= thr else (pal["warn"] if score >= 50 else pal["err"])
+        painter.setBrush(QColor(col))
+        painter.drawRoundedRect(QRect(x, y, max(3, int(bar_w * score / 100)), bar_h), 3, 3)
+        painter.setPen(QPen(QColor(pal["fg2"])))
+        f = painter.font()
+        f.setPointSizeF(f.pointSizeF() - 0.5)
+        painter.setFont(f)
+        painter.drawText(QRect(x + bar_w + 8, r.top(), 46, r.height()),
+                         int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+                         "%d %%" % score)
+        painter.restore()
+
+
+class LibraryPage(QWidget):
+    course_opened = Signal(str)
+    generate_requested = Signal(list)       # liste d'identifiants
+    exercises_requested = Signal(str)
+    cancel_requested = Signal(str)
+    delete_requested = Signal(str)
+
+    def __init__(self, syllabus: Syllabus, parent=None):
+        super().__init__(parent)
+        self.syl = syllabus
+        self.statuses: Dict[str, Status] = {}
+        self._queue_lookup = None
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        bar = QWidget()
+        bar.setObjectName("TopBar")
+        bl = QHBoxLayout(bar)
+        bl.setContentsMargins(14, 9, 14, 9)
+        bl.setSpacing(9)
+
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Rechercher un cours, un mot-cle...")
+        self.search.setClearButtonEnabled(True)
+        self.search.setMinimumWidth(230)
+        self.search.textChanged.connect(self.refresh)
+        bl.addWidget(self.search, 2)
+
+        self.f_domain = QComboBox()
+        self.f_domain.addItem("Tous les domaines", None)
+        for did in self.syl.domain_order:
+            self.f_domain.addItem(self.syl.domain_name(did), did)
+        self.f_domain.currentIndexChanged.connect(self.refresh)
+        bl.addWidget(self.f_domain)
+
+        self.f_level = QComboBox()
+        self.f_level.addItem("Tous niveaux", None)
+        for value, label in sorted(self.syl.levels.items()):
+            self.f_level.addItem("%d - %s" % (value, label), value)
+        self.f_level.currentIndexChanged.connect(self.refresh)
+        bl.addWidget(self.f_level)
+
+        self.f_state = QComboBox()
+        for label, key in [
+            ("Tous les cours", None),
+            ("Accessibles maintenant", "unlocked"),
+            ("Non generes", "ungenerated"),
+            ("Generes", "generated"),
+            ("A reviser (< seuil)", "weak"),
+            ("Maitrises", MASTERED),
+            ("Verrouilles", LOCKED),
+        ]:
+            self.f_state.addItem(label, key)
+        self.f_state.currentIndexChanged.connect(self.refresh)
+        bl.addWidget(self.f_state)
+
+        self.f_track = QComboBox()
+        self.f_track.addItem("Tout le syllabus", None)
+        for tid, track in self.syl.tracks.items():
+            self.f_track.addItem("Parcours : %s" % track.title, tid)
+        self.f_track.currentIndexChanged.connect(self.refresh)
+        bl.addWidget(self.f_track)
+
+        bl.addStretch(1)
+        self.summary = QLabel("")
+        self.summary.setObjectName("Muted")
+        bl.addWidget(self.summary)
+        root.addWidget(bar)
+
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(5)
+        self.tree.setHeaderLabels(["Cours", "Niveau", "Prerequis", "Score QCM", "Etat"])
+        self.tree.setRootIsDecorated(True)
+        self.tree.setAlternatingRowColors(False)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setExpandsOnDoubleClick(False)
+        self.tree.setItemDelegateForColumn(COL_SCORE, ScoreDelegate(self.tree))
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._menu)
+        self.tree.itemDoubleClicked.connect(self._activate)
+        header = self.tree.header()
+        header.setSectionResizeMode(COL_TITLE, QHeaderView.ResizeMode.Stretch)
+        for col, width in ((COL_LEVEL, 108), (COL_PREREQ, 130), (COL_SCORE, 130), (COL_STATE, 120)):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            self.tree.setColumnWidth(col, width)
+        root.addWidget(self.tree, 1)
+
+    # ------------------------------------------------------------------ etat
+    def set_queue_lookup(self, fn) -> None:
+        """fn(course_id) -> texte d'avancement ou None."""
+        self._queue_lookup = fn
+
+    def selected_id(self) -> Optional[str]:
+        item = self.tree.currentItem()
+        return item.data(0, ROLE_ID) if item else None
+
+    def _filtered(self) -> List[str]:
+        query = self.search.text().strip().lower()
+        domain = self.f_domain.currentData()
+        level = self.f_level.currentData()
+        state = self.f_state.currentData()
+        track = self.f_track.currentData()
+        allowed = set(self.syl.track_path(track)) if track else None
+
+        out = []
+        for course in self.syl.all():
+            s = self.statuses[course.id]
+            if allowed is not None and course.id not in allowed:
+                continue
+            if domain and course.domain != domain:
+                continue
+            if level and course.level != level:
+                continue
+            if state == "unlocked" and not (s.unlocked and s.state != MASTERED):
+                continue
+            if state == "ungenerated" and s.generated:
+                continue
+            if state == "generated" and not s.generated:
+                continue
+            if state == "weak" and not (s.attempts and not s.mastered):
+                continue
+            if state == MASTERED and not s.mastered:
+                continue
+            if state == LOCKED and s.unlocked:
+                continue
+            if query:
+                hay = " ".join([course.title, course.summary, " ".join(course.keywords),
+                                " ".join(course.objectives)]).lower()
+                if query not in hay:
+                    continue
+            out.append(course.id)
+        return out
+
+    def refresh(self) -> None:
+        self.statuses = st_mod.compute(self.syl)
+        pal = theme.palette()
+        visible = self._filtered()
+        by_domain: Dict[str, List[str]] = {}
+        for cid in visible:
+            by_domain.setdefault(self.syl.get(cid).domain, []).append(cid)
+
+        expanded = {
+            self.tree.topLevelItem(i).data(0, ROLE_ID)
+            for i in range(self.tree.topLevelItemCount())
+            if self.tree.topLevelItem(i).isExpanded()
+        }
+        current = self.selected_id()
+
+        self.tree.clear()
+        mono = QFont("monospace")
+        for did in self.syl.domain_order:
+            ids = by_domain.get(did)
+            if not ids:
+                continue
+            mastered = sum(1 for c in ids if self.statuses[c].mastered)
+            generated = sum(1 for c in ids if self.statuses[c].generated)
+            group = QTreeWidgetItem(self.tree)
+            group.setData(0, ROLE_ID, did)
+            group.setText(COL_TITLE, self.syl.domain_name(did))
+            group.setText(COL_STATE, "%d/%d maitrises" % (mastered, len(ids)))
+            group.setText(COL_PREREQ, "%d/%d generes" % (generated, len(ids)))
+            f = group.font(COL_TITLE)
+            f.setBold(True)
+            group.setFont(COL_TITLE, f)
+            group.setForeground(COL_TITLE, QColor(self.syl.domain_color(did)))
+            group.setForeground(COL_STATE, QColor(pal["muted"]))
+            group.setForeground(COL_PREREQ, QColor(pal["muted"]))
+            group.setFirstColumnSpanned(False)
+
+            for cid in ids:
+                course = self.syl.get(cid)
+                s = self.statuses[cid]
+                item = QTreeWidgetItem(group)
+                item.setData(0, ROLE_ID, cid)
+                item.setData(0, ROLE_STATE, s.state)
+                item.setText(COL_TITLE, course.title)
+                item.setToolTip(COL_TITLE, course.summary)
+                item.setText(COL_LEVEL, "%d - %s" % (course.level, self.syl.levels.get(course.level, "")))
+                item.setForeground(COL_LEVEL, QColor(pal["muted"]))
+
+                if s.missing:
+                    item.setText(COL_PREREQ, "%d manquant%s" % (len(s.missing), "s" if len(s.missing) > 1 else ""))
+                    item.setForeground(COL_PREREQ, QColor(pal["locked"]))
+                    item.setToolTip(COL_PREREQ, "\n".join(self.syl.title(m) for m in s.missing))
+                elif course.prereqs:
+                    item.setText(COL_PREREQ, "ok")
+                    item.setForeground(COL_PREREQ, QColor(pal["ok"]))
+                else:
+                    item.setText(COL_PREREQ, "aucun")
+                    item.setForeground(COL_PREREQ, QColor(pal["muted"]))
+
+                if s.best_pct is not None:
+                    item.setData(COL_SCORE, ROLE_SCORE, s.best_pct)
+                    item.setToolTip(COL_SCORE, "Meilleur : %d %%\nDernier : %s\n%d tentative(s)"
+                                    % (s.best_pct,
+                                       "%d %%" % s.last_pct if s.last_pct is not None else "-",
+                                       s.attempts))
+                else:
+                    item.setText(COL_SCORE, "-")
+                    item.setForeground(COL_SCORE, QColor(pal["muted"]))
+                    item.setFont(COL_SCORE, mono)
+
+                running = self._queue_lookup(cid) if self._queue_lookup else None
+                if running:
+                    item.setText(COL_STATE, running)
+                    item.setForeground(COL_STATE, QColor(pal["accent"]))
+                else:
+                    extra = ""
+                    if s.generated and s.proofs_total:
+                        extra = "  (%d/%d demos)" % (s.proofs_done, s.proofs_total)
+                    item.setText(COL_STATE, s.label + extra)
+                    item.setForeground(COL_STATE, QColor(pal[STATE_COLOR[s.state]]))
+                if s.state == LOCKED:
+                    item.setForeground(COL_TITLE, QColor(pal["locked"]))
+
+            group.setExpanded(did in expanded or len(by_domain) <= 3 or bool(self.search.text()))
+
+        if current:
+            self.select(current)
+        total = len(visible)
+        mastered = sum(1 for c in visible if self.statuses[c].mastered)
+        generated = sum(1 for c in visible if self.statuses[c].generated)
+        self.summary.setText("%d cours  ·  %d generes  ·  %d maitrises" % (total, generated, mastered))
+
+    def select(self, course_id: str) -> None:
+        for i in range(self.tree.topLevelItemCount()):
+            group = self.tree.topLevelItem(i)
+            for j in range(group.childCount()):
+                child = group.child(j)
+                if child.data(0, ROLE_ID) == course_id:
+                    group.setExpanded(True)
+                    self.tree.setCurrentItem(child)
+                    self.tree.scrollToItem(child)
+                    return
+
+    # ---------------------------------------------------------------- actions
+    def _activate(self, item: QTreeWidgetItem, _col: int) -> None:
+        cid = item.data(0, ROLE_ID)
+        if cid and cid in self.syl.courses:
+            self.course_opened.emit(cid)
+        else:
+            item.setExpanded(not item.isExpanded())
+
+    def _menu(self, pos) -> None:
+        item = self.tree.itemAt(pos)
+        if item is None:
+            return
+        cid = item.data(0, ROLE_ID)
+        menu = QMenu(self)
+
+        if cid in self.syl.courses:
+            s = self.statuses[cid]
+            course = self.syl.get(cid)
+            running = self._queue_lookup(cid) if self._queue_lookup else None
+
+            act = QAction("Ouvrir", self)
+            act.triggered.connect(lambda: self.course_opened.emit(cid))
+            menu.addAction(act)
+            menu.addSeparator()
+
+            if running:
+                act = QAction("Annuler la generation", self)
+                act.triggered.connect(lambda: self.cancel_requested.emit(cid))
+                menu.addAction(act)
+            else:
+                label = "Regenerer le cours" if s.generated else "Generer le cours"
+                act = QAction(label, self)
+                act.triggered.connect(lambda: self.generate_requested.emit([cid]))
+                menu.addAction(act)
+                if s.generated:
+                    act = QAction("Regenerer seulement les exercices", self)
+                    act.triggered.connect(lambda: self.exercises_requested.emit(cid))
+                    menu.addAction(act)
+
+            missing_path = [c for c in self.syl.path_to(cid)
+                            if not self.statuses[c].generated]
+            if missing_path:
+                act = QAction("Generer tout le chemin de prerequis (%d cours)" % len(missing_path), self)
+                act.triggered.connect(lambda: self.generate_requested.emit(missing_path))
+                menu.addAction(act)
+
+            if s.generated:
+                menu.addSeparator()
+                act = QAction("Supprimer le contenu genere", self)
+                act.triggered.connect(lambda: self.delete_requested.emit(cid))
+                menu.addAction(act)
+        else:
+            ids = [item.child(i).data(0, ROLE_ID) for i in range(item.childCount())]
+            todo = [c for c in ids if not self.statuses[c].generated]
+            if todo:
+                act = QAction("Generer les %d cours non generes de ce domaine" % len(todo), self)
+                act.triggered.connect(lambda: self.generate_requested.emit(todo))
+                menu.addAction(act)
+            act = QAction("Tout deplier", self)
+            act.triggered.connect(lambda: item.setExpanded(True))
+            menu.addAction(act)
+
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
