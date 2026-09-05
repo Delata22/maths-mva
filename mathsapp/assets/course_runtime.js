@@ -28,6 +28,7 @@
       ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
       throwOnError: false,
       strict: false,
+      output: 'html',
       macros: {
         '\\R': '\\mathbb{R}', '\\N': '\\mathbb{N}', '\\Z': '\\mathbb{Z}',
         '\\Q': '\\mathbb{Q}', '\\C': '\\mathbb{C}', '\\E': '\\mathbb{E}',
@@ -65,7 +66,9 @@
       if (!h.id) h.id = slug(h.textContent, i);
       var a = document.createElement('a');
       a.href = '#' + h.id;
-      a.textContent = h.textContent;
+      // on copie le HTML brut : KaTeX rendra le sommaire en meme temps que
+      // le corps du cours, au lieu d'y recopier du texte deja rendu
+      a.innerHTML = h.innerHTML;
       a.className = h.tagName === 'H3' ? 'lvl3' : 'lvl2';
       box.appendChild(a);
       links.push({ a: a, h: h });
@@ -207,9 +210,9 @@
   };
 
   function boot() {
-    renderMath();
     wrapTables();
     buildToc();
+    renderMath();
     decorateProofs();
     setupMasks();
     connectBridge(setupAsk);

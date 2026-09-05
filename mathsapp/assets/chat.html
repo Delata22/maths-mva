@@ -71,7 +71,7 @@ function typeset(node) {
       {left: '\\(', right: '\\)', display: false}
     ],
     ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-    throwOnError: false, strict: false, macros: MACROS
+    throwOnError: false, strict: false, output: 'html', macros: MACROS
   });
 }
 var log = document.getElementById('log');
