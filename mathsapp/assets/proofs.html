@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="__ASSETS__/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="__ASSETS__/course.css">
+<style>
+  body { font-size: 15.5px; overflow: hidden; }
+  #split { display: flex; height: 100vh; }
+  #list {
+    flex: 0 0 268px; border-right: 1px solid var(--line); background: var(--bg-soft);
+    overflow-y: auto; padding: 14px 10px 30px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  #list .lt {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); padding: 0 8px 10px;
+  }
+  .pitem {
+    padding: 10px 11px; border-radius: 9px; cursor: pointer; margin-bottom: 4px;
+    border: 1px solid transparent;
+  }
+  .pitem:hover { background: var(--bg); }
+  .pitem.on { background: var(--bg); border-color: var(--line-strong); }
+  .pitem .pt { font-size: 13.5px; font-weight: 550; line-height: 1.35; }
+  .pitem .pm {
+    display: flex; align-items: center; gap: 8px; margin-top: 5px;
+    font-size: 11.5px; color: var(--muted);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
+  .dot.wip { background: var(--warn); }
+  .dot.done { background: var(--ok); }
+  #pane { flex: 1; overflow-y: auto; padding: 30px 34px 100px; }
+  #pane .inner { max-width: 700px; }
+  .ptitle { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 1.5em; font-weight: 680; margin: 0 0 4px; }
+  .pmeta { color: var(--muted); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; margin-bottom: 22px; }
+  .stmt {
+    border-left: 3px solid var(--violet); background: var(--violet-soft);
+    padding: 14px 17px; border-radius: 10px; margin-bottom: 26px;
+  }
+  .stmt > :first-child { margin-top: 0; } .stmt > :last-child { margin-bottom: 0; }
+  .sect { margin: 26px 0 0; }
+  .sect > h4 {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: .8em; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+    margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  }
+  .hint {
+    border: 1px solid var(--line); border-radius: 9px; padding: 11px 14px; margin-bottom: 8px;
+    background: var(--bg-soft);
+  }
+  .hint .hl {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--warn); margin-bottom: 4px;
+  }
+  .hint > .body > :first-child { margin-top: 0; } .hint > .body > :last-child { margin-bottom: 0; }
+  .step { margin: 0 0 14px; padding-left: 14px; border-left: 2px solid var(--line-strong); }
+  .step .sl {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: .8em; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px;
+  }
+  .step > .body > :first-child { margin-top: 0; } .step > .body > :last-child { margin-bottom: 0; }
+  button.btn {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 600;
+    padding: 8px 15px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--bg-soft); color: var(--fg); cursor: pointer;
+  }
+  button.btn:hover { border-color: var(--accent); color: var(--accent); }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn.primary:hover { filter: brightness(1.08); color: #fff; }
+  button.btn.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .row { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+  .statusbar {
+    position: sticky; bottom: 0; margin-top: 34px; padding: 14px 0 0;
+    border-top: 1px solid var(--line); background: var(--bg);
+  }
+  #empty { padding: 80px 30px; text-align: center; color: var(--muted);
+    font-family: ui-sans-serif, system-ui, sans-serif; }
+</style>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="__ASSETS__/vendor/katex/katex.min.js"></script>
+<script src="__ASSETS__/vendor/katex/contrib/auto-render.min.js"></script>
+</head>
+<body>
+<div id="split"><div id="list"></div><div id="pane"><div id="empty">Choisissez une demonstration.</div></div></div>
+<script>
+var DATA = __DATA__;
+var STATUS = __STATUS__;
+var bridge = null, cur = -1;
+var MACROS = {
+  '\\R': '\\mathbb{R}', '\\N': '\\mathbb{N}', '\\Z': '\\mathbb{Z}',
+  '\\Q': '\\mathbb{Q}', '\\C': '\\mathbb{C}', '\\E': '\\mathbb{E}',
+  '\\P': '\\mathbb{P}', '\\1': '\\mathbf{1}',
+  '\\norm': '\\left\\lVert #1 \\right\\rVert', '\\abs': '\\left| #1 \\right|',
+  '\\scal': '\\left\\langle #1 , #2 \\right\\rangle',
+  '\\argmin': '\\operatorname{arg\\,min}', '\\argmax': '\\operatorname{arg\\,max}',
+  '\\Var': '\\operatorname{Var}', '\\Cov': '\\operatorname{Cov}',
+  '\\rank': '\\operatorname{rang}', '\\tr': '\\operatorname{tr}',
+  '\\diag': '\\operatorname{diag}', '\\Id': '\\mathrm{Id}',
+  '\\dd': '\\mathrm{d}', '\\eps': '\\varepsilon'
+};
+function typeset(n) {
+  if (typeof renderMathInElement === 'undefined') return;
+  renderMathInElement(n, {
+    delimiters: [{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},
+                 {left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}],
+    ignoredTags: ['script','noscript','style','textarea','pre','code'],
+    throwOnError: false, strict: false, macros: MACROS
+  });
+}
+if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTransport) {
+  new QWebChannel(window.qt.webChannelTransport, function (ch) { bridge = ch.objects.app; });
+}
+function esc(s) { return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function stars(n) { return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)); }
+
+function renderList() {
+  var h = '<div class="lt">Demonstrations a faire</div>';
+  DATA.proofs.forEach(function (p, i) {
+    var s = STATUS[p.id] || 'todo';
+    h += '<div class="pitem' + (i === cur ? ' on' : '') + '" data-i="' + i + '">'
+      + '<div class="pt">' + esc(p.title) + '</div>'
+      + '<div class="pm"><span class="dot ' + (s === 'done' ? 'done' : s === 'wip' ? 'wip' : '') + '"></span>'
+      + '<span>' + stars(p.difficulty) + '</span></div></div>';
+  });
+  var l = document.getElementById('list');
+  l.innerHTML = h;
+  Array.prototype.forEach.call(l.querySelectorAll('.pitem'), function (el) {
+    el.addEventListener('click', function () { open(parseInt(el.getAttribute('data-i'), 10)); });
+  });
+}
+
+function open(i) {
+  cur = i;
+  var p = DATA.proofs[i];
+  var s = STATUS[p.id] || 'todo';
+  var h = '<div class="inner">';
+  h += '<h2 class="ptitle">' + esc(p.title) + '</h2>';
+  h += '<div class="pmeta">Difficulte ' + stars(p.difficulty) + '</div>';
+  h += '<div class="stmt">' + p.statement + '</div>';
+
+  h += '<div class="sect"><h4>Cherchez d\'abord</h4>'
+    + '<p style="color:var(--muted);font-size:.94em">Prenez le temps de chercher avant de reveler '
+    + 'quoi que ce soit. Les indices vont du plus vague au plus explicite.</p>'
+    + '<div class="row"><button class="btn" id="hint">Reveler un indice</button>'
+    + '<span id="hintn" style="color:var(--muted);font-size:12.5px"></span></div>'
+    + '<div id="hints" style="margin-top:12px"></div></div>';
+
+  h += '<div class="sect"><h4>Squelette de la preuve</h4>'
+    + '<div class="row"><button class="btn" id="sk">Afficher les etapes</button>'
+    + '<button class="btn" id="walk">Decortiquer avec Claude</button></div>'
+    + '<div id="steps" style="margin-top:14px"></div></div>';
+
+  h += '<div class="sect"><h4>Solution redigee</h4>'
+    + '<div class="row"><button class="btn" id="sol">Afficher la solution</button></div>'
+    + '<div id="solution" style="margin-top:14px"></div></div>';
+
+  h += '<div class="statusbar"><div class="row">'
+    + '<span style="color:var(--muted);font-size:12.5px;margin-right:4px">Ou en suis-je ?</span>'
+    + '<button class="btn' + (s === 'todo' ? ' primary' : '') + '" data-st="todo">A faire</button>'
+    + '<button class="btn' + (s === 'wip' ? ' primary' : '') + '" data-st="wip">En cours</button>'
+    + '<button class="btn' + (s === 'done' ? ' on' : '') + '" data-st="done">Reussie</button>'
+    + '</div></div>';
+  h += '</div>';
+
+  var pane = document.getElementById('pane');
+  pane.innerHTML = h;
+  pane.scrollTop = 0;
+  typeset(pane);
+  renderList();
+
+  var shown = 0;
+  var hintBtn = document.getElementById('hint');
+  function updateHintLabel() {
+    document.getElementById('hintn').textContent =
+      shown + ' / ' + p.hints.length + ' indice' + (p.hints.length > 1 ? 's' : '');
+    if (shown >= p.hints.length) { hintBtn.disabled = true; hintBtn.textContent = 'Plus d\'indice'; }
+  }
+  updateHintLabel();
+  hintBtn.addEventListener('click', function () {
+    if (shown >= p.hints.length) return;
+    var d = document.createElement('div');
+    d.className = 'hint';
+    d.innerHTML = '<div class="hl">Indice ' + (shown + 1) + '</div><div class="body">' + p.hints[shown] + '</div>';
+    document.getElementById('hints').appendChild(d);
+    typeset(d);
+    shown++;
+    updateHintLabel();
+  });
+
+  document.getElementById('sk').addEventListener('click', function () {
+    var box = document.getElementById('steps');
+    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Afficher les etapes'; return; }
+    var out = '';
+    p.steps.forEach(function (st, k) {
+      out += '<div class="step"><span class="sl">Etape ' + (k + 1) + ' &mdash; ' + esc(st.title) + '</span>'
+        + '<div class="body">' + st.content + '</div></div>';
+    });
+    box.innerHTML = out || '<p style="color:var(--muted)">Pas de squelette fourni.</p>';
+    typeset(box);
+    this.textContent = 'Masquer les etapes';
+  });
+
+  document.getElementById('sol').addEventListener('click', function () {
+    var box = document.getElementById('solution');
+    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Afficher la solution'; return; }
+    box.innerHTML = p.solution;
+    typeset(box);
+    this.textContent = 'Masquer la solution';
+  });
+
+  document.getElementById('walk').addEventListener('click', function () {
+    if (!bridge) return;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = '<p>Enonce : ' + p.statement + '</p>'
+      + p.steps.map(function (st) { return '<p>' + st.title + ' : ' + st.content + '</p>'; }).join('')
+      + '<p>Solution : ' + p.solution + '</p>';
+    bridge.openProofHelper(p.id, p.title, tmp.innerText.slice(0, 8000));
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-st]'), function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-st');
+      STATUS[p.id] = v;
+      if (bridge) bridge.setProofStatus(p.id, v);
+      open(cur);
+    });
+  });
+}
+
+window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
+renderList();
+if (DATA.proofs.length) open(0);
+</script>
+</body>
+</html>

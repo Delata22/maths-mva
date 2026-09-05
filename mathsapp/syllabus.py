@@ -62,6 +62,15 @@ class Syllabus:
             for p in course.prereqs:
                 self.courses[p].dependents.append(cid)
         self._compute_depth()
+        # `order` suit la presentation du syllabus, qui n'est pas topologique :
+        # un cours de probabilites peut dependre d'un cours de Fourier liste
+        # plus loin. `topo` garantit qu'un prerequis vient toujours avant.
+        self.topo: List[str] = sorted(
+            self.order, key=lambda cid: (self.courses[cid].depth, self.order.index(cid)))
+        self._topo_rank = {cid: i for i, cid in enumerate(self.topo)}
+
+    def topo_rank(self, cid: str) -> int:
+        return self._topo_rank.get(cid, 0)
 
     def _compute_depth(self) -> None:
         memo: Dict[str, int] = {}

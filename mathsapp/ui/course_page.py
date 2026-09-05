@@ -1,0 +1,434 @@
+"""Page d'un cours : lecture, QCM, demonstrations, notes."""
+from __future__ import annotations
+
+import json
+from typing import Dict, List, Optional
+
+from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtGui import QAction, QColor
+from PySide6.QtWidgets import (
+    QFrame, QHBoxLayout, QLabel, QMenu, QPlainTextEdit, QProgressBar, QPushButton,
+    QScrollArea, QSizePolicy, QTabWidget, QVBoxLayout, QWidget,
+)
+
+from .. import content, status as st_mod, store
+from ..paths import ASSETS_DIR, library_dir
+from ..syllabus import Course, Syllabus
+from . import theme
+from .webview import WebView
+
+TAB_COURSE, TAB_QUIZ, TAB_PROOFS, TAB_NOTES = range(4)
+
+
+def _page_path(name: str):
+    d = library_dir() / "_views"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / name
+
+
+class Chip(QPushButton):
+    def __init__(self, text: str, tone: str = "chip", parent=None):
+        super().__init__(text, parent)
+        self.setObjectName("Chip")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFlat(True)
+        pal = theme.palette()
+        colors = {
+            "chip": (pal["bg3"], pal["fg2"], pal["line"]),
+            "ok": (pal["ok_soft"], pal["ok"], pal["ok"]),
+            "warn": (pal["warn_soft"], pal["warn"], pal["warn"]),
+            "accent": (pal["accent_soft"], pal["accent"], pal["accent"]),
+        }
+        bg, fg, border = colors.get(tone, colors["chip"])
+        self.setStyleSheet(
+            "QPushButton{background:%s;color:%s;border:1px solid %s;border-radius:999px;"
+            "padding:3px 11px;font-size:11.5px;font-weight:500;}"
+            "QPushButton:hover{border-color:%s;}" % (bg, fg, border, pal["accent"]))
+
+
+class EmptyState(QWidget):
+    """Ce qu'on voit quand le cours n'est pas encore genere."""
+
+    generate = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        outer.addWidget(area)
+
+        inner = QWidget()
+        area.setWidget(inner)
+        lay = QVBoxLayout(inner)
+        lay.setContentsMargins(56, 46, 56, 56)
+        lay.setSpacing(14)
+
+        self.title = QLabel()
+        self.title.setObjectName("H1")
+        self.title.setWordWrap(True)
+        lay.addWidget(self.title)
+
+        self.summary = QLabel()
+        self.summary.setObjectName("Muted")
+        self.summary.setWordWrap(True)
+        lay.addWidget(self.summary)
+
+        lay.addSpacing(10)
+        self.obj_title = QLabel("Ce que ce cours doit vous apprendre")
+        self.obj_title.setObjectName("H2")
+        lay.addWidget(self.obj_title)
+        self.objectives = QLabel()
+        self.objectives.setWordWrap(True)
+        self.objectives.setTextFormat(Qt.TextFormat.RichText)
+        lay.addWidget(self.objectives)
+
+        lay.addSpacing(18)
+        self.btn = QPushButton("Generer ce cours")
+        self.btn.setProperty("primary", True)
+        self.btn.setFixedWidth(220)
+        self.btn.clicked.connect(self.generate.emit)
+        lay.addWidget(self.btn)
+
+        self.note = QLabel()
+        self.note.setObjectName("Muted")
+        self.note.setWordWrap(True)
+        lay.addWidget(self.note)
+
+        self.progress = QProgressBar()
+        self.progress.setFixedWidth(360)
+        self.progress.setTextVisible(False)
+        self.progress.setVisible(False)
+        lay.addWidget(self.progress)
+
+        self.phase = QLabel("")
+        self.phase.setObjectName("Muted")
+        self.phase.setVisible(False)
+        lay.addWidget(self.phase)
+
+        lay.addStretch(1)
+
+    def set_course(self, syl: Syllabus, course: Course, st: st_mod.Status) -> None:
+        pal = theme.palette()
+        self.title.setText(course.title)
+        self.summary.setText(course.summary)
+        self.objectives.setText(
+            "<ul style='margin-left:-18px'>%s</ul>"
+            % "".join("<li style='margin-bottom:5px'>%s</li>" % o for o in course.objectives))
+        if st.missing:
+            names = ", ".join(syl.title(m) for m in st.missing[:4])
+            more = "" if len(st.missing) <= 4 else " (+%d)" % (len(st.missing) - 4)
+            self.note.setText(
+                "<span style='color:%s'>Prerequis non encore maitrises : %s%s. "
+                "Rien n'empeche de generer ce cours, mais il sera plus dur a suivre.</span>"
+                % (pal["warn"], names, more))
+        else:
+            self.note.setText("Genere par le Claude local. Comptez quelques minutes : "
+                              "plan, puis chaque section, puis les exercices.")
+
+    def set_progress(self, running: bool, frac: float = 0.0, label: str = "") -> None:
+        self.btn.setVisible(not running)
+        self.progress.setVisible(running)
+        self.phase.setVisible(running)
+        if running:
+            self.progress.setRange(0, 1000)
+            self.progress.setValue(int(frac * 1000))
+            self.phase.setText(label)
+
+
+class CoursePage(QWidget):
+    open_course = Signal(str)
+    ask_requested = Signal(str, str, str)          # course_id, extrait, section
+    proof_help_requested = Signal(str, str, str, str)  # course_id, proof_id, titre, texte
+    generate_requested = Signal(list)
+    exercises_requested = Signal(str)
+    cancel_requested = Signal(str)
+
+    def __init__(self, syllabus: Syllabus, parent=None):
+        super().__init__(parent)
+        self.syl = syllabus
+        self.course: Optional[Course] = None
+        self.status: Optional[st_mod.Status] = None
+        self._loaded_tabs: set = set()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ----------------------------------------------------------- en-tete
+        head = QFrame()
+        head.setObjectName("TopBar")
+        hv = QVBoxLayout(head)
+        hv.setContentsMargins(18, 12, 16, 10)
+        hv.setSpacing(8)
+
+        line1 = QHBoxLayout()
+        line1.setSpacing(10)
+        self.title = QLabel()
+        self.title.setObjectName("H1")
+        self.title.setWordWrap(True)
+        self.title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        line1.addWidget(self.title, 1)
+
+        self.btn_ask = QPushButton("Discuter")
+        self.btn_ask.setToolTip("Ouvrir le chat sur ce cours")
+        self.btn_ask.clicked.connect(lambda: self.ask_requested.emit(
+            self.course.id if self.course else "", "", ""))
+        line1.addWidget(self.btn_ask)
+
+        self.btn_gen = QPushButton("Generer")
+        self.btn_gen.setProperty("primary", True)
+        self.btn_gen.clicked.connect(self._on_generate_clicked)
+        line1.addWidget(self.btn_gen)
+
+        self.btn_more = QPushButton("...")
+        self.btn_more.setFixedWidth(38)
+        self.btn_more.clicked.connect(self._show_menu)
+        line1.addWidget(self.btn_more)
+        hv.addLayout(line1)
+
+        self.chips_row = QHBoxLayout()
+        self.chips_row.setSpacing(6)
+        self.chips_row.addStretch(1)
+        chips_host = QWidget()
+        chips_host.setLayout(self.chips_row)
+        hv.addWidget(chips_host)
+        root.addWidget(head)
+
+        # ---------------------------------------------------------- onglets
+        self.tabs = QTabWidget()
+        self.tabs.currentChanged.connect(self._on_tab)
+        root.addWidget(self.tabs, 1)
+
+        self.empty = EmptyState()
+        self.empty.generate.connect(lambda: self.generate_requested.emit(
+            [self.course.id] if self.course else []))
+
+        self.course_view = WebView(with_bridge=True)
+        self.course_view.bridge.ask_requested.connect(self._forward_ask)
+        self.course_view.bridge.proof_help_requested.connect(self._forward_proof_help)
+
+        self.course_holder = QWidget()
+        ch = QVBoxLayout(self.course_holder)
+        ch.setContentsMargins(0, 0, 0, 0)
+        ch.addWidget(self.empty)
+        ch.addWidget(self.course_view)
+
+        self.quiz_view = WebView(with_bridge=True)
+        self.quiz_view.bridge.quiz_finished.connect(self._on_quiz_finished)
+        self.quiz_view.bridge.ask_requested.connect(self._forward_ask)
+
+        self.proofs_view = WebView(with_bridge=True)
+        self.proofs_view.bridge.proof_status_changed.connect(self._on_proof_status)
+        self.proofs_view.bridge.proof_help_requested.connect(self._forward_proof_help)
+        self.proofs_view.bridge.ask_requested.connect(self._forward_ask)
+
+        self.notes = QPlainTextEdit()
+        self.notes.setPlaceholderText(
+            "Vos notes sur ce cours : ce qui coince, les analogies qui marchent, "
+            "les exercices a refaire.")
+        notes_host = QWidget()
+        nv = QVBoxLayout(notes_host)
+        nv.setContentsMargins(20, 16, 20, 16)
+        nv.addWidget(self.notes)
+        self._notes_timer = QTimer(self)
+        self._notes_timer.setSingleShot(True)
+        self._notes_timer.setInterval(900)
+        self._notes_timer.timeout.connect(self._save_notes)
+        self.notes.textChanged.connect(lambda: self._notes_timer.start())
+
+        self.tabs.addTab(self.course_holder, "Cours")
+        self.tabs.addTab(self.quiz_view, "QCM")
+        self.tabs.addTab(self.proofs_view, "Demonstrations")
+        self.tabs.addTab(notes_host, "Notes")
+
+    # -------------------------------------------------------------- chargement
+    def show_course(self, course_id: str) -> None:
+        same = self.course is not None and self.course.id == course_id
+        self.course = self.syl.get(course_id)
+        if self.course is None:
+            return
+        if not same:
+            self._loaded_tabs.clear()
+            self.notes.blockSignals(True)
+            self.notes.setPlainText(store.get_notes(course_id))
+            self.notes.blockSignals(False)
+            store.mark_opened(course_id)
+            self.tabs.setCurrentIndex(TAB_COURSE)
+        self.refresh()
+
+    def refresh(self) -> None:
+        if self.course is None:
+            return
+        cid = self.course.id
+        self.status = st_mod.compute(self.syl)[cid]
+        self.title.setText(self.course.title)
+        self._build_chips()
+
+        generated = self.status.generated
+        self.empty.setVisible(not generated)
+        self.course_view.setVisible(generated)
+        self.btn_gen.setText("Regenerer" if generated else "Generer")
+        self.tabs.setTabEnabled(TAB_QUIZ, self.status.has_exercises)
+        self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
+        if not generated:
+            self.empty.set_course(self.syl, self.course, self.status)
+        self._loaded_tabs.discard(self.tabs.currentIndex())
+        self._on_tab(self.tabs.currentIndex())
+
+    def _build_chips(self) -> None:
+        while self.chips_row.count():
+            item = self.chips_row.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        course, st = self.course, self.status
+        pal = theme.palette()
+
+        dom = Chip(self.syl.domain_name(course.domain))
+        dom.setStyleSheet(dom.styleSheet().replace(pal["fg2"], self.syl.domain_color(course.domain)))
+        dom.setEnabled(False)
+        self.chips_row.addWidget(dom)
+
+        lvl = Chip("Niveau %d - %s" % (course.level, self.syl.levels.get(course.level, "")))
+        lvl.setEnabled(False)
+        self.chips_row.addWidget(lvl)
+
+        state_tone = {"mastered": "ok", "started": "warn", "locked": "chip"}.get(st.state, "accent")
+        state_text = st.label
+        if st.best_pct is not None:
+            state_text += "  ·  %d %%" % st.best_pct
+        state = Chip(state_text, state_tone)
+        state.setEnabled(False)
+        self.chips_row.addWidget(state)
+
+        if course.prereqs:
+            label = QLabel("Prerequis")
+            label.setObjectName("Muted")
+            label.setStyleSheet("padding-left:8px")
+            self.chips_row.addWidget(label)
+            statuses = st_mod.compute(self.syl)
+            for pid in course.prereqs:
+                ok = statuses[pid].mastered
+                chip = Chip(self.syl.title(pid), "ok" if ok else "warn")
+                chip.setToolTip("Maitrise" if ok else "Pas encore maitrise — cliquez pour l'ouvrir")
+                chip.clicked.connect(lambda _=False, p=pid: self.open_course.emit(p))
+                self.chips_row.addWidget(chip)
+        self.chips_row.addStretch(1)
+
+    def _on_tab(self, index: int) -> None:
+        if self.course is None or index in self._loaded_tabs:
+            return
+        cid = self.course.id
+        if index == TAB_COURSE and self.status and self.status.generated:
+            path = content.render_course_page(cid, self.course.title, theme.name())
+            self.course_view.load_file(path)
+            self._loaded_tabs.add(index)
+        elif index == TAB_QUIZ and self.status and self.status.has_exercises:
+            self._load_quiz()
+            self._loaded_tabs.add(index)
+        elif index == TAB_PROOFS and self.status and self.status.has_exercises:
+            self._load_proofs()
+            self._loaded_tabs.add(index)
+
+    def _load_quiz(self) -> None:
+        data = content.read_exercises(self.course.id) or {"qcm": []}
+        tpl = (ASSETS_DIR / "quiz.html").read_text(encoding="utf-8")
+        page = (tpl.replace("__THEME__", theme.name())
+                   .replace("__ASSETS__", content.assets_url())
+                   .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
+        path = _page_path("quiz_%s.html" % self.course.id)
+        path.write_text(page, encoding="utf-8")
+        self.quiz_view.load_file(path)
+
+    def _load_proofs(self) -> None:
+        data = content.read_exercises(self.course.id) or {"proofs": []}
+        statuses = store.proof_statuses(self.course.id)
+        tpl = (ASSETS_DIR / "proofs.html").read_text(encoding="utf-8")
+        page = (tpl.replace("__THEME__", theme.name())
+                   .replace("__ASSETS__", content.assets_url())
+                   .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+                   .replace("__STATUS__", json.dumps(statuses, ensure_ascii=False)))
+        path = _page_path("proofs_%s.html" % self.course.id)
+        path.write_text(page, encoding="utf-8")
+        self.proofs_view.load_file(path)
+
+    def reload_exercises(self) -> None:
+        self._loaded_tabs.discard(TAB_QUIZ)
+        self._loaded_tabs.discard(TAB_PROOFS)
+        self._on_tab(self.tabs.currentIndex())
+
+    # ----------------------------------------------------------------- actions
+    def _on_generate_clicked(self) -> None:
+        if self.course:
+            self.generate_requested.emit([self.course.id])
+
+    def _show_menu(self) -> None:
+        if self.course is None:
+            return
+        cid = self.course.id
+        menu = QMenu(self)
+        if self.status and self.status.generated:
+            act = QAction("Regenerer seulement les exercices", self)
+            act.triggered.connect(lambda: self.exercises_requested.emit(cid))
+            menu.addAction(act)
+        missing = [c for c in self.syl.path_to(cid) if not content.has_course(c)]
+        if missing:
+            act = QAction("Generer tout le chemin de prerequis (%d cours)" % len(missing), self)
+            act.triggered.connect(lambda: self.generate_requested.emit(missing))
+            menu.addAction(act)
+        act = QAction("Annuler la generation en cours", self)
+        act.triggered.connect(lambda: self.cancel_requested.emit(cid))
+        menu.addAction(act)
+        menu.addSeparator()
+        act = QAction("Ouvrir le dossier du cours", self)
+        act.triggered.connect(self._reveal)
+        menu.addAction(act)
+        menu.exec(self.btn_more.mapToGlobal(self.btn_more.rect().bottomLeft()))
+
+    def _reveal(self) -> None:
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        from ..paths import course_dir
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(course_dir(self.course.id))))
+
+    def set_generation_progress(self, running: bool, frac: float, label: str) -> None:
+        self.empty.set_progress(running, frac, label)
+        self.btn_gen.setEnabled(not running)
+        self.btn_gen.setText(label if running else
+                             ("Regenerer" if (self.status and self.status.generated) else "Generer"))
+
+    def apply_theme(self) -> None:
+        for view in (self.course_view, self.quiz_view, self.proofs_view):
+            view.set_theme(theme.name())
+        if self.course:
+            self._build_chips()
+
+    # ------------------------------------------------------------------ ponts
+    def _forward_ask(self, text: str, heading: str) -> None:
+        if self.course:
+            self.ask_requested.emit(self.course.id, text, heading)
+
+    def _forward_proof_help(self, proof_id: str, heading: str, text: str) -> None:
+        if self.course:
+            self.proof_help_requested.emit(self.course.id, proof_id, heading, text)
+
+    def _on_quiz_finished(self, payload: str) -> None:
+        if self.course is None:
+            return
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            return
+        store.record_attempt(self.course.id, int(data.get("total", 0)),
+                             int(data.get("correct", 0)), data)
+        self.refresh()
+
+    def _on_proof_status(self, proof_id: str, value: str) -> None:
+        if self.course:
+            store.set_proof_status(self.course.id, proof_id, value)
+
+    def _save_notes(self) -> None:
+        if self.course:
+            store.set_notes(self.course.id, self.notes.toPlainText())

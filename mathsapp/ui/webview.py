@@ -10,8 +10,10 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 class Bridge(QObject):
     """Objet expose au JavaScript sous le nom `app`."""
 
-    ask_requested = Signal(str, str)          # extrait, titre de section
+    ask_requested = Signal(str, str)              # extrait, titre de section
     proof_help_requested = Signal(str, str, str)  # id, titre, texte
+    quiz_finished = Signal(str)                   # charge utile JSON
+    proof_status_changed = Signal(str, str)       # id, statut
 
     @Slot(str, str)
     def askAbout(self, text: str, heading: str) -> None:  # noqa: N802 (appele par JS)
@@ -20,6 +22,14 @@ class Bridge(QObject):
     @Slot(str, str, str)
     def openProofHelper(self, proof_id: str, heading: str, text: str) -> None:  # noqa: N802
         self.proof_help_requested.emit(proof_id, heading, text)
+
+    @Slot(str)
+    def quizFinished(self, payload: str) -> None:  # noqa: N802
+        self.quiz_finished.emit(payload)
+
+    @Slot(str, str)
+    def setProofStatus(self, proof_id: str, value: str) -> None:  # noqa: N802
+        self.proof_status_changed.emit(proof_id, value)
 
 
 class _Page(QWebEnginePage):

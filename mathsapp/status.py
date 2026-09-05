@@ -67,8 +67,9 @@ def compute(syl: Syllabus, progress: Optional[Dict[str, store.Progress]] = None)
             st.proofs_total = p.proofs_total
         out[cid] = st
 
-    # maitrise puis deblocage (l'ordre du syllabus est topologique)
-    for cid in syl.order:
+    # maitrise puis deblocage, en ordre topologique : l'etat d'un prerequis
+    # doit etre connu avant celui des cours qui en dependent
+    for cid in syl.topo:
         st = out[cid]
         mastered = st.best_pct is not None and st.best_pct >= thr
         st.missing = [p for p in syl.get(cid).prereqs if out[p].state != MASTERED]
