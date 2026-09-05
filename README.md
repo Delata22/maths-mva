@@ -35,6 +35,11 @@ verrouille</em></td>
 </tr>
 </table>
 
+![Redaction d'une demonstration](docs/images/redaction-demonstration.png)
+
+<p align="center"><em>Rediger sa demonstration avec la palette de symboles, puis la
+faire corriger par Claude</em></p>
+
 ---
 
 ## Installation
