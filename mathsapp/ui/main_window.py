@@ -310,8 +310,7 @@ class MainWindow(QMainWindow):
         elif self.stack.currentIndex() == PAGE_GRAPH:
             self.graph.rebuild()
         if self.course_page.course and self.course_page.course.id == course_id and ok:
-            self.course_page.show_course(course_id)
-            self.course_page.reload_exercises()
+            self.course_page.reload_content()
 
     # -------------------------------------------------------------------- chat
     def ask_about(self, course_id: str, excerpt: str, heading: str) -> None:

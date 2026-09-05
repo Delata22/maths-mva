@@ -449,6 +449,14 @@
    *           animate : { param: 'nom', period: 4 }  (boucle automatique)
    *           draw(g, p) : fonction de dessin, p contient les valeurs des curseurs
    */
+  function digitsOf(spec) {
+    if (spec.digits != null) return spec.digits;
+    var step = spec.step;
+    if (step == null) return 2;
+    if (step >= 1) return 0;
+    return Math.min(4, Math.max(0, Math.ceil(-Math.log(step) / Math.LN10)));
+  }
+
   function plot(target, opts) {
     opts = opts || {};
     var host = resolve(target);
@@ -513,10 +521,10 @@
         input.step = spec.step == null ? (spec.max - spec.min) / 100 : spec.step;
         input.value = values[k];
         var out = el('span', 'mviz-slider-value', row);
-        out.textContent = (+values[k]).toFixed(spec.digits == null ? 2 : spec.digits);
+        out.textContent = (+values[k]).toFixed(digitsOf(spec));
         input.addEventListener('input', function () {
           values[k] = parseFloat(input.value);
-          out.textContent = values[k].toFixed(spec.digits == null ? 2 : spec.digits);
+          out.textContent = values[k].toFixed(digitsOf(spec));
           render();
         });
         row._input = input; row._out = out;
@@ -544,7 +552,7 @@
         values[opts.animate.param] = v;
         if (spec._row) {
           spec._row._input.value = v;
-          spec._row._out.textContent = v.toFixed(spec.digits == null ? 2 : spec.digits);
+          spec._row._out.textContent = v.toFixed(digitsOf(spec));
         }
         render();
         raf = requestAnimationFrame(frame);

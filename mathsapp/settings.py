@@ -11,6 +11,7 @@ DEFAULTS = {
     "model/exercises": "sonnet",
     "model/chat": "opus",
     "gen/concurrency": 1,
+    "gen/section_parallel": 3,
     "gen/max_sections": 9,
     "ui/mastery_threshold": 80,
     "ui/font_scale": 100,

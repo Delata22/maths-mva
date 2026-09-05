@@ -10,6 +10,7 @@ from typing import Optional
 from .paths import ASSETS_DIR, course_dir
 
 BODY = "body.html"
+SECTIONS = "sections"
 PLAN = "plan.json"
 EXOS = "exercises.json"
 META = "meta.json"
@@ -36,6 +37,33 @@ def read_body(course_id: str) -> str:
 
 def write_body(course_id: str, body: str) -> None:
     _p(course_id, BODY).write_text(body, encoding="utf-8")
+
+
+def sections_dir(course_id: str) -> pathlib.Path:
+    d = course_dir(course_id) / SECTIONS
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def read_section(course_id: str, index: int, fingerprint: str) -> Optional[str]:
+    """Section deja generee pour ce plan, ou None.
+
+    Le plan peut changer d'une generation a l'autre : on ne reutilise une
+    section que si l'empreinte du plan est la meme.
+    """
+    p = sections_dir(course_id) / ("%02d.html" % index)
+    if not p.exists():
+        return None
+    text = p.read_text(encoding="utf-8")
+    head, _, body = text.partition("\n")
+    if head.strip() != "<!--%s-->" % fingerprint or len(body.strip()) < 200:
+        return None
+    return body.strip()
+
+
+def write_section(course_id: str, index: int, fingerprint: str, html_text: str) -> None:
+    p = sections_dir(course_id) / ("%02d.html" % index)
+    p.write_text("<!--%s-->\n%s" % (fingerprint, html_text), encoding="utf-8")
 
 
 def read_json(course_id: str, name: str) -> Optional[dict]:
@@ -70,6 +98,11 @@ def delete_course(course_id: str) -> None:
     for f in d.iterdir():
         if f.is_file():
             f.unlink()
+    sec = d / SECTIONS
+    if sec.is_dir():
+        for f in sec.iterdir():
+            if f.is_file():
+                f.unlink()
 
 
 # ------------------------------------------------------------------ nettoyage

@@ -1,8 +1,12 @@
 """Chaine de generation d'un cours : plan -> sections -> exercices."""
 from __future__ import annotations
 
+import hashlib
+import json
+import threading
 import time
-from typing import Callable, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Dict, List, Optional
 
 from .. import content, settings, store
 from ..syllabus import Syllabus, load as load_syllabus
@@ -54,39 +58,104 @@ def generate_plan(syl: Syllabus, course_id: str, model: str,
     return plan
 
 
+def plan_fingerprint(plan: dict) -> str:
+    """Identifie un plan par ses sections, pour savoir si le cache est valide."""
+    payload = json.dumps([[sec.get("id"), sec.get("title"), sec.get("content")]
+                          for sec in plan.get("sections", [])],
+                         ensure_ascii=False, sort_keys=True)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+
+
 def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
                       on_progress: ProgressCb = _noop,
                       cancel: CancelCb = _never) -> tuple[str, float]:
+    """Redige toutes les sections, en parallele et de facon reprenable.
+
+    Chaque section est ecrite dans son propre fichier : une generation
+    interrompue reprend la ou elle s'etait arretee au lieu de tout refaire.
+    """
     course = syl.get(course_id)
     sections: List[dict] = plan["sections"]
     n = len(sections)
-    parts: List[str] = []
-    titles: List[str] = []
-    cost = 0.0
-    for i, section in enumerate(sections):
+    fingerprint = plan_fingerprint(plan)
+    titles = [sec["title"] for sec in sections]
+    parts: List[Optional[str]] = [None] * n
+    costs: List[float] = [0.0] * n
+    chars: Dict[int, int] = {}
+
+    for i in range(n):
+        cached = content.read_section(course_id, i, fingerprint)
+        if cached:
+            parts[i] = cached
+            chars[i] = len(cached)
+
+    todo = [i for i in range(n) if parts[i] is None]
+    done_count = n - len(todo)
+    lock = threading.Lock()
+
+    def flush() -> None:
+        """Ecrit le corps du cours avec ce qui est deja pret."""
+        content.write_body(course_id, "\n\n".join(p for p in parts if p))
+
+    def report() -> None:
+        # avancement : sections terminees, plus les caracteres recus pour
+        # celles en cours (une section fait ~9000 caracteres)
+        partial = sum(min(1.0, chars.get(i, 0) / 9000.0) for i in todo if parts[i] is None)
+        frac = 0.10 + 0.72 * (done_count + partial) / max(1, n)
+        running = [titles[i] for i in todo if parts[i] is None and chars.get(i)]
+        label = ("Section %d/%d - %s" % (done_count + 1, n, running[0])
+                 if running else "Sections %d/%d" % (done_count, n))
+        if len(running) > 1:
+            label += "  (+%d en parallele)" % (len(running) - 1)
+        on_progress(label, frac)
+
+    if done_count:
+        flush()
+    report()
+
+    def work(index: int) -> None:
+        nonlocal done_count
         _check(cancel)
-        base = 0.10 + 0.72 * i / n
-        span = 0.72 / n
 
-        def progress(chars: int, _base=base, _span=span, _title=section["title"], _i=i):
-            # on estime une section a ~9000 caracteres pour la barre
-            frac = min(0.97, chars / 9000.0)
-            on_progress("Section %d/%d - %s" % (_i + 1, n, _title), _base + _span * frac)
+        def progress(count: int, _i=index) -> None:
+            with lock:
+                chars[_i] = count
+            report()
 
-        on_progress("Section %d/%d - %s" % (i + 1, n, section["title"]), base)
         res = cc.run(
-            prompts.section_prompt(syl, course, plan, i, titles),
+            prompts.section_prompt(syl, course, plan, index, titles[:index]),
             model=model,
             system=("Vous redigez des cours de mathematiques en HTML. Vous ne "
                     "produisez que le fragment HTML demande, sans commentaire."),
             cancel=cancel,
             on_progress=progress,
         )
-        cost += res.cost_usd
-        parts.append(content.clean_html(res.text))
-        titles.append(section["title"])
-        content.write_body(course_id, "\n\n".join(parts))
-    return "\n\n".join(parts), cost
+        body = content.clean_html(res.text)
+        with lock:
+            parts[index] = body
+            costs[index] = res.cost_usd
+            done_count += 1
+            content.write_section(course_id, index, fingerprint, body)
+            flush()
+        report()
+
+    workers = max(1, min(6, int(settings.get("gen/section_parallel") or 3), len(todo) or 1))
+    if todo:
+        if workers == 1:
+            for index in todo:
+                work(index)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = [pool.submit(work, index) for index in todo]
+                for future in as_completed(futures):
+                    future.result()   # laisse remonter la premiere erreur
+
+    missing = [i for i in range(n) if parts[i] is None]
+    if missing:
+        raise cc.ClaudeError("Sections manquantes : %s"
+                             % ", ".join(titles[i] for i in missing))
+    flush()
+    return "\n\n".join(parts), sum(costs)
 
 
 def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,

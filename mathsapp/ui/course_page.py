@@ -150,6 +150,7 @@ class CoursePage(QWidget):
         self.syl = syllabus
         self.course: Optional[Course] = None
         self.status: Optional[st_mod.Status] = None
+        self._statuses: Dict[str, st_mod.Status] = {}
         self._loaded_tabs: set = set()
 
         root = QVBoxLayout(self)
@@ -262,7 +263,8 @@ class CoursePage(QWidget):
         if self.course is None:
             return
         cid = self.course.id
-        self.status = st_mod.compute(self.syl)[cid]
+        self._statuses = st_mod.compute(self.syl)
+        self.status = self._statuses[cid]
         self.title.setText(self.course.title)
         self._build_chips()
 
@@ -274,7 +276,6 @@ class CoursePage(QWidget):
         self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
         if not generated:
             self.empty.set_course(self.syl, self.course, self.status)
-        self._loaded_tabs.discard(self.tabs.currentIndex())
         self._on_tab(self.tabs.currentIndex())
 
     def _build_chips(self) -> None:
@@ -308,9 +309,8 @@ class CoursePage(QWidget):
             label.setObjectName("Muted")
             label.setStyleSheet("padding-left:8px")
             self.chips_row.addWidget(label)
-            statuses = st_mod.compute(self.syl)
             for pid in course.prereqs:
-                ok = statuses[pid].mastered
+                ok = self._statuses[pid].mastered
                 chip = Chip(self.syl.title(pid), "ok" if ok else "warn")
                 chip.setToolTip("Maitrise" if ok else "Pas encore maitrise — cliquez pour l'ouvrir")
                 chip.clicked.connect(lambda _=False, p=pid: self.open_course.emit(p))
@@ -354,10 +354,10 @@ class CoursePage(QWidget):
         path.write_text(page, encoding="utf-8")
         self.proofs_view.load_file(path)
 
-    def reload_exercises(self) -> None:
-        self._loaded_tabs.discard(TAB_QUIZ)
-        self._loaded_tabs.discard(TAB_PROOFS)
-        self._on_tab(self.tabs.currentIndex())
+    def reload_content(self) -> None:
+        """Force le rechargement des vues web (apres une (re)generation)."""
+        self._loaded_tabs.clear()
+        self.refresh()
 
     # ----------------------------------------------------------------- actions
     def _on_generate_clicked(self) -> None:

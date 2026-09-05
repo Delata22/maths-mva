@@ -71,6 +71,13 @@ Regles pour les figures :
 """
 
 HTML_CONVENTIONS = r"""
+LANGUE : francais, avec TOUS les accents et signes diacritiques
+(e-accent-aigu, e-accent-grave, a-accent-grave, c-cedille, circonflexes...).
+Ces consignes sont ecrites sans accents pour des raisons techniques :
+n'imitez surtout pas ce style. Un texte de cours sans accents est
+inacceptable. Cela vaut aussi pour les titres, les legendes de figures, les
+libelles de curseurs et le texte dessine dans les figures.
+
 FORMAT DE SORTIE : fragment HTML uniquement.
 Interdit : ``` de code autour de la reponse, <html>, <head>, <body>, <article>,
 commentaires d'introduction du type "Voici le cours". Vous ecrivez directement
@@ -227,6 +234,9 @@ Contraintes :
   cours, et representatifs. Ils seront enonces dans le cours avec la mention
   qu'ils sont a demontrer en exercice.
 - `hook` : une phrase qui dit ce que l'etudiant saura faire a la fin.
+
+Redigez en francais avec TOUS les accents. Ces consignes sont ecrites sans
+accents pour des raisons techniques : n'imitez pas ce style.
 
 Repondez uniquement par l'objet JSON."""
 
@@ -389,6 +399,9 @@ TACHE : produire un JSON avec deux tableaux, `qcm` et `proofs`.
     l'etape, chaque `content` explique en une a trois phrases CE QU'ON FAIT ET
     POURQUOI, sans dérouler tout le calcul.
   - `solution` : la demonstration complete et rigoureuse, redigee.
+
+Redigez en francais avec TOUS les accents : ces consignes sont ecrites sans
+accents pour des raisons techniques, n'imitez pas ce style.
 
 Tous les champs texte sont du HTML simple (p, ul, li, strong, em, code) avec du
 LaTeX entre $ ... $. Pas de titres <h*>, pas de figures, pas de blocs ```.

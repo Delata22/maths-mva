@@ -50,6 +50,14 @@ class PrefsDialog(QDialog):
         self.concurrency.setToolTip("Nombre de cours generes en parallele.")
         gf.addRow("Generations en parallele", self.concurrency)
 
+        self.section_parallel = QSpinBox()
+        self.section_parallel.setRange(1, 6)
+        self.section_parallel.setValue(int(settings.get("gen/section_parallel")))
+        self.section_parallel.setToolTip(
+            "Sections d'un meme cours redigees en parallele. Accelere nettement "
+            "la generation ; 3 est un bon compromis.")
+        gf.addRow("Sections en parallele", self.section_parallel)
+
         self.sections = QSpinBox()
         self.sections.setRange(4, 14)
         self.sections.setValue(int(settings.get("gen/max_sections")))
@@ -111,6 +119,7 @@ class PrefsDialog(QDialog):
         settings.put("model/exercises", self.m_exos.currentText().strip())
         settings.put("model/chat", self.m_chat.currentText().strip())
         settings.put("gen/concurrency", self.concurrency.value())
+        settings.put("gen/section_parallel", self.section_parallel.value())
         settings.put("gen/max_sections", self.sections.value())
         settings.put("claude/timeout", self.timeout.value())
         settings.put("claude/binary", self.binary.text().strip() or "claude")
