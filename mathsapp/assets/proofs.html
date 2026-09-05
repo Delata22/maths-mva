@@ -109,7 +109,8 @@ function typeset(n) {
   });
 }
 if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTransport) {
-  new QWebChannel(window.qt.webChannelTransport, function (ch) { bridge = ch.objects.app; });
+  new QWebChannel(window.qt.webChannelTransport,
+    function (ch) { bridge = ch.objects.app; window.app = bridge; });
 }
 function esc(s) { return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)); }

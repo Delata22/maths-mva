@@ -17,8 +17,8 @@ META = "meta.json"
 
 
 # ------------------------------------------------------------------- acces
-def _p(course_id: str, name: str) -> pathlib.Path:
-    return course_dir(course_id) / name
+def _p(course_id: str, name: str, create: bool = False) -> pathlib.Path:
+    return course_dir(course_id, create=create) / name
 
 
 def has_course(course_id: str) -> bool:
@@ -36,12 +36,13 @@ def read_body(course_id: str) -> str:
 
 
 def write_body(course_id: str, body: str) -> None:
-    _p(course_id, BODY).write_text(body, encoding="utf-8")
+    _p(course_id, BODY, create=True).write_text(body, encoding="utf-8")
 
 
-def sections_dir(course_id: str) -> pathlib.Path:
-    d = course_dir(course_id) / SECTIONS
-    d.mkdir(parents=True, exist_ok=True)
+def sections_dir(course_id: str, create: bool = False) -> pathlib.Path:
+    d = course_dir(course_id, create=create) / SECTIONS
+    if create:
+        d.mkdir(parents=True, exist_ok=True)
     return d
 
 
@@ -62,7 +63,7 @@ def read_section(course_id: str, index: int, fingerprint: str) -> Optional[str]:
 
 
 def write_section(course_id: str, index: int, fingerprint: str, html_text: str) -> None:
-    p = sections_dir(course_id) / ("%02d.html" % index)
+    p = sections_dir(course_id, create=True) / ("%02d.html" % index)
     p.write_text("<!--%s-->\n%s" % (fingerprint, html_text), encoding="utf-8")
 
 
@@ -77,7 +78,7 @@ def read_json(course_id: str, name: str) -> Optional[dict]:
 
 
 def write_json(course_id: str, name: str, data) -> None:
-    _p(course_id, name).write_text(
+    _p(course_id, name, create=True).write_text(
         json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
@@ -95,6 +96,8 @@ def read_meta(course_id: str):
 
 def delete_course(course_id: str) -> None:
     d = course_dir(course_id)
+    if not d.is_dir():
+        return
     for f in d.iterdir():
         if f.is_file():
             f.unlink()
@@ -145,7 +148,7 @@ def build_page(body: str, title: str, theme: str = "light", extra_css: str = "")
 def render_course_page(course_id: str, title: str, theme: str = "light") -> pathlib.Path:
     """Ecrit la page complete du cours et retourne son chemin."""
     page = build_page(read_body(course_id), title, theme)
-    out = course_dir(course_id) / "_render.html"
+    out = course_dir(course_id, create=True) / "_render.html"
     out.write_text(page, encoding="utf-8")
     return out
 

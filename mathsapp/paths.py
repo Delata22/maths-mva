@@ -21,9 +21,12 @@ def library_dir() -> pathlib.Path:
     return d
 
 
-def course_dir(course_id: str) -> pathlib.Path:
+def course_dir(course_id: str, create: bool = False) -> pathlib.Path:
+    """Dossier d'un cours. `create=True` uniquement avant une ecriture :
+    une simple lecture ne doit pas semer des dossiers vides."""
     d = library_dir() / course_id
-    d.mkdir(parents=True, exist_ok=True)
+    if create:
+        d.mkdir(parents=True, exist_ok=True)
     return d
 
 

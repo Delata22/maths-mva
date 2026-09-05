@@ -391,7 +391,8 @@ class CoursePage(QWidget):
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
         from ..paths import course_dir
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(course_dir(self.course.id))))
+        QDesktopServices.openUrl(
+            QUrl.fromLocalFile(str(course_dir(self.course.id, create=True))))
 
     def set_generation_progress(self, running: bool, frac: float, label: str) -> None:
         self.empty.set_progress(running, frac, label)

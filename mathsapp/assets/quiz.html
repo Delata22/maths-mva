@@ -110,7 +110,8 @@ function typeset(n) {
   });
 }
 if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTransport) {
-  new QWebChannel(window.qt.webChannelTransport, function (ch) { bridge = ch.objects.app; });
+  new QWebChannel(window.qt.webChannelTransport,
+    function (ch) { bridge = ch.objects.app; window.app = bridge; });
 }
 
 var shell = document.getElementById('shell');

@@ -10,6 +10,7 @@
     }
     new QWebChannel(window.qt.webChannelTransport, function (channel) {
       bridge = channel.objects.app || null;
+      window.app = bridge;   // expose pour le debogage et les tests
       done();
     });
   }
