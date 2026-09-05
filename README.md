@@ -12,6 +12,29 @@ faire expliquer une demonstration etape par etape.
 
 Tout est local : aucun serveur, aucun navigateur, KaTeX embarque.
 
+![Accueil](docs/images/accueil.png)
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/cours-gradient.png" alt="Figure interactive"></td>
+<td width="50%"><img src="docs/images/graphe.png" alt="Graphe des prerequis"></td>
+</tr>
+<tr>
+<td align="center"><em>Une figure de cours : carte topographique, lignes de niveau et
+gradient, avec curseurs</em></td>
+<td align="center"><em>Le cursus comme graphe : ce qui est accessible, ce qui est
+verrouille</em></td>
+</tr>
+<tr>
+<td><img src="docs/images/qcm.png" alt="QCM"></td>
+<td><img src="docs/images/demonstrations.png" alt="Demonstrations"></td>
+</tr>
+<tr>
+<td align="center"><em>QCM a difficulte croissante</em></td>
+<td align="center"><em>Demonstrations a faire, avec indices progressifs</em></td>
+</tr>
+</table>
+
 ---
 
 ## Installation
