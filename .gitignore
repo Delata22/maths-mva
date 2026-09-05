@@ -1,0 +1,12 @@
+# environnement
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# contenu genere par l'app (cours, exercices, progression)
+library/
+
+# divers
+.DS_Store
+*.log
