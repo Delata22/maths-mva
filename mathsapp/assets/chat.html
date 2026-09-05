@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="__ASSETS__/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="__ASSETS__/course.css">
+<style>
+  body { font-size: 14.5px; line-height: 1.62; }
+  #log { padding: 14px 16px 26px; max-width: 100%; }
+  .msg { margin: 0 0 14px; }
+  .msg .who {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 5px;
+  }
+  .msg.user .bubble {
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: .62em .9em;
+    white-space: pre-wrap;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: .95em;
+  }
+  .msg.user .who { color: var(--accent); }
+  .msg.assistant .bubble > :first-child { margin-top: 0; }
+  .msg.assistant .bubble > :last-child { margin-bottom: 0; }
+  .msg.assistant h4 { margin: 1.1em 0 .35em; font-size: 1em; }
+  .msg.error .bubble {
+    border-left: 3px solid #dc2626; background: var(--warn-soft);
+    padding: .6em .9em; border-radius: 8px; font-size: .92em;
+  }
+  .box { margin: 1em 0; padding: .8em 1em; }
+  .katex-display { margin: .8em 0; }
+  #empty {
+    padding: 30px 20px; color: var(--muted);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px;
+    text-align: center; line-height: 1.7;
+  }
+  .cursor {
+    display: inline-block; width: 7px; height: 1em; vertical-align: -2px;
+    background: var(--accent); animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+<script src="__ASSETS__/vendor/katex/katex.min.js"></script>
+<script src="__ASSETS__/vendor/katex/contrib/auto-render.min.js"></script>
+</head>
+<body>
+<div id="log"><div id="empty">__EMPTY__</div></div>
+<script>
+var MACROS = {
+  '\\R': '\\mathbb{R}', '\\N': '\\mathbb{N}', '\\Z': '\\mathbb{Z}',
+  '\\Q': '\\mathbb{Q}', '\\C': '\\mathbb{C}', '\\E': '\\mathbb{E}',
+  '\\P': '\\mathbb{P}', '\\1': '\\mathbf{1}',
+  '\\norm': '\\left\\lVert #1 \\right\\rVert', '\\abs': '\\left| #1 \\right|',
+  '\\scal': '\\left\\langle #1 , #2 \\right\\rangle',
+  '\\argmin': '\\operatorname{arg\\,min}', '\\argmax': '\\operatorname{arg\\,max}',
+  '\\Var': '\\operatorname{Var}', '\\Cov': '\\operatorname{Cov}',
+  '\\rank': '\\operatorname{rang}', '\\tr': '\\operatorname{tr}',
+  '\\diag': '\\operatorname{diag}', '\\Id': '\\mathrm{Id}',
+  '\\dd': '\\mathrm{d}', '\\eps': '\\varepsilon'
+};
+function typeset(node) {
+  if (typeof renderMathInElement === 'undefined') return;
+  renderMathInElement(node, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '\\[', right: '\\]', display: true},
+      {left: '$', right: '$', display: false},
+      {left: '\\(', right: '\\)', display: false}
+    ],
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+    throwOnError: false, strict: false, macros: MACROS
+  });
+}
+var log = document.getElementById('log');
+var current = null, buffer = '', pending = false;
+
+function dropEmpty() {
+  var e = document.getElementById('empty');
+  if (e) e.remove();
+}
+function atBottom() {
+  return window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
+}
+function toBottom(force) {
+  if (force || atBottom()) window.scrollTo(0, document.body.scrollHeight);
+}
+function makeMsg(role, label) {
+  dropEmpty();
+  var d = document.createElement('div');
+  d.className = 'msg ' + role;
+  var w = document.createElement('div');
+  w.className = 'who';
+  w.textContent = label;
+  var b = document.createElement('div');
+  b.className = 'bubble';
+  d.appendChild(w); d.appendChild(b);
+  log.appendChild(d);
+  return b;
+}
+window.chatAdd = function (role, html) {
+  var b = makeMsg(role, role === 'user' ? 'Vous' : (role === 'error' ? 'Erreur' : 'Claude'));
+  b.innerHTML = html;
+  if (role !== 'user') typeset(b);
+  toBottom(true);
+};
+window.chatBegin = function () {
+  current = makeMsg('assistant', 'Claude');
+  buffer = '';
+  current.innerHTML = '<span class="cursor"></span>';
+  toBottom(true);
+};
+window.chatDelta = function (chunk) {
+  if (!current) window.chatBegin();
+  buffer += chunk;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(function () {
+    pending = false;
+    var stick = atBottom();
+    current.innerHTML = buffer + '<span class="cursor"></span>';
+    toBottom(stick);
+  });
+};
+window.chatEnd = function () {
+  if (!current) return;
+  current.innerHTML = buffer;
+  typeset(current);
+  current = null; buffer = '';
+  toBottom(false);
+};
+window.chatError = function (msg) {
+  if (current) { current.parentElement.remove(); current = null; buffer = ''; }
+  window.chatAdd('error', msg);
+};
+window.chatReset = function (emptyText) {
+  log.innerHTML = '<div id="empty">' + (emptyText || '') + '</div>';
+  current = null; buffer = '';
+};
+window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
+</script>
+</body>
+</html>

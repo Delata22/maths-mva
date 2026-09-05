@@ -1,0 +1,385 @@
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f6f7fa;
+  --fg: #1a1d24;
+  --fg-soft: #4a5261;
+  --muted: #79839a;
+  --line: #e2e6ee;
+  --line-strong: #ccd3e0;
+  --accent: #2f6df6;
+  --accent-soft: #eaf0ff;
+  --ok: #0f9d76;
+  --ok-soft: #e6f7f1;
+  --warn: #c2740a;
+  --warn-soft: #fdf3e2;
+  --violet: #7c4dff;
+  --violet-soft: #f1ecff;
+  --pink: #db2777;
+  --code-bg: #f2f4f8;
+  --radius: 10px;
+  --maxw: 780px;
+}
+
+[data-theme="dark"] {
+  --bg: #12151c;
+  --bg-soft: #181c25;
+  --fg: #e6e9f0;
+  --fg-soft: #b8c0d0;
+  --muted: #8b93a5;
+  --line: #262c39;
+  --line-strong: #333b4c;
+  --accent: #6ea0ff;
+  --accent-soft: #17233c;
+  --ok: #3ddc97;
+  --ok-soft: #12251f;
+  --warn: #fbbf24;
+  --warn-soft: #2a2113;
+  --violet: #b39dff;
+  --violet-soft: #201a35;
+  --pink: #f472b6;
+  --code-bg: #1b2029;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Source Serif 4", Charter, Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { display: flex; align-items: flex-start; gap: 0; }
+
+/* ------------------------------------------------------------------- sommaire */
+#toc {
+  position: sticky;
+  top: 0;
+  flex: 0 0 236px;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 28px 14px 40px 20px;
+  border-right: 1px solid var(--line);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--bg-soft);
+}
+#toc .toc-title {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+#toc a {
+  display: block;
+  padding: 4px 8px;
+  margin: 1px 0;
+  color: var(--fg-soft);
+  text-decoration: none;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+}
+#toc a:hover { background: var(--bg); color: var(--fg); }
+#toc a.lvl3 { padding-left: 20px; font-size: 12.3px; color: var(--muted); }
+#toc a.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg); font-weight: 600; }
+
+main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 34px 40px 140px;
+}
+article { max-width: var(--maxw); margin: 0 auto; }
+
+/* ------------------------------------------------------------------- titres */
+h1, h2, h3, h4 {
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  line-height: 1.25;
+  color: var(--fg);
+  scroll-margin-top: 18px;
+}
+h1 { font-size: 2.05em; font-weight: 700; letter-spacing: -.018em; margin: 0 0 .1em; }
+h2 {
+  font-size: 1.42em; font-weight: 660; margin: 2.4em 0 .7em;
+  padding-bottom: .32em; border-bottom: 1px solid var(--line);
+}
+h3 { font-size: 1.12em; font-weight: 640; margin: 1.9em 0 .5em; }
+h4 { font-size: 1em; font-weight: 640; margin: 1.4em 0 .4em; color: var(--fg-soft); }
+
+.lead {
+  font-size: 1.1em;
+  color: var(--fg-soft);
+  margin: .5em 0 2em;
+  padding-bottom: 1.4em;
+  border-bottom: 1px solid var(--line);
+}
+
+p { margin: 0 0 1.05em; }
+ul, ol { margin: 0 0 1.05em; padding-left: 1.5em; }
+li { margin: .3em 0; }
+li > ul, li > ol { margin: .3em 0; }
+a { color: var(--accent); }
+
+hr { border: 0; border-top: 1px solid var(--line); margin: 2.4em 0; }
+
+/* ------------------------------------------------------------------ encadres */
+.box {
+  margin: 1.5em 0;
+  padding: 1.05em 1.25em;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  position: relative;
+}
+.box > :last-child { margin-bottom: 0; }
+.box .box-title {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .74em;
+  font-weight: 700;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+  margin-bottom: .55em;
+  display: block;
+}
+
+.definition { border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.definition .box-title { color: var(--accent); }
+
+.theorem, .proposition, .lemma, .corollary {
+  border-left: 3px solid var(--violet); background: var(--violet-soft);
+}
+.theorem .box-title, .proposition .box-title,
+.lemma .box-title, .corollary .box-title { color: var(--violet); }
+.theorem .statement, .proposition .statement { font-style: italic; }
+
+.intuition { border-left: 3px solid var(--ok); background: var(--ok-soft); }
+.intuition .box-title { color: var(--ok); }
+
+.warning, .pitfall { border-left: 3px solid var(--warn); background: var(--warn-soft); }
+.warning .box-title, .pitfall .box-title { color: var(--warn); }
+
+.example { border-left: 3px solid var(--muted); }
+.example .box-title { color: var(--muted); }
+
+.recap { border: 1px solid var(--line-strong); background: var(--bg-soft); }
+.recap .box-title { color: var(--fg-soft); }
+
+/* ---------------------------------------------------------------- preuves */
+details.proof {
+  margin: 1.2em 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+details.proof > summary {
+  cursor: pointer;
+  padding: .62em 1em;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .84em;
+  font-weight: 620;
+  letter-spacing: .02em;
+  color: var(--fg-soft);
+  background: var(--bg-soft);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: .5em;
+  user-select: none;
+}
+details.proof > summary::-webkit-details-marker { display: none; }
+details.proof > summary::before {
+  content: "▸";
+  color: var(--muted);
+  transition: transform .15s;
+  display: inline-block;
+}
+details.proof[open] > summary::before { transform: rotate(90deg); }
+details.proof[open] > summary { border-bottom: 1px solid var(--line); }
+details.proof .proof-body { padding: 1em 1.25em .2em; }
+details.proof .proof-body > :last-child { margin-bottom: 1em; }
+
+.proof-step {
+  margin: .9em 0;
+  padding-left: .95em;
+  border-left: 2px solid var(--line-strong);
+}
+.proof-step > .step-label {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .78em;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+  margin-bottom: .2em;
+}
+
+.qed { text-align: right; color: var(--muted); font-size: .9em; margin-top: .4em; }
+
+.proof-help {
+  margin: .2em 1.25em 1em;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .82em;
+}
+
+/* ----------------------------------------------------------------- figures */
+figure, .mviz {
+  margin: 1.8em 0;
+  padding: 0;
+}
+.mviz-stage {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+  display: block;
+  line-height: 0;
+}
+.mviz canvas { display: block; width: 100%; }
+.mviz-caption, figcaption {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .82em;
+  color: var(--muted);
+  margin-top: .6em;
+  line-height: 1.5;
+  text-align: left;
+}
+.mviz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5em 1.4em;
+  align-items: center;
+  margin-top: .7em;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .82em;
+}
+.mviz-slider { display: flex; align-items: center; gap: .55em; color: var(--fg-soft); }
+.mviz-slider-name { min-width: 1.4em; }
+.mviz-slider input[type=range] { width: 148px; accent-color: var(--accent); }
+.mviz-slider-value {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: .92em;
+  color: var(--muted);
+  min-width: 3.2em;
+}
+.mviz-play {
+  font: inherit;
+  padding: .28em .85em;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-soft);
+  color: var(--fg-soft);
+  cursor: pointer;
+}
+.mviz-play:hover { border-color: var(--accent); color: var(--accent); }
+.mviz-play.is-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* -------------------------------------------------------------------- code */
+code, kbd {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: .88em;
+  background: var(--code-bg);
+  padding: .12em .38em;
+  border-radius: 4px;
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .95em 1.1em;
+  overflow-x: auto;
+  line-height: 1.55;
+  font-size: .86em;
+  margin: 1.4em 0;
+}
+pre code { background: none; padding: 0; font-size: 1em; }
+
+/* ------------------------------------------------------------------ tables */
+.table-scroll { overflow-x: auto; margin: 1.5em 0; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .89em;
+}
+th, td {
+  border-bottom: 1px solid var(--line);
+  padding: .55em .8em;
+  text-align: left;
+  vertical-align: top;
+}
+th { font-weight: 640; color: var(--fg-soft); background: var(--bg-soft); }
+tbody tr:hover { background: var(--bg-soft); }
+
+blockquote {
+  margin: 1.4em 0;
+  padding: .2em 0 .2em 1.1em;
+  border-left: 3px solid var(--line-strong);
+  color: var(--fg-soft);
+}
+
+/* ------------------------------------------------------------------- KaTeX */
+.katex { font-size: 1.045em; }
+.katex-display {
+  margin: 1.15em 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.katex-display > .katex { text-align: center; }
+
+/* --------------------------------------------------------- bulle "demander" */
+#ask-bubble {
+  position: fixed;
+  z-index: 900;
+  display: none;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: .42em .9em;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.22);
+}
+#ask-bubble:hover { filter: brightness(1.08); }
+
+.mask { filter: blur(5px); opacity: .55; cursor: pointer; transition: filter .2s, opacity .2s; }
+.mask.revealed { filter: none; opacity: 1; cursor: auto; }
+
+.badge {
+  display: inline-block;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .68em;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: .16em .55em;
+  border-radius: 999px;
+  vertical-align: middle;
+  background: var(--bg-soft);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+::selection { background: var(--accent-soft); }
+[data-theme="dark"] ::selection { background: #2b3d63; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 900px) {
+  #toc { display: none; }
+  main { padding: 26px 20px 120px; }
+}
