@@ -141,6 +141,7 @@ class CoursePage(QWidget):
     open_course = Signal(str)
     ask_requested = Signal(str, str, str)          # course_id, extrait, section
     proof_help_requested = Signal(str, str, str, str)  # course_id, proof_id, titre, texte
+    proof_review_requested = Signal(str, str, str)     # course_id, proof_id, charge utile
     generate_requested = Signal(list)
     exercises_requested = Signal(str)
     cancel_requested = Signal(str)
@@ -222,6 +223,8 @@ class CoursePage(QWidget):
 
         self.proofs_view = WebView(with_bridge=True)
         self.proofs_view.bridge.proof_status_changed.connect(self._on_proof_status)
+        self.proofs_view.bridge.proof_draft_changed.connect(self._on_proof_draft)
+        self.proofs_view.bridge.proof_review_requested.connect(self._on_proof_review)
         self.proofs_view.bridge.proof_help_requested.connect(self._forward_proof_help)
         self.proofs_view.bridge.ask_requested.connect(self._forward_ask)
 
@@ -345,11 +348,13 @@ class CoursePage(QWidget):
     def _load_proofs(self) -> None:
         data = content.read_exercises(self.course.id) or {"proofs": []}
         statuses = store.proof_statuses(self.course.id)
+        drafts = store.proof_drafts(self.course.id)
         tpl = (ASSETS_DIR / "proofs.html").read_text(encoding="utf-8")
         page = (tpl.replace("__THEME__", theme.name())
                    .replace("__ASSETS__", content.assets_url())
                    .replace("__DATA__", json.dumps(data, ensure_ascii=False))
-                   .replace("__STATUS__", json.dumps(statuses, ensure_ascii=False)))
+                   .replace("__STATUS__", json.dumps(statuses, ensure_ascii=False))
+                   .replace("__DRAFTS__", json.dumps(drafts, ensure_ascii=False)))
         path = _page_path("proofs_%s.html" % self.course.id)
         path.write_text(page, encoding="utf-8")
         self.proofs_view.load_file(path)
@@ -434,6 +439,14 @@ class CoursePage(QWidget):
     def _on_proof_status(self, proof_id: str, value: str) -> None:
         if self.course:
             store.set_proof_status(self.course.id, proof_id, value)
+
+    def _on_proof_draft(self, proof_id: str, text: str) -> None:
+        if self.course:
+            store.set_proof_draft(self.course.id, proof_id, text)
+
+    def _on_proof_review(self, proof_id: str, payload: str) -> None:
+        if self.course:
+            self.proof_review_requested.emit(self.course.id, proof_id, payload)
 
     def _save_notes(self) -> None:
         if self.course:

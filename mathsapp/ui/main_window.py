@@ -178,6 +178,7 @@ class MainWindow(QMainWindow):
         self.course_page.cancel_requested.connect(self.queue.cancel)
         self.course_page.ask_requested.connect(self.ask_about)
         self.course_page.proof_help_requested.connect(self.open_proof_helper)
+        self.course_page.proof_review_requested.connect(self.open_proof_review)
 
         self.graph.course_opened.connect(self.open_course)
         self.graph.generate_requested.connect(self.enqueue)
@@ -336,7 +337,7 @@ class MainWindow(QMainWindow):
         course = self.syl.get(course_id)
         window = ProofHelperWindow(self.syl, self)
         window.setWindowTitle("Démonstration : %s" % (title or self.syl.title(course_id)))
-        window.chat.set_context(course, "proof:%s" % proof_id, proof_mode=True,
+        window.chat.set_context(course, "proof:%s" % proof_id, mode="proof",
                                 title=title or "Démonstration")
         self._proof_windows.append(window)
         window.finished.connect(lambda _=0, w=window: self._proof_windows.remove(w)
@@ -346,6 +347,50 @@ class MainWindow(QMainWindow):
             window.chat.send_hidden(
                 proof_walkthrough_prompt(title or self.syl.title(course_id), text),
                 shown="Explique-moi cette démonstration étape par étape.")
+
+    def open_proof_review(self, course_id: str, proof_id: str, payload: str) -> None:
+        """Ouvre la correction d'une demonstration redigee par l'utilisateur."""
+        import json as _json
+        from ..generation.prompts import proof_review_prompt
+        try:
+            data = _json.loads(payload)
+        except _json.JSONDecodeError:
+            return
+        attempt = (data.get("attempt") or "").strip()
+        if not attempt:
+            return
+        course = self.syl.get(course_id)
+        title = data.get("title") or "Démonstration"
+        attempt_no = store.count_review(course_id, proof_id)
+
+        window = self._proof_window("review:%s" % proof_id)
+        if window is None:
+            window = ProofHelperWindow(self.syl, self)
+            self._proof_windows.append(window)
+            window.finished.connect(
+                lambda _=0, w=window: self._proof_windows.remove(w)
+                if w in self._proof_windows else None)
+        window.setWindowTitle("Correction : %s" % title)
+        window.chat.set_context(course, "review:%s" % proof_id, mode="review",
+                                title="Correction — %s" % title)
+        window.show()
+        window.raise_()
+        window.activateWindow()
+        if window.chat.busy:
+            return
+        shown = ("Ma démonstration :\n\n%s" % attempt if attempt_no == 1
+                 else "Version %d de ma démonstration :\n\n%s" % (attempt_no, attempt))
+        window.chat.send_hidden(
+            proof_review_prompt(title, data.get("statement", ""),
+                                data.get("solution", ""), attempt, attempt_no),
+            shown=shown)
+
+    def _proof_window(self, context_key: str):
+        for w in self._proof_windows:
+            session = w.chat.session
+            if session is not None and session.context_key == context_key:
+                return w
+        return None
 
     # ----------------------------------------------------------------- divers
     def toggle_theme(self) -> None:

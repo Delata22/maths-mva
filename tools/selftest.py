@@ -108,6 +108,8 @@ def test_bridge() -> None:
     view.bridge.proof_help_requested.connect(lambda i, h, t: got.update(proof=(i, h)))
     view.bridge.quiz_finished.connect(lambda p: got.update(quiz=p))
     view.bridge.proof_status_changed.connect(lambda i, v: got.update(status=(i, v)))
+    view.bridge.proof_draft_changed.connect(lambda i, t: got.update(draft=(i, t)))
+    view.bridge.proof_review_requested.connect(lambda i, p: got.update(review=(i, p)))
 
     body = ('<h2>Section test</h2><p>Un peu de texte $a^2+b^2$.</p>'
             '<h2>Deuxieme section</h2><p>Suite, avec $$\\int_0^1 x\\,\\dd x$$.</p>'
@@ -150,12 +152,88 @@ def test_bridge() -> None:
     view.page().runJavaScript("app.openProofHelper('p1', 'Theoreme test', 'texte');")
     view.page().runJavaScript("app.quizFinished('{\"total\":2,\"correct\":1}');")
     view.page().runJavaScript("app.setProofStatus('p1', 'done');")
-    ok = wait_until(lambda: len(got) == 4, 8000)
+    view.page().runJavaScript("app.saveProofDraft('p1', 'Soit x dans E. $x^2 \\geq 0$.');")
+    view.page().runJavaScript("app.reviewProof('p1', '{\"attempt\":\"ma preuve\"}');")
+    ok = wait_until(lambda: len(got) == 6, 8000)
     check("pont JS -> application", ok, str(sorted(got)))
     check("  selection de texte transmise", got.get("ask") == ("extrait choisi", "Section test"))
     check("  aide a la demonstration transmise", got.get("proof") == ("p1", "Theoreme test"))
     check("  fin de QCM transmise", '"correct":1' in (got.get("quiz") or ""))
     check("  statut de demonstration transmis", got.get("status") == ("p1", "done"))
+    check("  brouillon de demonstration transmis",
+          got.get("draft", ("", ""))[0] == "p1" and "x^2" in got.get("draft", ("", ""))[1])
+    check("  demande de correction transmise",
+          got.get("review", ("", ""))[0] == "p1" and "ma preuve" in got.get("review", ("", ""))[1])
+    view.deleteLater()
+
+
+def test_proof_editor() -> None:
+    """La page des demonstrations doit offrir un editeur utilisable."""
+    import json
+    from mathsapp import content
+    from mathsapp.paths import ASSETS_DIR, library_dir
+    from mathsapp.ui.webview import WebView
+
+    data = {"proofs": [{
+        "id": "d1", "difficulty": 2, "title": "Test $\\lor$",
+        "statement": "<p>Montrer que $p \\lor \\neg p$ est une tautologie.</p>",
+        "hints": ["<p>Table de verite.</p>"],
+        "steps": [{"title": "Cas", "content": "<p>Deux cas.</p>"}],
+        "solution": "<p>Immediat.</p>"}]}
+    tpl = (ASSETS_DIR / "proofs.html").read_text(encoding="utf-8")
+    page = (tpl.replace("__THEME__", "light")
+               .replace("__ASSETS__", content.assets_url())
+               .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+               .replace("__STATUS__", "{}")
+               .replace("__DRAFTS__", json.dumps({"d1": "Soit $p$ une proposition."})))
+    d = library_dir() / "_views"
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / "selftest_proofs.html"
+    path.write_text(page, encoding="utf-8")
+
+    view = WebView(with_bridge=True)
+    view.resize(1200, 900)
+    view.show()
+    got: dict = {}
+    view.bridge.proof_draft_changed.connect(lambda i, t: got.update(draft=(i, t)))
+    view.bridge.proof_review_requested.connect(lambda i, p: got.update(review=(i, p)))
+    loaded: dict = {}
+    view.loadFinished.connect(lambda ok: loaded.update(ok=ok))
+    view.load_file(path)
+    wait_until(lambda: "ok" in loaded)
+    wait(2500)
+
+    probe: dict = {}
+    view.page().runJavaScript("!!document.getElementById('draft')", lambda r: probe.update(ta=r))
+    view.page().runJavaScript("document.getElementById('draft').value",
+                              lambda r: probe.update(val=r))
+    view.page().runJavaScript("document.querySelectorAll('.pal-tab').length",
+                              lambda r: probe.update(tabs=r))
+    view.page().runJavaScript("document.querySelectorAll('.pal-key').length",
+                              lambda r: probe.update(keys=r))
+    wait_until(lambda: len(probe) == 4, 8000)
+    check("editeur de demonstration present", bool(probe.get("ta")))
+    check("brouillon precedent recharge", "proposition" in (probe.get("val") or ""))
+    check("palette de symboles", probe.get("tabs", 0) == 6 and probe.get("keys", 0) >= 10,
+          "%s categories, %s touches" % (probe.get("tabs"), probe.get("keys")))
+
+    # insertion depuis la palette, puis demande de correction
+    view.page().runJavaScript(
+        "var t=document.getElementById('draft'); t.focus();"
+        "t.setSelectionRange(t.value.length, t.value.length);"
+        "document.querySelectorAll('.pal-key')[0].click();")
+    wait(1200)
+    view.page().runJavaScript("document.getElementById('draft').value",
+                              lambda r: probe.update(after=r))
+    wait_until(lambda: "after" in probe, 5000)
+    check("insertion depuis la palette", "\\forall" in (probe.get("after") or ""),
+          repr((probe.get("after") or "")[-30:]))
+    ok = wait_until(lambda: "draft" in got, 8000)
+    check("brouillon enregistre automatiquement", ok)
+
+    view.page().runJavaScript("document.getElementById('review').click();")
+    ok = wait_until(lambda: "review" in got, 8000)
+    check("correction demandable", ok and "attempt" in (got.get("review", ("", ""))[1]))
     view.deleteLater()
 
 
@@ -210,6 +288,8 @@ def main() -> int:
     test_pages()
     print("\n--- pont javascript ---")
     test_bridge()
+    print("\n--- editeur de demonstration ---")
+    test_proof_editor()
     print("\n--- vues ---")
     test_views()
     if "--chat" in sys.argv:

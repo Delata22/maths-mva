@@ -142,13 +142,13 @@ class ChatPanel(QWidget):
 
     # --------------------------------------------------------------- session
     def set_context(self, course: Optional[Course], context_key: str = "general",
-                    proof_mode: bool = False, title: Optional[str] = None) -> None:
+                    mode: str = "general", title: Optional[str] = None) -> None:
         if (self.session and self.session.context_key == context_key
                 and (self.session.course.id if self.session.course else None)
                 == (course.id if course else None)):
             return
         self.stop()
-        self.session = ChatSession(course, self.syl, context_key, proof_mode)
+        self.session = ChatSession(course, self.syl, context_key, mode)
         self._empty_text = EMPTY_COURSE if course else EMPTY_GENERAL
         self.title.setText(title or (course.title if course else "Discussion générale"))
         self.hint.setText("modèle : %s" % settings.get("model/chat"))
@@ -216,9 +216,10 @@ class ChatPanel(QWidget):
         self._js("window.chatDelta(%s);" % json.dumps(chunk))
 
     def _on_done(self, text: str, session_id: str) -> None:
-        self._js("window.chatEnd();")
+        answer = clean_answer(text)
+        self._js("window.chatFinalize(%s);" % json.dumps(answer))
         if self.session:
-            self.session.record_assistant(clean_answer(text), session_id)
+            self.session.record_assistant(answer, session_id)
 
     def _on_failed(self, message: str) -> None:
         self._js("window.chatError(%s);" % json.dumps(html_mod.escape(message)))

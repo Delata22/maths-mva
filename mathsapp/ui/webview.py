@@ -14,6 +14,8 @@ class Bridge(QObject):
     proof_help_requested = Signal(str, str, str)  # id, titre, texte
     quiz_finished = Signal(str)                   # charge utile JSON
     proof_status_changed = Signal(str, str)       # id, statut
+    proof_draft_changed = Signal(str, str)        # id, texte du brouillon
+    proof_review_requested = Signal(str, str)     # id, charge utile JSON
 
     @Slot(str, str)
     def askAbout(self, text: str, heading: str) -> None:  # noqa: N802 (appele par JS)
@@ -30,6 +32,14 @@ class Bridge(QObject):
     @Slot(str, str)
     def setProofStatus(self, proof_id: str, value: str) -> None:  # noqa: N802
         self.proof_status_changed.emit(proof_id, value)
+
+    @Slot(str, str)
+    def saveProofDraft(self, proof_id: str, text: str) -> None:  # noqa: N802
+        self.proof_draft_changed.emit(proof_id, text)
+
+    @Slot(str, str)
+    def reviewProof(self, proof_id: str, payload: str) -> None:  # noqa: N802
+        self.proof_review_requested.emit(proof_id, payload)
 
 
 class _Page(QWebEnginePage):

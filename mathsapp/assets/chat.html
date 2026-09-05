@@ -70,7 +70,7 @@ function typeset(node) {
       {left: '$', right: '$', display: false},
       {left: '\\(', right: '\\)', display: false}
     ],
-    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
     throwOnError: false, strict: false, output: 'html', macros: MACROS
   });
 }
@@ -103,7 +103,7 @@ function makeMsg(role, label) {
 window.chatAdd = function (role, html) {
   var b = makeMsg(role, role === 'user' ? 'Vous' : (role === 'error' ? 'Erreur' : 'Claude'));
   b.innerHTML = html;
-  if (role !== 'user') typeset(b);
+  typeset(b);   // l'utilisateur ecrit aussi du LaTeX (demonstrations redigees)
   toBottom(true);
 };
 window.chatBegin = function () {
@@ -112,6 +112,7 @@ window.chatBegin = function () {
   current.innerHTML = '<span class="cursor"></span>';
   toBottom(true);
 };
+var lastTypeset = 0;
 window.chatDelta = function (chunk) {
   if (!current) window.chatBegin();
   buffer += chunk;
@@ -121,6 +122,14 @@ window.chatDelta = function (chunk) {
     pending = false;
     var stick = atBottom();
     current.innerHTML = buffer + '<span class="cursor"></span>';
+    // On typographie aussi pendant la reception : sinon on lit du LaTeX brut
+    // pendant toute la duree d'une reponse longue. Throttle pour ne pas
+    // reparser la reponse entiere a chaque fragment.
+    var now = Date.now();
+    if (now - lastTypeset > 400) {
+      lastTypeset = now;
+      typeset(current);
+    }
     toBottom(stick);
   });
 };
@@ -128,7 +137,16 @@ window.chatEnd = function () {
   if (!current) return;
   current.innerHTML = buffer;
   typeset(current);
-  current = null; buffer = '';
+  current = null; buffer = ''; lastTypeset = 0;
+  toBottom(false);
+};
+// Remplace la bulle en cours par la version nettoyee cote application, pour
+// que l'affichage soit identique a ce qui sera rejoue depuis l'historique.
+window.chatFinalize = function (html) {
+  if (!current) { window.chatAdd('assistant', html); return; }
+  current.innerHTML = html;
+  typeset(current);
+  current = null; buffer = ''; lastTypeset = 0;
   toBottom(false);
 };
 window.chatError = function (msg) {

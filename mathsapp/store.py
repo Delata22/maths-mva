@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS proof_state (
     PRIMARY KEY (course_id, proof_id)
 );
 
+CREATE TABLE IF NOT EXISTS proof_draft (
+    course_id   TEXT NOT NULL,
+    proof_id    TEXT NOT NULL,
+    text        TEXT NOT NULL DEFAULT '',
+    reviews     INTEGER NOT NULL DEFAULT 0,
+    updated_at  REAL NOT NULL,
+    PRIMARY KEY (course_id, proof_id)
+);
+
 CREATE TABLE IF NOT EXISTS chat_thread (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id   TEXT,
@@ -147,6 +156,39 @@ def set_proof_status(course_id: str, proof_id: str, status: str) -> None:
         (course_id, proof_id, status, time.time()),
     )
     c.commit()
+
+
+def set_proof_draft(course_id: str, proof_id: str, text: str) -> None:
+    c = conn()
+    c.execute(
+        """INSERT INTO proof_draft (course_id, proof_id, text, updated_at) VALUES (?,?,?,?)
+           ON CONFLICT(course_id, proof_id) DO UPDATE SET
+             text=excluded.text, updated_at=excluded.updated_at""",
+        (course_id, proof_id, text, time.time()),
+    )
+    c.commit()
+
+
+def count_review(course_id: str, proof_id: str) -> int:
+    """Incremente et retourne le nombre de corrections demandees."""
+    c = conn()
+    c.execute(
+        """INSERT INTO proof_draft (course_id, proof_id, reviews, updated_at)
+           VALUES (?,?,1,?)
+           ON CONFLICT(course_id, proof_id) DO UPDATE SET
+             reviews=proof_draft.reviews+1, updated_at=excluded.updated_at""",
+        (course_id, proof_id, time.time()),
+    )
+    c.commit()
+    row = c.execute("SELECT reviews FROM proof_draft WHERE course_id=? AND proof_id=?",
+                    (course_id, proof_id)).fetchone()
+    return int(row["reviews"]) if row else 1
+
+
+def proof_drafts(course_id: str) -> Dict[str, str]:
+    rows = conn().execute(
+        "SELECT proof_id, text FROM proof_draft WHERE course_id=?", (course_id,))
+    return {r["proof_id"]: r["text"] for r in rows}
 
 
 def proof_statuses(course_id: str) -> Dict[str, str]:

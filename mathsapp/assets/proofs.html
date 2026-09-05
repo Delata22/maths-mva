@@ -71,11 +71,62 @@
   button.btn.on { background: var(--ok); border-color: var(--ok); color: #fff; }
   .row { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
   .statusbar {
-    position: sticky; bottom: 0; margin-top: 34px; padding: 14px 0 0;
-    border-top: 1px solid var(--line); background: var(--bg);
+    margin: 0 0 24px; padding: 0 0 16px;
+    border-bottom: 1px solid var(--line);
   }
   #empty { padding: 80px 30px; text-align: center; color: var(--muted);
     font-family: ui-sans-serif, system-ui, sans-serif; }
+
+  /* ------------------------------------------------------ redaction */
+  .palette { margin-bottom: 8px; }
+  .pal-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .pal-tab {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+    background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .pal-tab:hover { color: var(--fg); border-color: var(--line-strong); }
+  .pal-tab.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .pal-keys {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg-soft);
+  }
+  .pal-key {
+    min-width: 34px; height: 30px; padding: 0 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid transparent; border-radius: 7px; background: var(--bg);
+    cursor: pointer; font-size: 14px; color: var(--fg);
+  }
+  .pal-key:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .pal-key .katex { font-size: 1em; }
+  #draft {
+    width: 100%; min-height: 240px; resize: vertical;
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 13.5px; line-height: 1.65;
+    padding: 12px 14px; border-radius: 10px;
+    border: 1.5px solid var(--line-strong); background: var(--bg); color: var(--fg);
+    tab-size: 2;
+  }
+  #draft:focus { outline: none; border-color: var(--accent); }
+  .edrow { margin-top: 10px; }
+  .hintlbl { color: var(--muted); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; }
+  .autolbl {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--muted); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px;
+    cursor: pointer;
+  }
+  #previewbox {
+    margin-top: 12px; padding: 14px 16px; border-radius: 10px;
+    border: 1px dashed var(--line-strong); background: var(--bg-soft);
+  }
+  #previewbox:empty { display: none; }
+  .keyhelp {
+    margin-top: 8px; color: var(--muted);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; line-height: 1.6;
+  }
+  .keyhelp code {
+    background: var(--code-bg); padding: .1em .35em; border-radius: 4px; font-size: .92em;
+  }
 </style>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="__ASSETS__/vendor/katex/katex.min.js"></script>
@@ -86,6 +137,7 @@
 <script>
 var DATA = __DATA__;
 var STATUS = __STATUS__;
+var DRAFTS = __DRAFTS__;
 var bridge = null, cur = -1;
 var MACROS = {
   '\\R': '\\mathbb{R}', '\\N': '\\mathbb{N}', '\\Z': '\\mathbb{Z}',
@@ -115,6 +167,136 @@ if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTrans
 function esc(s) { return String(s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)); }
 
+// ------------------------------------------------------------- palette
+var PALETTE = [
+  ['Logique', [
+    ['\\forall', '\\forall #'], ['\\exists', '\\exists #'], ['\\nexists', '\\nexists #'],
+    ['\\neg', '\\neg #'], ['\\land', ' \\land '], ['\\lor', ' \\lor '],
+    ['\\Rightarrow', ' \\Rightarrow '], ['\\Leftarrow', ' \\Leftarrow '],
+    ['\\iff', ' \\iff '], ['\\mid', ' \\mid '],
+    ['\\top', '\\top'], ['\\bot', '\\bot'], ['\\square', '\\square']
+  ]],
+  ['Ensembles', [
+    ['\\in', ' \\in '], ['\\notin', ' \\notin '], ['\\subset', ' \\subset '],
+    ['\\subseteq', ' \\subseteq '], ['\\supset', ' \\supset '],
+    ['\\cup', ' \\cup '], ['\\cap', ' \\cap '], ['\\setminus', ' \\setminus '],
+    ['\\emptyset', '\\emptyset'], ['\\times', ' \\times '],
+    ['\\{\\}', '\\{ # \\}'], ['\\mathbb{R}', '\\R'], ['\\mathbb{N}', '\\N'],
+    ['\\mathbb{Z}', '\\Z'], ['\\mathbb{Q}', '\\Q'], ['\\mathbb{C}', '\\C'],
+    ['\\mathbb{E}', '\\E'], ['\\mathbb{P}', '\\P']
+  ]],
+  ['Analyse', [
+    ['\\to', ' \\to '], ['\\mapsto', ' \\mapsto '], ['\\infty', '\\infty'],
+    ['\\leq', ' \\leq '], ['\\geq', ' \\geq '], ['\\neq', ' \\neq '],
+    ['\\approx', ' \\approx '], ['\\sim', ' \\sim '], ['\\ll', ' \\ll '],
+    ['\\lim_{n}', '\\lim_{# \\to +\\infty} '], ['\\sum_{}^{}', '\\sum_{#}^{} '],
+    ['\\prod_{}^{}', '\\prod_{#}^{} '], ['\\int_{}^{}', '\\int_{#}^{} '],
+    ['\\partial', '\\partial '], ['\\nabla', '\\nabla '], ['\\varepsilon', '\\eps'],
+    ['\\delta', '\\delta '], ['\\lVert x\\rVert', '\\norm{#}'], ['|x|', '\\abs{#}'],
+    ['\\langle x,y\\rangle', '\\scal{#}{}'], ['\\circ', ' \\circ ']
+  ]],
+  ['Algebre', [
+    ['A^{\\mathsf T}', '^{\\mathsf T}'], ['A^{-1}', '^{-1}'],
+    ['\\dim', '\\dim '], ['\\operatorname{rg}', '\\rank '],
+    ['\\ker', '\\ker '], ['\\operatorname{Im}', '\\operatorname{Im} '],
+    ['\\operatorname{tr}', '\\tr '], ['\\det', '\\det '],
+    ['\\oplus', ' \\oplus '], ['\\otimes', ' \\otimes '],
+    ['\\operatorname{Vect}', '\\operatorname{Vect}(#)'],
+    ['\\begin{pmatrix}a\\end{pmatrix}', '\\begin{pmatrix} # \\end{pmatrix}']
+  ]],
+  ['Grec', [
+    ['\\alpha', '\\alpha '], ['\\beta', '\\beta '], ['\\gamma', '\\gamma '],
+    ['\\delta', '\\delta '], ['\\varepsilon', '\\eps'], ['\\zeta', '\\zeta '],
+    ['\\eta', '\\eta '], ['\\theta', '\\theta '], ['\\lambda', '\\lambda '],
+    ['\\mu', '\\mu '], ['\\nu', '\\nu '], ['\\xi', '\\xi '], ['\\pi', '\\pi '],
+    ['\\rho', '\\rho '], ['\\sigma', '\\sigma '], ['\\tau', '\\tau '],
+    ['\\varphi', '\\varphi '], ['\\chi', '\\chi '], ['\\psi', '\\psi '],
+    ['\\omega', '\\omega '], ['\\Gamma', '\\Gamma '], ['\\Delta', '\\Delta '],
+    ['\\Lambda', '\\Lambda '], ['\\Sigma', '\\Sigma '], ['\\Omega', '\\Omega ']
+  ]],
+  ['Structure', [
+    ['$x$', '$#$'], ['$$x$$', '$$\n#\n$$'], ['\\frac{a}{b}', '\\frac{#}{}'],
+    ['\\sqrt{x}', '\\sqrt{#}'], ['x^{n}', '^{#}'], ['x_{i}', '_{#}'],
+    ['\\begin{cases}a\\end{cases}', '\\begin{cases} # \\\\ \\end{cases}'],
+    ['\\text{texte}', '\\text{#}'], ['\\quad', ' \\quad '],
+    ['\\dots', '\\dots '], ['\\left(\\right)', '\\left( # \\right)']
+  ]]
+];
+
+var SHORTCUTS = {
+  a: '\\forall #', e: '\\exists #', i: ' \\in ', r: ' \\Rightarrow ', q: ' \\iff ',
+  u: ' \\cup ', n: ' \\cap ', o: '\\emptyset', d: '\\delta ', p: '\\partial ',
+  g: '\\nabla ', l: '\\lim_{# \\to +\\infty} ', s: '\\sum_{#}^{} ',
+  t: '\\int_{#}^{} ', f: '\\frac{#}{}', w: '\\norm{#}', m: '$#$'
+};
+
+var AUTO = {
+  '=>': '\\Rightarrow', '<=>': '\\iff', 'ssi': '\\iff', '!=': '\\neq',
+  '>=': '\\geq', '<=': '\\leq', '->': '\\to', '|->': '\\mapsto',
+  'inf': '\\infty', 'qqs': '\\forall', 'ex': '\\exists'
+};
+
+function insert(tpl) {
+  var ta = document.getElementById('draft');
+  if (!ta) return;
+  var start = ta.selectionStart, end = ta.selectionEnd;
+  var selected = ta.value.slice(start, end);
+  var text = tpl.indexOf('#') === -1 ? tpl : tpl.replace('#', selected);
+  var caret = tpl.indexOf('#');
+  ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  var pos = caret === -1 ? start + text.length
+                         : start + caret + selected.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+  ta.dispatchEvent(new Event('input'));
+}
+
+function buildPalette(host) {
+  var tabs = document.createElement('div');
+  tabs.className = 'pal-tabs';
+  var keys = document.createElement('div');
+  keys.className = 'pal-keys';
+  host.appendChild(tabs);
+  host.appendChild(keys);
+
+  function show(index) {
+    keys.innerHTML = '';
+    Array.prototype.forEach.call(tabs.children, function (t, i) {
+      t.classList.toggle('on', i === index);
+    });
+    PALETTE[index][1].forEach(function (entry) {
+      var b = document.createElement('button');
+      b.className = 'pal-key';
+      b.type = 'button';
+      b.title = entry[1].replace('#', '…');
+      try {
+        b.innerHTML = katex.renderToString(entry[0], {throwOnError: false, output: 'html'});
+      } catch (err) { b.textContent = entry[0]; }
+      b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      b.addEventListener('click', function () { insert(entry[1]); });
+      keys.appendChild(b);
+    });
+  }
+  PALETTE.forEach(function (group, i) {
+    var t = document.createElement('button');
+    t.className = 'pal-tab';
+    t.type = 'button';
+    t.textContent = group[0];
+    t.addEventListener('click', function () { show(i); });
+    tabs.appendChild(t);
+  });
+  show(0);
+}
+
+function previewHtml(text) {
+  var esc = text.replace(/[&<>]/g, function (c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c];
+  });
+  return esc.split(/\n{2,}/).map(function (block) {
+    return '<p>' + block.replace(/\n/g, '<br>') + '</p>';
+  }).join('');
+}
+
 function renderList() {
   var h = '<div class="lt">Démonstrations à faire</div>';
   DATA.proofs.forEach(function (p, i) {
@@ -122,7 +304,9 @@ function renderList() {
     h += '<div class="pitem' + (i === cur ? ' on' : '') + '" data-i="' + i + '">'
       + '<div class="pt">' + p.title + '</div>'
       + '<div class="pm"><span class="dot ' + (s === 'done' ? 'done' : s === 'wip' ? 'wip' : '') + '"></span>'
-      + '<span>' + stars(p.difficulty) + '</span></div></div>';
+      + '<span>' + stars(p.difficulty) + '</span>'
+      + ((DRAFTS[p.id] || '').trim() ? '<span title="brouillon commencé">✎</span>' : '')
+      + '</div></div>';
   });
   var l = document.getElementById('list');
   l.innerHTML = h;
@@ -139,6 +323,12 @@ function open(i) {
   var h = '<div class="inner">';
   h += '<h2 class="ptitle">' + p.title + '</h2>';
   h += '<div class="pmeta">Difficulté ' + stars(p.difficulty) + '</div>';
+  h += '<div class="statusbar"><div class="row">'
+    + '<span style="color:var(--muted);font-size:12.5px;margin-right:4px">Où en suis-je ?</span>'
+    + '<button class="btn' + (s === 'todo' ? ' primary' : '') + '" data-st="todo">À faire</button>'
+    + '<button class="btn' + (s === 'wip' ? ' primary' : '') + '" data-st="wip">En cours</button>'
+    + '<button class="btn' + (s === 'done' ? ' on' : '') + '" data-st="done">Réussie</button>'
+    + '</div></div>';
   h += '<div class="stmt">' + p.statement + '</div>';
 
   h += '<div class="sect"><h4>Cherchez d\'abord</h4>'
@@ -153,16 +343,34 @@ function open(i) {
     + '<button class="btn" id="walk">Décortiquer avec Claude</button></div>'
     + '<div id="steps" style="margin-top:14px"></div></div>';
 
+  h += '<div class="sect" id="editor-sect"><h4>Ma démonstration</h4>'
+    + '<div class="palette" id="palette"></div>'
+    + '<textarea id="draft" spellcheck="false" placeholder="Rédigez ici. Les maths s\'écrivent en LaTeX entre $ ... $ — la palette ci-dessus insère les symboles, et Alt+lettre va plus vite."></textarea>'
+    + '<div class="row edrow">'
+    + '<button class="btn primary" id="review">Faire corriger par Claude</button>'
+    + '<button class="btn" id="prev">Aperçu</button>'
+    + '<label class="autolbl"><input type="checkbox" id="auto" checked> remplacements automatiques</label>'
+    + '<span class="hintlbl" id="saved"></span>'
+    + '</div>'
+    + '<div id="previewbox"></div>'
+    + '<div class="keyhelp">'
+    + '<strong>Raccourcis</strong> — Alt+A <code>\\forall</code>, Alt+E <code>\\exists</code>, '
+    + 'Alt+I <code>\\in</code>, Alt+R <code>\\Rightarrow</code>, Alt+Q <code>\\iff</code>, '
+    + 'Alt+U <code>\\cup</code>, Alt+N <code>\\cap</code>, Alt+G <code>\\nabla</code>, '
+    + 'Alt+F <code>\\frac</code>, Alt+S <code>\\sum</code>, Alt+T <code>\\int</code>, '
+    + 'Alt+L <code>\\lim</code>, Alt+W <code>\\norm</code>, Alt+M entoure de <code>$…$</code>, '
+    + 'Ctrl+Entrée envoie à la correction.<br>'
+    + '<strong>Abréviations</strong> (suivies d\'une espace) — <code>=></code>, <code>&lt;=></code>, '
+    + '<code>ssi</code>, <code>!=</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>-></code>, '
+    + '<code>|-></code>, <code>inf</code>, <code>qqs</code>, <code>ex</code>.<br>'
+    + '<strong>Macros</strong> — <code>\\R \\N \\Z \\Q \\C \\E \\P \\eps \\norm{} \\abs{} \\scal{}{} '
+    + '\\rank \\tr \\Id \\argmin</code>.'
+    + '</div></div>';
+
   h += '<div class="sect"><h4>Solution rédigée</h4>'
     + '<div class="row"><button class="btn" id="sol">Afficher la solution</button></div>'
     + '<div id="solution" style="margin-top:14px"></div></div>';
 
-  h += '<div class="statusbar"><div class="row">'
-    + '<span style="color:var(--muted);font-size:12.5px;margin-right:4px">Où en suis-je ?</span>'
-    + '<button class="btn' + (s === 'todo' ? ' primary' : '') + '" data-st="todo">À faire</button>'
-    + '<button class="btn' + (s === 'wip' ? ' primary' : '') + '" data-st="wip">En cours</button>'
-    + '<button class="btn' + (s === 'done' ? ' on' : '') + '" data-st="done">Réussie</button>'
-    + '</div></div>';
   h += '</div>';
 
   var pane = document.getElementById('pane');
@@ -210,6 +418,85 @@ function open(i) {
     typeset(box);
     this.textContent = 'Masquer la solution';
   });
+
+  // ------------------------------------------------------- redaction
+  buildPalette(document.getElementById('palette'));
+  var ta = document.getElementById('draft');
+  var saved = document.getElementById('saved');
+  var autoBox = document.getElementById('auto');
+  ta.value = DRAFTS[p.id] || '';
+
+  var saveTimer = null;
+  function markSaving() {
+    saved.textContent = ta.value.trim() ? 'enregistrement…' : '';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      DRAFTS[p.id] = ta.value;
+      if (bridge) bridge.saveProofDraft(p.id, ta.value);
+      saved.textContent = ta.value.trim()
+        ? 'brouillon enregistré · ' + ta.value.trim().length + ' caractères' : '';
+      renderList();
+    }, 700);
+  }
+  ta.addEventListener('input', markSaving);
+
+  ta.addEventListener('keydown', function (ev) {
+    if (ev.altKey && !ev.ctrlKey && !ev.metaKey) {
+      var tpl = SHORTCUTS[ev.key.toLowerCase()];
+      if (tpl) { ev.preventDefault(); insert(tpl); return; }
+    }
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+      ev.preventDefault();
+      document.getElementById('review').click();
+      return;
+    }
+    if (ev.key === ' ' && autoBox.checked) {
+      var pos = ta.selectionStart;
+      if (pos !== ta.selectionEnd) return;
+      var before = ta.value.slice(0, pos);
+      var m = before.match(/([^\s]+)$/);
+      if (!m) return;
+      var repl = AUTO[m[1]];
+      if (!repl) return;
+      ev.preventDefault();
+      var start = pos - m[1].length;
+      ta.value = ta.value.slice(0, start) + repl + ' ' + ta.value.slice(pos);
+      var caret = start + repl.length + 1;
+      ta.setSelectionRange(caret, caret);
+      markSaving();
+    }
+  });
+
+  document.getElementById('prev').addEventListener('click', function () {
+    var box = document.getElementById('previewbox');
+    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Aperçu'; return; }
+    box.innerHTML = previewHtml(ta.value) || '<p style="color:var(--muted)">Rien à afficher.</p>';
+    typeset(box);
+    this.textContent = 'Masquer l\'aperçu';
+  });
+
+  document.getElementById('review').addEventListener('click', function () {
+    if (!bridge) return;
+    var text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+    clearTimeout(saveTimer);
+    DRAFTS[p.id] = ta.value;
+    bridge.saveProofDraft(p.id, ta.value);
+    var tmp = document.createElement('div');
+    tmp.innerHTML = p.statement;
+    var sol = document.createElement('div');
+    sol.innerHTML = p.solution;
+    bridge.reviewProof(p.id, JSON.stringify({
+      title: p.title,
+      statement: tmp.innerText.trim(),
+      solution: sol.innerText.trim().slice(0, 6000),
+      attempt: text
+    }));
+  });
+
+  if (ta.value.trim()) {
+    saved.textContent = 'brouillon enregistré · ' + ta.value.trim().length + ' caractères';
+  }
 
   document.getElementById('walk').addEventListener('click', function () {
     if (!bridge) return;

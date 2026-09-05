@@ -149,10 +149,35 @@ Un cours passe **maitrise** quand le meilleur score de QCM atteint le seuil
 - **Demonstration pas a pas** : sur toute demonstration, du cours comme des
   exercices, « Decortiquer avec Claude » ouvre une fenetre dediee ou l'IA
   explique la logique de chaque etape, et ou l'on peut poser des questions.
+- **Correction de sa propre demonstration** : voir ci-dessous.
 - **Apres un QCM rate** : « Revoir mes erreurs avec Claude » envoie les
   questions manquees pour identifier la confusion de fond.
 
 Chaque fil garde sa memoire entre les sessions.
+
+### Rediger et faire corriger ses demonstrations
+
+Chaque demonstration a faire dispose d'une zone de redaction, avec brouillon
+enregistre automatiquement. Les mathematiques s'ecrivent en LaTeX entre `$ ... $`,
+et trois choses evitent d'avoir a le taper a la main :
+
+- une **palette de symboles** en six categories (logique, ensembles, analyse,
+  algebre, grec, structures) qui insere au curseur ;
+- des **raccourcis clavier** : `Alt+A` pour `\forall`, `Alt+E` pour `\exists`,
+  `Alt+I` pour `\in`, `Alt+R` pour `\Rightarrow`, `Alt+Q` pour `\iff`,
+  `Alt+G` pour `\nabla`, `Alt+F` pour `\frac`, `Alt+S` pour `\sum`,
+  `Alt+T` pour `\int`, `Alt+L` pour `\lim`, `Alt+W` pour `\norm`,
+  `Alt+M` pour entourer de `$…$` ;
+- des **abreviations** developpees a l'espace : `=>`, `<=>`, `ssi`, `!=`, `>=`,
+  `<=`, `->`, `|->`, `inf`, `qqs`, `ex`.
+
+Un bouton *Apercu* rend le texte par KaTeX. **Faire corriger par Claude**
+(ou `Ctrl+Entree`) ouvre une fenetre de correction : verdict, ce qui tient,
+**le premier** point qui bloque avec une piste pour repartir, et les remarques
+de redaction. La correction ne deroule pas la solution — sauf si vous la
+demandez — et une preuve correcte differente de la solution de reference est
+reconnue comme correcte. Vous corrigez, vous resoumettez : le fil garde les
+versions precedentes et Claude dit si le point signale est regle.
 
 ---
 

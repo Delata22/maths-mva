@@ -9,7 +9,7 @@ from PySide6.QtCore import QThread, Signal
 
 from . import settings, store
 from .generation import claude_cli as cc
-from .generation.prompts import chat_system, proof_helper_system
+from .generation.prompts import chat_system, proof_helper_system, proof_review_system
 from .syllabus import Course, Syllabus
 
 
@@ -58,11 +58,11 @@ class ChatSession:
     """Un fil de discussion persistant, identifie par (cours, contexte)."""
 
     def __init__(self, course: Optional[Course], syl: Optional[Syllabus],
-                 context_key: str = "general", proof_mode: bool = False):
+                 context_key: str = "general", mode: str = "general"):
         self.course = course
         self.syl = syl
         self.context_key = context_key
-        self.proof_mode = proof_mode
+        self.mode = mode
         course_id = course.id if course else None
         row = store.find_thread(course_id, context_key)
         if row is None:
@@ -75,8 +75,10 @@ class ChatSession:
 
     @property
     def system(self) -> str:
-        if self.proof_mode:
+        if self.mode == "proof":
             return proof_helper_system(self.course, self.syl)
+        if self.mode == "review":
+            return proof_review_system(self.course, self.syl)
         return chat_system(self.course, self.syl)
 
     @property
