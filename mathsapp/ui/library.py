@@ -72,6 +72,7 @@ class LibraryPage(QWidget):
         self.syl = syllabus
         self.statuses: Dict[str, Status] = {}
         self._queue_lookup = None
+        self._first_build = True
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -203,11 +204,15 @@ class LibraryPage(QWidget):
         for cid in visible:
             by_domain.setdefault(self.syl.get(cid).domain, []).append(cid)
 
-        expanded = {
-            self.tree.topLevelItem(i).data(0, ROLE_ID)
-            for i in range(self.tree.topLevelItemCount())
-            if self.tree.topLevelItem(i).isExpanded()
-        }
+        if self._first_build:
+            expanded = set(self.syl.domain_order)
+            self._first_build = False
+        else:
+            expanded = {
+                self.tree.topLevelItem(i).data(0, ROLE_ID)
+                for i in range(self.tree.topLevelItemCount())
+                if self.tree.topLevelItem(i).isExpanded()
+            }
         current = self.selected_id()
 
         self.tree.clear()
@@ -277,7 +282,7 @@ class LibraryPage(QWidget):
                 if s.state == LOCKED:
                     item.setForeground(COL_TITLE, QColor(pal["locked"]))
 
-            group.setExpanded(did in expanded or len(by_domain) <= 3 or bool(self.search.text()))
+            group.setExpanded(did in expanded or bool(self.search.text()))
 
         if current:
             self.select(current)

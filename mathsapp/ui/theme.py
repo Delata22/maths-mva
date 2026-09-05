@@ -157,7 +157,6 @@ QTreeWidget::item:selected, QListWidget::item:selected {
     background: %(accent_soft)s; color: %(fg)s;
 }
 QTreeWidget::item:hover, QListWidget::item:hover { background: %(bg2)s; }
-QTreeWidget::branch { background: transparent; }
 QHeaderView::section {
     background: %(bg2)s;
     color: %(muted)s;
@@ -282,6 +281,9 @@ QScrollArea { border: none; background: %(bg)s; }
     border: 1px solid %(line)s;
     border-radius: 11px;
 }
+#Card QWidget, #Card QLabel { background: transparent; }
+#Card QPushButton[flat="true"] { background: transparent; }
+#Card QPushButton[flat="true"]:hover { background: %(bg3)s; }
 #Muted { color: %(muted)s; }
 #H1 { font-size: 21px; font-weight: 700; letter-spacing: -.015em; }
 #H2 { font-size: 15px; font-weight: 650; }

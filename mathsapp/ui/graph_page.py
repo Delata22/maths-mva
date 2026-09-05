@@ -299,7 +299,26 @@ class GraphPage(QWidget):
 
         rect = self.scene.itemsBoundingRect()
         self.scene.setSceneRect(rect.adjusted(-120, -120, 120, 120))
-        self.fit()
+        self._initial_view(ids)
+
+    def _initial_view(self, ids: List[str]) -> None:
+        """Vue de depart lisible : on cadre sur ce qu'il y a a faire ensuite.
+
+        Un ajustement plein ecran sur 142 cours reduit tellement les noeuds que
+        plus aucun titre n'est lisible ; le bouton « Ajuster » reste la pour
+        avoir la forme d'ensemble.
+        """
+        self.view.resetTransform()
+        self.view._zoom = 1.0
+        target = next((cid for cid in sorted(ids, key=self.syl.topo_rank)
+                       if self.statuses[cid].state in (AVAILABLE, READY, STARTED)), None)
+        node = self.scene.nodes.get(target) if target else None
+        if node is not None:
+            self.scene.clearSelection()
+            node.setSelected(True)
+            self.view.centerOn(node)
+        else:
+            self.fit()
 
     def fit(self) -> None:
         rect = self.scene.itemsBoundingRect()

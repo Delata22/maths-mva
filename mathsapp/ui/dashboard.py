@@ -72,8 +72,9 @@ class Dashboard(QWidget):
         title.setObjectName("H1")
         self.root.addWidget(title)
 
-        sub = QLabel("%d cours sur %d maîtrisés  ·  %d générés  ·  seuil de maîtrise : %d %%"
-                     % (mastered, total, generated, st_mod.threshold()))
+        sub = QLabel("%d cours sur %d maîtrisé%s  ·  %d généré%s  ·  seuil de maîtrise : %d %%"
+                     % (mastered, total, "s" if mastered > 1 else "",
+                        generated, "s" if generated > 1 else "", st_mod.threshold()))
         sub.setObjectName("Muted")
         self.root.addWidget(sub)
         self.root.addWidget(_bar(mastered, total, pal["ok"]))
@@ -115,7 +116,9 @@ class Dashboard(QWidget):
             name.setObjectName("H2")
             name.setWordWrap(True)
             card.lay.addWidget(name)
-            info = QLabel("%d cours  ·  %d maîtrisés  ·  %d générés" % (len(path), done, gen))
+            info = QLabel("%d cours  ·  %d maîtrisé%s  ·  %d généré%s"
+                          % (len(path), done, "s" if done > 1 else "",
+                             gen, "s" if gen > 1 else ""))
             info.setObjectName("Muted")
             card.lay.addWidget(info)
             card.lay.addWidget(_bar(done, len(path), pal["ok"] if done else pal["accent"]))
@@ -127,7 +130,8 @@ class Dashboard(QWidget):
             row.addWidget(btn)
             todo = [c for c in path if not statuses[c].generated]
             if todo:
-                gen_btn = QPushButton("Générer les %d manquants" % len(todo))
+                gen_btn = QPushButton("Générer le cours manquant" if len(todo) == 1
+                                      else "Générer les %d manquants" % len(todo))
                 gen_btn.setProperty("flat", True)
                 gen_btn.clicked.connect(lambda _=False, ids=todo: self.generate_requested.emit(ids))
                 row.addWidget(gen_btn)
