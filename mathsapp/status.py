@@ -9,6 +9,7 @@ from .syllabus import Syllabus
 
 LOCKED = "locked"          # des prerequis ne sont pas maitrises
 AVAILABLE = "available"    # prerequis ok, mais cours pas encore genere
+PARTIAL = "partial"        # generation commencee puis interrompue
 READY = "ready"            # cours genere, pas encore evalue
 STARTED = "started"        # QCM tente, pas au niveau
 MASTERED = "mastered"      # QCM reussi au-dela du seuil
@@ -16,6 +17,7 @@ MASTERED = "mastered"      # QCM reussi au-dela du seuil
 LABELS = {
     LOCKED: "Verrouillé",
     AVAILABLE: "Disponible",
+    PARTIAL: "Incomplet",
     READY: "À étudier",
     STARTED: "En cours",
     MASTERED: "Maîtrisé",
@@ -26,6 +28,10 @@ LABELS = {
 class Status:
     course_id: str
     generated: bool = False
+    complete: bool = False
+    partial: bool = False
+    sections_done: int = 0
+    sections_total: int = 0
     has_exercises: bool = False
     unlocked: bool = False
     missing: List[str] = field(default_factory=list)
@@ -57,8 +63,13 @@ def compute(syl: Syllabus, progress: Optional[Dict[str, store.Progress]] = None)
     for cid in syl.order:
         p = progress.get(cid)
         st = Status(course_id=cid)
+        state = content.generation_state(cid)
         st.generated = content.has_course(cid)
-        st.has_exercises = content.has_exercises(cid)
+        st.complete = state["complete"]
+        st.partial = state["partial"]
+        st.sections_done = state["sections_done"]
+        st.sections_total = state["sections_total"]
+        st.has_exercises = state["has_exercises"]
         if p is not None:
             st.best_pct = p.best_pct
             st.last_pct = p.last_pct
@@ -78,13 +89,20 @@ def compute(syl: Syllabus, progress: Optional[Dict[str, store.Progress]] = None)
             st.state = MASTERED
         elif st.attempts > 0:
             st.state = STARTED
-        elif st.generated:
+        elif st.partial:
+            st.state = PARTIAL
+        elif st.complete:
             st.state = READY
         elif st.unlocked:
             st.state = AVAILABLE
         else:
             st.state = LOCKED
     return out
+
+
+def incomplete(syl: Syllabus, statuses: Dict[str, Status]) -> List[str]:
+    """Cours dont la generation a ete interrompue."""
+    return [cid for cid in syl.order if statuses[cid].partial]
 
 
 def next_recommended(syl: Syllabus, statuses: Dict[str, Status], limit: int = 6) -> List[str]:

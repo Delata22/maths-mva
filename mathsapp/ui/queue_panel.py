@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QHBoxLayout, QHeaderView, QLabel, QProgressBar, QPushButton, QTreeWidget,
+    QHBoxLayout, QHeaderView, QLabel, QMenu, QProgressBar, QPushButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -16,6 +17,7 @@ from . import theme
 
 class QueuePanel(QWidget):
     course_opened = Signal(str)
+    retried = Signal()
 
     def __init__(self, queue: GenerationQueue, parent=None):
         super().__init__(parent)
@@ -32,6 +34,11 @@ class QueuePanel(QWidget):
         self.summary.setObjectName("Muted")
         bl.addWidget(self.summary)
         bl.addStretch(1)
+        self.btn_retry = QPushButton("Relancer les échecs")
+        self.btn_retry.setProperty("primary", True)
+        self.btn_retry.setVisible(False)
+        self.btn_retry.clicked.connect(self._retry_failed)
+        bl.addWidget(self.btn_retry)
         btn_clear = QPushButton("Effacer les terminées")
         btn_clear.setProperty("flat", True)
         btn_clear.clicked.connect(self.queue.clear_finished)
@@ -48,6 +55,8 @@ class QueuePanel(QWidget):
         self.tree.setRootIsDecorated(False)
         self.tree.itemDoubleClicked.connect(
             lambda item, _c: self.course_opened.emit(item.data(0, Qt.ItemDataRole.UserRole)))
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._menu)
         header = self.tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -60,13 +69,43 @@ class QueuePanel(QWidget):
         self.queue.changed.connect(self.refresh)
         self.refresh()
 
+    def _retry(self, course_id: str, kind: str) -> None:
+        self.queue.retry(course_id, kind)
+        self.retried.emit()
+
+    def _retry_failed(self) -> None:
+        if self.queue.retry_failed():
+            self.retried.emit()
+
+    def _menu(self, pos) -> None:
+        item = self.tree.itemAt(pos)
+        if item is None:
+            return
+        course_id = item.data(0, Qt.ItemDataRole.UserRole)
+        kind = item.data(1, Qt.ItemDataRole.UserRole) or "course"
+        menu = QMenu(self)
+        act = QAction("Ouvrir le cours", self)
+        act.triggered.connect(lambda: self.course_opened.emit(course_id))
+        menu.addAction(act)
+        act = QAction("Relancer", self)
+        act.triggered.connect(lambda: self._retry(course_id, kind))
+        menu.addAction(act)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
+
     def refresh(self) -> None:
         pal = theme.palette()
         self.tree.clear()
-        for job in reversed(self.queue.jobs):
+        # Ce qui tourne d'abord, puis ce qui attend dans l'ordre de la file,
+        # puis les echecs, puis les terminees les plus recentes.
+        rank = {RUNNING: 0, QUEUED: 1, ERROR: 2, CANCELLED: 3, DONE: 4}
+        order = list(enumerate(self.queue.jobs))
+        order.sort(key=lambda pair: (rank.get(pair[1].state, 5),
+                                     pair[0] if pair[1].active else -pair[0]))
+        for _index, job in order:
             item = QTreeWidgetItem(self.tree)
             item.setData(0, Qt.ItemDataRole.UserRole, job.course_id)
             item.setText(0, job.title)
+            item.setData(1, Qt.ItemDataRole.UserRole, job.kind)
             item.setText(1, KIND_LABEL.get(job.kind, job.kind))
             item.setForeground(1, QColor(pal["muted"]))
             item.setText(2, job.error or job.label)
@@ -82,13 +121,26 @@ class QueuePanel(QWidget):
                 bar.setTextVisible(False)
                 bar.setFixedHeight(6)
                 self.tree.setItemWidget(item, 3, bar)
+            elif job.state in (ERROR, CANCELLED):
+                button = QPushButton("Relancer")
+                button.setProperty("flat", True)
+                button.clicked.connect(
+                    lambda _=False, c=job.course_id, k=job.kind: self._retry(c, k))
+                self.tree.setItemWidget(item, 3, button)
             else:
-                labels = {DONE: "terminé", ERROR: "échec", CANCELLED: "annulé", QUEUED: "en attente"}
+                labels = {DONE: "terminé", QUEUED: "en attente"}
                 item.setText(3, labels.get(job.state, ""))
                 item.setForeground(3, QColor(pal["muted"]))
 
         active = self.queue.active_count()
-        self.summary.setText("Aucune génération en cours" if not active
-                             else "%d génération%s en cours ou en attente"
-                                  % (active, "s" if active > 1 else ""))
+        failed = sum(1 for j in self.queue.jobs if j.state == ERROR)
+        if active:
+            text = "%d génération%s en cours ou en attente" % (active, "s" if active > 1 else "")
+        else:
+            text = "Aucune génération en cours"
+        if failed:
+            text += "  ·  %d échec%s" % (failed, "s" if failed > 1 else "")
+        self.summary.setText(text)
         self.btn_cancel.setEnabled(active > 0)
+        self.btn_retry.setVisible(failed > 0)
+        self.btn_retry.setText("Relancer %s" % ("l'échec" if failed == 1 else "les %d échecs" % failed))

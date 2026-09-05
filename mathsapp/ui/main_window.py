@@ -7,10 +7,10 @@ from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDockWidget, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
+    QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import content, settings, store
+from .. import content, settings, status as st_mod, store
 from ..generation.claude_cli import ClaudeError, check_available
 from ..generation.queue import GenerationQueue
 from ..syllabus import Syllabus, load as load_syllabus
@@ -24,6 +24,42 @@ from .prefs import PrefsDialog
 from .queue_panel import QueuePanel
 
 PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH = range(4)
+
+
+class NoticeBar(QWidget):
+    """Bandeau d'information non bloquant, en haut de la fenetre.
+
+    Une boite de dialogue modale au demarrage bloque l'application (et les
+    tests) tant qu'on ne l'a pas fermee : pour une information, un bandeau
+    qu'on peut ignorer vaut mieux.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("Notice")
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(16, 9, 12, 9)
+        lay.setSpacing(10)
+        self.label = QLabel("")
+        self.label.setWordWrap(True)
+        lay.addWidget(self.label, 1)
+        self.action = QPushButton("")
+        lay.addWidget(self.action)
+        self.dismiss = QPushButton("Ignorer")
+        self.dismiss.setProperty("flat", True)
+        self.dismiss.clicked.connect(self.hide)
+        lay.addWidget(self.dismiss)
+        self.hide()
+
+    def show_message(self, text: str, action_text: str, callback) -> None:
+        self.label.setText(text)
+        self.action.setText(action_text)
+        try:
+            self.action.clicked.disconnect()
+        except RuntimeError:
+            pass
+        self.action.clicked.connect(lambda: (self.hide(), callback()))
+        self.show()
 
 
 class ProofHelperWindow(QDialog):
@@ -66,6 +102,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.status_info)
 
         QTimer.singleShot(300, self._check_cli)
+        QTimer.singleShot(900, self._check_interrupted)
         self.go_home()
 
     # ------------------------------------------------------------- barre haute
@@ -136,7 +173,9 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(central)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
+        self.notice = NoticeBar()
         lay.addWidget(self.topbar)
+        lay.addWidget(self.notice)
         lay.addWidget(self.stack, 1)
         self.setCentralWidget(central)
 
@@ -168,12 +207,14 @@ class MainWindow(QMainWindow):
         self.library.set_queue_lookup(self._queue_label)
         self.library.course_opened.connect(self.open_course)
         self.library.generate_requested.connect(self.enqueue)
+        self.library.regenerate_requested.connect(self.regenerate)
         self.library.exercises_requested.connect(self.enqueue_exercises)
         self.library.cancel_requested.connect(self.queue.cancel)
         self.library.delete_requested.connect(self.delete_content)
 
         self.course_page.open_course.connect(self.open_course)
         self.course_page.generate_requested.connect(self.enqueue)
+        self.course_page.regenerate_requested.connect(self.regenerate)
         self.course_page.exercises_requested.connect(self.enqueue_exercises)
         self.course_page.cancel_requested.connect(self.queue.cancel)
         self.course_page.ask_requested.connect(self.ask_about)
@@ -188,6 +229,8 @@ class MainWindow(QMainWindow):
         self.dashboard.show_graph.connect(self.show_track)
 
         self.queue_panel.course_opened.connect(self.open_course)
+        self.queue_panel.retried.connect(lambda: self.statusBar().showMessage(
+            "Génération relancée — elle reprend où elle s'était arrêtée", 8000))
         self._library_refresh = QTimer(self)
         self._library_refresh.setSingleShot(True)
         self._library_refresh.setInterval(1500)
@@ -269,6 +312,26 @@ class MainWindow(QMainWindow):
                 "%d génération%s ajoutée%s à la file"
                 % (added, "s" if added > 1 else "", "s" if added > 1 else ""), 5000)
 
+    def regenerate(self, course_id: str) -> None:
+        answer = QMessageBox.question(
+            self, "Régénérer le cours",
+            "Refaire entièrement « %s » ?\n\n"
+            "Le cours, les figures et les exercices actuels seront remplacés par une "
+            "nouvelle version, à partir d'un nouveau plan. Vos scores et vos notes "
+            "sont conservés." % self.syl.title(course_id),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.queue.enqueue(course_id, self.syl.title(course_id), "regenerate")
+        self.queue_dock.setVisible(True)
+
+    def resume_all(self) -> None:
+        """Reprend toutes les generations interrompues."""
+        statuses = st_mod.compute(self.syl)
+        ids = st_mod.incomplete(self.syl, statuses)
+        if ids:
+            self.enqueue(ids)
+
     def enqueue_exercises(self, course_id: str) -> None:
         self.queue.enqueue(course_id, self.syl.title(course_id), "exercises")
         self.queue_dock.setVisible(True)
@@ -306,6 +369,12 @@ class MainWindow(QMainWindow):
 
     def _on_job_done(self, course_id: str, _kind: str, ok: bool, message: str) -> None:
         self._library_refresh.stop()
+        if not ok and message != "Annulé":
+            self.notice.show_message(
+                "La génération de « %s » a échoué : %s"
+                % (self.syl.title(course_id), message.splitlines()[0]),
+                "Relancer", lambda c=course_id: self.queue.retry(c))
+            self.queue_dock.setVisible(True)
         title = self.syl.title(course_id)
         self.statusBar().showMessage(
             "%s : %s" % (title, message if ok else "échec — %s" % message), 12000)
@@ -422,6 +491,22 @@ class MainWindow(QMainWindow):
             else:
                 self.library.refresh()
             self.chat.hint.setText("modèle : %s" % settings.get("model/chat"))
+
+    def _check_interrupted(self) -> None:
+        """Signale au demarrage les generations laissees en plan."""
+        statuses = st_mod.compute(self.syl)
+        ids = st_mod.incomplete(self.syl, statuses)
+        if not ids:
+            self.notice.hide()
+            return
+        names = ", ".join(self.syl.title(c) for c in ids[:2])
+        more = "" if len(ids) <= 2 else " (+%d)" % (len(ids) - 2)
+        self.notice.show_message(
+            "%d génération%s interrompue%s : %s%s. Les sections déjà écrites sont conservées."
+            % (len(ids), "s" if len(ids) > 1 else "", "s" if len(ids) > 1 else "",
+               names, more),
+            "Reprendre" if len(ids) == 1 else "Tout reprendre",
+            lambda todo=list(ids): self.enqueue(todo))
 
     def _check_cli(self) -> None:
         try:

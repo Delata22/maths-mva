@@ -25,8 +25,8 @@ def _never() -> bool:
     return False
 
 
-class GenerationCancelled(RuntimeError):
-    pass
+# Une seule exception d'annulation, qu'elle vienne du CLI ou de la chaine.
+GenerationCancelled = cc.Cancelled
 
 
 def _check(cancel: CancelCb) -> None:
@@ -47,6 +47,7 @@ def generate_plan(syl: Syllabus, course_id: str, model: str,
         system="Vous concevez des cours de mathematiques. Vous repondez uniquement en JSON valide.",
         schema=prompts.PLAN_SCHEMA,
         cancel=cancel,
+        on_notice=lambda msg: on_progress("Plan du cours — %s" % msg, 0.02),
     )
     sections = plan.get("sections") or []
     if not sections:
@@ -122,6 +123,10 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
                 chars[_i] = count
             report()
 
+        def notice(msg: str, _i=index) -> None:
+            on_progress("Section %d/%d — %s" % (_i + 1, n, msg),
+                        0.10 + 0.72 * done_count / max(1, n))
+
         res = cc.run(
             prompts.section_prompt(syl, course, plan, index, titles[:index]),
             model=model,
@@ -129,6 +134,7 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
                     "produisez que le fragment HTML demande, sans commentaire."),
             cancel=cancel,
             on_progress=progress,
+            on_notice=notice,
         )
         body = content.clean_html(res.text)
         with lock:
@@ -170,6 +176,7 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
                 "uniquement en JSON valide."),
         schema=prompts.EXERCISES_SCHEMA,
         cancel=cancel,
+        on_notice=lambda msg: on_progress("QCM et démonstrations — %s" % msg, 0.86),
     )
     qcm = data.get("qcm") or []
     proofs = data.get("proofs") or []
@@ -201,24 +208,31 @@ def generate_course(course_id: str,
                     on_progress: ProgressCb = _noop,
                     cancel: CancelCb = _never,
                     with_exercises: bool = True,
-                    syl: Optional[Syllabus] = None) -> dict:
+                    syl: Optional[Syllabus] = None,
+                    model_course: Optional[str] = None,
+                    model_exercises: Optional[str] = None) -> dict:
     """Genere cours + exercices. Retourne les metadonnees."""
     syl = syl or load_syllabus()
     course = syl.get(course_id)
     if course is None:
         raise ValueError("cours inconnu : %s" % course_id)
-    model_course = str(settings.get("model/course"))
-    model_exos = str(settings.get("model/exercises"))
+    model_course = str(model_course or settings.get("model/course"))
+    model_exos = str(model_exercises or settings.get("model/exercises"))
     started = time.time()
     cost = 0.0
 
-    plan = generate_plan(syl, course_id, model_course, on_progress, cancel)
-    cost += float(plan.get("_cost") or 0.0)
+    plan = content.read_plan(course_id)
+    if plan and plan.get("sections"):
+        # reprise : on garde le plan existant, donc les sections deja ecrites
+        on_progress("Reprise du plan existant", 0.08)
+    else:
+        plan = generate_plan(syl, course_id, model_course, on_progress, cancel)
+        cost += float(plan.get("_cost") or 0.0)
 
     _body, c = generate_sections(syl, course_id, plan, model_course, on_progress, cancel)
     cost += c
 
-    if with_exercises:
+    if with_exercises and not content.has_exercises(course_id):
         _exos, c = generate_exercises(syl, course_id, plan, model_exos, on_progress, cancel)
         cost += c
 

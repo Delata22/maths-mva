@@ -10,11 +10,15 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 from .. import settings
 from ..syllabus import load as load_syllabus
 from . import pipeline
-from .claude_cli import ClaudeError
+from .claude_cli import Cancelled, ClaudeError, connectivity_hint
 
 QUEUED, RUNNING, DONE, ERROR, CANCELLED = "queued", "running", "done", "error", "cancelled"
 
-KIND_LABEL = {"course": "Cours + exercices", "exercises": "Exercices seuls"}
+KIND_LABEL = {
+    "course": "Cours + exercices",
+    "regenerate": "Régénération complète",
+    "exercises": "Exercices seuls",
+}
 
 
 @dataclass
@@ -62,7 +66,13 @@ class _Task(QRunnable):
 
         try:
             syl = load_syllabus()
-            if job.kind == "exercises":
+            if job.kind == "regenerate":
+                from .. import content
+                content.delete_course(job.course_id)
+                meta = pipeline.generate_course(job.course_id, on_progress, cancel, True, syl)
+                msg = "Régénéré en %s (%.2f $)" % (
+                    _fmt_duration(meta.get("duration_s", 0)), meta.get("cost_usd", 0))
+            elif job.kind == "exercises":
                 pipeline.regenerate_exercises(job.course_id, on_progress, cancel, syl)
                 msg = "Exercices régénérés"
             else:
@@ -70,10 +80,12 @@ class _Task(QRunnable):
                 msg = "Généré en %s (%.2f $)" % (
                     _fmt_duration(meta.get("duration_s", 0)), meta.get("cost_usd", 0))
             self.signals.finished.emit(job.course_id, job.kind, True, msg)
-        except pipeline.GenerationCancelled:
+        except Cancelled:
             self.signals.finished.emit(job.course_id, job.kind, False, "Annulé")
         except ClaudeError as exc:
-            self.signals.finished.emit(job.course_id, job.kind, False, str(exc))
+            hint = connectivity_hint(str(exc))
+            message = "%s\n%s" % (exc, hint) if hint else str(exc)
+            self.signals.finished.emit(job.course_id, job.kind, False, message)
         except Exception as exc:  # noqa: BLE001 - on veut voir toute erreur dans l'UI
             traceback.print_exc()
             self.signals.finished.emit(
@@ -145,6 +157,26 @@ class GenerationQueue(QObject):
                 j.cancel_requested = True
                 j.label = "Annulation…"
         self.changed.emit()
+
+    def retry(self, course_id: str, kind: str = "course") -> Optional[Job]:
+        """Relance un travail termine en echec, sans repartir de zero."""
+        job = self._by_key.get((course_id, kind))
+        title = job.title if job else course_id
+        self._by_key.pop((course_id, kind), None)
+        if job is not None and not job.active:
+            self.jobs = [j for j in self.jobs if j is not job]
+        return self.enqueue(course_id, title, kind)
+
+    def retry_failed(self) -> int:
+        failed = [(j.course_id, j.title, j.kind) for j in self.jobs if j.state == ERROR]
+        count = 0
+        for course_id, title, kind in failed:
+            self._by_key.pop((course_id, kind), None)
+            self.jobs = [j for j in self.jobs
+                         if not (j.course_id == course_id and j.kind == kind and not j.active)]
+            if self.enqueue(course_id, title, kind) is not None:
+                count += 1
+        return count
 
     def cancel_all(self) -> None:
         for j in self.jobs:

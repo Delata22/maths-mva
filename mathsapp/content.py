@@ -26,6 +26,37 @@ def has_course(course_id: str) -> bool:
     return p.exists() and p.stat().st_size > 200
 
 
+def is_complete(course_id: str) -> bool:
+    """Un cours n'est fini que si meta.json existe : il est ecrit en dernier."""
+    return has_course(course_id) and has_exercises(course_id) and bool(read_meta(course_id))
+
+
+def generation_state(course_id: str) -> dict:
+    """Ou en est la generation de ce cours.
+
+    Sert a distinguer un cours termine d'un cours interrompu en cours de route :
+    body.html est ecrit au fil des sections, il ne prouve rien a lui seul.
+    """
+    plan = read_plan(course_id)
+    total = len(plan.get("sections", [])) if plan else 0
+    done = 0
+    if plan:
+        from .generation.pipeline import plan_fingerprint
+        fingerprint = plan_fingerprint(plan)
+        done = sum(1 for i in range(total)
+                   if read_section(course_id, i, fingerprint) is not None)
+    started = bool(plan) or has_course(course_id)
+    complete = is_complete(course_id)
+    return {
+        "started": started,
+        "complete": complete,
+        "sections_done": done,
+        "sections_total": total,
+        "has_exercises": has_exercises(course_id),
+        "partial": started and not complete,
+    }
+
+
 def has_exercises(course_id: str) -> bool:
     p = _p(course_id, EXOS)
     return p.exists() and p.stat().st_size > 50

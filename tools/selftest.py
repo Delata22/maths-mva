@@ -237,6 +237,87 @@ def test_proof_editor() -> None:
     view.deleteLater()
 
 
+def test_queue() -> None:
+    """Ordre d'affichage et relance, sans lancer de vraie generation."""
+    from mathsapp.generation.queue import (
+        CANCELLED, DONE, ERROR, QUEUED, RUNNING, GenerationQueue,
+    )
+    from mathsapp.ui.queue_panel import QueuePanel
+
+    queue = GenerationQueue()
+    queue._pool.start = lambda task: None      # on n'execute rien
+    for cid, title in [("a", "Alpha"), ("b", "Beta"), ("c", "Gamma"), ("d", "Delta")]:
+        queue.enqueue(cid, title)
+    queue.jobs[0].state = DONE
+    queue.jobs[1].state = ERROR
+    queue.jobs[2].state = RUNNING
+    queue.jobs[3].state = QUEUED
+
+    panel = QueuePanel(queue)
+    panel.resize(700, 300)
+    panel.refresh()
+    order = [panel.tree.topLevelItem(i).text(0) for i in range(panel.tree.topLevelItemCount())]
+    check("file : ce qui tourne en tete", order[0] == "Gamma", str(order))
+    check("file : l'attente avant les termines",
+          order.index("Delta") < order.index("Beta") < order.index("Alpha"), str(order))
+    check("bouton de relance visible", panel.btn_retry.isVisible() or panel.btn_retry.isVisibleTo(panel))
+
+    before = len(queue.jobs)
+    queue.retry("b")
+    job = queue.job_for("b")
+    check("relance d'un echec", job is not None and job.state == QUEUED,
+          "%d -> %d travaux" % (before, len(queue.jobs)))
+    panel.deleteLater()
+
+
+def test_resume() -> None:
+    """Un cours interrompu doit etre reconnu comme tel, pas comme termine."""
+    import json
+    from mathsapp import content, status as st_mod
+    from mathsapp.generation.pipeline import plan_fingerprint
+    from mathsapp.paths import course_dir, library_dir
+    from mathsapp.syllabus import load
+
+    cid = "alg-corps"          # cours de test, jamais genere
+    content.delete_course(cid)
+    plan = {"hook": "t", "sections": [{"id": "s%d" % i, "title": "S%d" % i,
+                                       "goal": "g", "content": "c"} for i in range(4)],
+            "proved_in_course": [], "left_as_exercise": []}
+    content.write_json(cid, content.PLAN, plan)
+    state = content.generation_state(cid)
+    check("plan seul = interrompu", state["partial"] and state["sections_done"] == 0,
+          str(state))
+
+    fingerprint = plan_fingerprint(plan)
+    for i in range(2):
+        content.write_section(cid, i, fingerprint, "<h2>S%d</h2>" % i + "x" * 300)
+    content.write_body(cid, "<h2>S0</h2>" + "x" * 300)
+    state = content.generation_state(cid)
+    check("sections en cache comptees", state["sections_done"] == 2, str(state))
+    check("corps present mais cours incomplet",
+          content.has_course(cid) and not content.is_complete(cid))
+
+    syl = load()
+    statuses = st_mod.compute(syl)
+    check("statut « incomplet »", statuses[cid].state == st_mod.PARTIAL,
+          statuses[cid].state)
+    check("liste des interrompus", cid in st_mod.incomplete(syl, statuses))
+
+    # un plan different invalide le cache
+    plan2 = dict(plan)
+    plan2["sections"] = plan["sections"] + [{"id": "s4", "title": "S4", "goal": "g",
+                                             "content": "c"}]
+    content.write_json(cid, content.PLAN, plan2)
+    check("cache invalide si le plan change",
+          content.generation_state(cid)["sections_done"] == 0)
+    content.delete_course(cid)
+    d = course_dir(cid)
+    if d.is_dir():
+        for sub in sorted(d.rglob("*"), reverse=True):
+            sub.rmdir() if sub.is_dir() else sub.unlink()
+        d.rmdir()
+
+
 def test_views() -> None:
     from mathsapp.ui.main_window import MainWindow, PAGE_GRAPH, PAGE_HOME, PAGE_LIBRARY
     window = MainWindow()
@@ -290,6 +371,10 @@ def main() -> int:
     test_bridge()
     print("\n--- editeur de demonstration ---")
     test_proof_editor()
+    print("\n--- reprise apres interruption ---")
+    test_resume()
+    print("\n--- file de generation ---")
+    test_queue()
     print("\n--- vues ---")
     test_views()
     if "--chat" in sys.argv:

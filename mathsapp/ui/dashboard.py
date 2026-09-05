@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import content, status as st_mod
-from ..status import MASTERED, Status
+from ..status import MASTERED, PARTIAL, Status
 from ..syllabus import Syllabus
 from . import theme
 
@@ -66,7 +66,7 @@ class Dashboard(QWidget):
         statuses = st_mod.compute(self.syl)
         total = len(self.syl.courses)
         mastered = sum(1 for s in statuses.values() if s.mastered)
-        generated = sum(1 for s in statuses.values() if s.generated)
+        generated = sum(1 for s in statuses.values() if s.complete)
 
         title = QLabel("Remise à niveau M2 MVA")
         title.setObjectName("H1")
@@ -80,6 +80,7 @@ class Dashboard(QWidget):
         self.root.addWidget(_bar(mastered, total, pal["ok"]))
         self.root.addSpacing(6)
 
+        self._interrupted(statuses, pal)
         self._tracks(statuses, pal)
         self._next(statuses, pal)
         self._review(statuses, pal)
@@ -102,6 +103,50 @@ class Dashboard(QWidget):
         self.root.addSpacing(10)
         self.root.addWidget(host)
 
+    def _interrupted(self, statuses: Dict[str, Status], pal: dict) -> None:
+        ids = st_mod.incomplete(self.syl, statuses)
+        if not ids:
+            return
+        self._section_title(
+            "Générations interrompues",
+            "reprendre ne refait pas les sections déjà écrites")
+        card = Card()
+        for cid in ids[:8]:
+            s = statuses[cid]
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 3, 0, 3)
+            row.setSpacing(10)
+            dot = QLabel("&#9679;")
+            dot.setTextFormat(Qt.TextFormat.RichText)
+            dot.setStyleSheet("color:%s" % pal["err"])
+            row.addWidget(dot)
+            link = QPushButton(self.syl.title(cid))
+            link.setProperty("flat", True)
+            link.setCursor(Qt.CursorShape.PointingHandCursor)
+            link.setStyleSheet("QPushButton{text-align:left;padding:2px 4px;}"
+                               "QPushButton:hover{color:%s;}" % pal["accent"])
+            link.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            link.clicked.connect(lambda _=False, c=cid: self.course_opened.emit(c))
+            row.addWidget(link, 1)
+            info = QLabel("%d / %d sections" % (s.sections_done, s.sections_total))
+            info.setObjectName("Muted")
+            row.addWidget(info)
+            host = QWidget()
+            host.setLayout(row)
+            card.lay.addWidget(host)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        btn = QPushButton("Tout reprendre (%d)" % len(ids) if len(ids) > 1 else "Reprendre")
+        btn.setProperty("primary", True)
+        btn.clicked.connect(lambda _=False, todo=list(ids): self.generate_requested.emit(todo))
+        actions.addWidget(btn)
+        actions.addStretch(1)
+        host = QWidget()
+        host.setLayout(actions)
+        card.lay.addWidget(host)
+        self.root.addWidget(card)
+
     def _tracks(self, statuses: Dict[str, Status], pal: dict) -> None:
         self._section_title("Les cours de remise à niveau de l'ENS",
                             "chaque parcours = le cours cible et tout ce qu'il faut avant")
@@ -110,7 +155,7 @@ class Dashboard(QWidget):
         for i, (tid, track) in enumerate(self.syl.tracks.items()):
             path = self.syl.track_path(tid)
             done = sum(1 for c in path if statuses[c].mastered)
-            gen = sum(1 for c in path if statuses[c].generated)
+            gen = sum(1 for c in path if statuses[c].complete)
             card = Card()
             name = QLabel(track.title)
             name.setObjectName("H2")
@@ -128,7 +173,7 @@ class Dashboard(QWidget):
             btn.setProperty("flat", True)
             btn.clicked.connect(lambda _=False, t=tid: self.show_graph.emit(t))
             row.addWidget(btn)
-            todo = [c for c in path if not statuses[c].generated]
+            todo = [c for c in path if not statuses[c].complete]
             if todo:
                 gen_btn = QPushButton("Générer le cours manquant" if len(todo) == 1
                                       else "Générer les %d manquants" % len(todo))
@@ -174,8 +219,8 @@ class Dashboard(QWidget):
             score.setStyleSheet("color:%s;font-weight:600"
                                 % (pal["ok"] if s.mastered else pal["warn"]))
             row.addWidget(score)
-        elif not s.generated:
-            btn = QPushButton("Générer")
+        elif not s.complete:
+            btn = QPushButton("Reprendre" if s.partial else "Générer")
             btn.setProperty("flat", True)
             btn.clicked.connect(lambda _=False, c=cid: self.generate_requested.emit([c]))
             row.addWidget(btn)

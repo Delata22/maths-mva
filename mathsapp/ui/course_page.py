@@ -85,6 +85,7 @@ class EmptyState(QWidget):
         lay.addWidget(self.objectives)
 
         lay.addSpacing(18)
+        self.resume = False
         self.btn = QPushButton("Générer ce cours")
         self.btn.setProperty("primary", True)
         self.btn.setFixedWidth(220)
@@ -111,6 +112,8 @@ class EmptyState(QWidget):
 
     def set_course(self, syl: Syllabus, course: Course, st: st_mod.Status) -> None:
         pal = theme.palette()
+        self.resume = st.partial
+        self.btn.setText("Reprendre la génération" if st.partial else "Générer ce cours")
         self.title.setText(course.title)
         self.summary.setText(course.summary)
         self.objectives.setText(
@@ -123,6 +126,12 @@ class EmptyState(QWidget):
                 "<span style='color:%s'>Prérequis non encore maîtrisés : %s%s. "
                 "Rien n'empêche de générer ce cours, mais il sera plus dur à suivre.</span>"
                 % (pal["warn"], names, more))
+        elif st.partial:
+            self.note.setText(
+                "<span style='color:%s'>Génération interrompue : %d section%s sur %d "
+                "déjà écrite%s. Reprendre ne refait pas ce qui est déjà là.</span>"
+                % (pal["warn"], st.sections_done, "s" if st.sections_done > 1 else "",
+                   st.sections_total, "s" if st.sections_done > 1 else ""))
         else:
             self.note.setText("Généré par le Claude local. Comptez quelques minutes : "
                               "plan, puis chaque section, puis les exercices.")
@@ -143,6 +152,7 @@ class CoursePage(QWidget):
     proof_help_requested = Signal(str, str, str, str)  # course_id, proof_id, titre, texte
     proof_review_requested = Signal(str, str, str)     # course_id, proof_id, charge utile
     generate_requested = Signal(list)
+    regenerate_requested = Signal(str)
     exercises_requested = Signal(str)
     cancel_requested = Signal(str)
 
@@ -271,14 +281,14 @@ class CoursePage(QWidget):
         self.title.setText(self.course.title)
         self._build_chips()
 
-        generated = self.status.generated
-        self.empty.setVisible(not generated)
-        self.course_view.setVisible(generated)
-        self.btn_gen.setText("Régénérer" if generated else "Générer")
+        readable = self.status.complete
+        self.empty.setVisible(not readable)
+        self.course_view.setVisible(readable)
         self.tabs.setTabEnabled(TAB_QUIZ, self.status.has_exercises)
         self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
-        if not generated:
+        if not readable:
             self.empty.set_course(self.syl, self.course, self.status)
+        self._sync_generate_button()
         self._on_tab(self.tabs.currentIndex())
 
     def _build_chips(self) -> None:
@@ -365,8 +375,27 @@ class CoursePage(QWidget):
         self.refresh()
 
     # ----------------------------------------------------------------- actions
+    def _sync_generate_button(self) -> None:
+        st = self.status
+        if st is None:
+            return
+        if st.partial:
+            self.btn_gen.setText("Reprendre")
+            self.btn_gen.setToolTip("%d section(s) sur %d déjà écrites"
+                                    % (st.sections_done, st.sections_total))
+        elif st.complete:
+            self.btn_gen.setText("Régénérer")
+            self.btn_gen.setToolTip("Refait le cours entier depuis un nouveau plan")
+        else:
+            self.btn_gen.setText("Générer")
+            self.btn_gen.setToolTip("")
+
     def _on_generate_clicked(self) -> None:
-        if self.course:
+        if self.course is None:
+            return
+        if self.status is not None and self.status.complete:
+            self.regenerate_requested.emit(self.course.id)
+        else:
             self.generate_requested.emit([self.course.id])
 
     def _show_menu(self) -> None:
@@ -374,11 +403,14 @@ class CoursePage(QWidget):
             return
         cid = self.course.id
         menu = QMenu(self)
-        if self.status and self.status.generated:
+        if self.status and self.status.complete:
             act = QAction("Régénérer seulement les exercices", self)
             act.triggered.connect(lambda: self.exercises_requested.emit(cid))
             menu.addAction(act)
-        missing = [c for c in self.syl.path_to(cid) if not content.has_course(c)]
+            act = QAction("Régénérer le cours entier", self)
+            act.triggered.connect(lambda: self.regenerate_requested.emit(cid))
+            menu.addAction(act)
+        missing = [c for c in self.syl.path_to(cid) if not content.is_complete(c)]
         if missing:
             act = QAction("Générer tout le chemin de prérequis (%d cours)" % len(missing), self)
             act.triggered.connect(lambda: self.generate_requested.emit(missing))
@@ -406,9 +438,7 @@ class CoursePage(QWidget):
             self.btn_gen.setText("Génération  %d %%" % int(frac * 100))
             self.btn_gen.setToolTip(label)
         else:
-            self.btn_gen.setText(
-                "Régénérer" if (self.status and self.status.generated) else "Générer")
-            self.btn_gen.setToolTip("")
+            self._sync_generate_button()
 
     def apply_theme(self) -> None:
         for view in (self.course_view, self.quiz_view, self.proofs_view):

@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, List, Optional
@@ -22,6 +23,25 @@ from .. import settings
 
 class ClaudeError(RuntimeError):
     pass
+
+
+class Cancelled(ClaudeError):
+    """L'utilisateur a demande l'arret : on ne reessaie pas."""
+
+
+# Erreurs qui valent la peine d'etre reessayees : une coupure reseau de
+# quelques secondes ne doit pas tuer une generation de vingt minutes.
+TRANSIENT = (
+    "network", "reseau", "econnreset", "enotfound", "eai_again", "etimedout",
+    "socket", "connection", "connexion", "timeout", "delai", "fetch failed",
+    "overloaded", "rate limit", "429", "500", "502", "503", "504",
+    "internal server", "service unavailable", "temporarily",
+)
+
+
+def is_transient(message: str) -> bool:
+    low = (message or "").lower()
+    return any(token in low for token in TRANSIENT)
 
 
 @dataclass
@@ -80,12 +100,45 @@ def run(prompt: str, model: str, system: Optional[str] = None,
         json_schema: Optional[dict] = None,
         timeout: Optional[int] = None,
         cancel: Optional[Callable[[], bool]] = None,
-        on_progress: Optional[Callable[[int], None]] = None) -> Result:
-    """Lance une generation et retourne le texte complet.
+        on_progress: Optional[Callable[[int], None]] = None,
+        on_notice: Optional[Callable[[str], None]] = None,
+        retries: Optional[int] = None) -> Result:
+    """Lance une generation, en reessayant les echecs transitoires.
 
-    `on_progress` recoit le nombre de caracteres deja recus (pour l'UI).
-    `cancel` est consulte regulierement : s'il renvoie True, le process est tue.
+    Une coupure reseau ne doit pas perdre le travail deja fait : on attend et
+    on relance le meme appel. `on_notice` sert a le dire dans l'interface.
     """
+    attempts = max(1, int(retries if retries is not None else (settings.get("claude/retries") or 3)))
+    delays = [10, 30, 90, 180]
+    last: Optional[ClaudeError] = None
+    for attempt in range(attempts):
+        try:
+            return _run_once(prompt, model, system, json_schema, timeout, cancel, on_progress)
+        except Cancelled:
+            raise
+        except ClaudeError as exc:
+            last = exc
+            if attempt == attempts - 1 or not is_transient(str(exc)):
+                raise
+            delay = delays[min(attempt, len(delays) - 1)]
+            if on_notice is not None:
+                on_notice("connexion perdue, nouvelle tentative dans %d s "
+                          "(essai %d/%d)" % (delay, attempt + 2, attempts))
+            waited = 0.0
+            while waited < delay:
+                if cancel is not None and cancel():
+                    raise Cancelled("Génération annulée.")
+                time.sleep(0.5)
+                waited += 0.5
+    raise last if last else ClaudeError("Échec inattendu.")
+
+
+def _run_once(prompt: str, model: str, system: Optional[str] = None,
+              json_schema: Optional[dict] = None,
+              timeout: Optional[int] = None,
+              cancel: Optional[Callable[[], bool]] = None,
+              on_progress: Optional[Callable[[int], None]] = None) -> Result:
+    """Un seul appel au CLI."""
     timeout = int(timeout or settings.get("claude/timeout") or 1800)
     cmd = _base_cmd(model, system, persist=False)
     cmd += ["--output-format", "stream-json", "--include-partial-messages", "--verbose"]
@@ -104,7 +157,7 @@ def run(prompt: str, model: str, system: Optional[str] = None,
         for line in proc.stdout:
             if cancel is not None and cancel():
                 proc.kill()
-                raise ClaudeError("Génération annulée.")
+                raise Cancelled("Génération annulée.")
             line = line.strip()
             if not line:
                 continue
@@ -179,6 +232,15 @@ def run_json(prompt: str, model: str, system: Optional[str] = None,
              schema: Optional[dict] = None, **kwargs):
     res = run(prompt, model, system=system, json_schema=schema, **kwargs)
     return extract_json(res.text), res
+
+
+def connectivity_hint(message: str) -> str:
+    """Message d'aide quand l'echec ressemble a une coupure reseau."""
+    if is_transient(message):
+        return ("La connexion semble avoir ete perdue. Le travail deja fait est "
+                "conserve : relancez la generation, elle reprendra ou elle s'est "
+                "arretee.")
+    return ""
 
 
 # ----------------------------------------------------------------------- chat

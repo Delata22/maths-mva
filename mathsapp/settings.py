@@ -17,6 +17,7 @@ DEFAULTS = {
     "ui/font_scale": 100,
     "claude/binary": "claude",
     "claude/timeout": 1800,
+    "claude/retries": 3,
 }
 
 

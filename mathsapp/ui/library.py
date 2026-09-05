@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import status as st_mod
-from ..status import AVAILABLE, LOCKED, MASTERED, READY, STARTED, Status
+from ..status import AVAILABLE, LOCKED, MASTERED, PARTIAL, READY, STARTED, Status
 from ..syllabus import Syllabus
 from . import theme
 
@@ -22,7 +22,7 @@ ROLE_STATE = Qt.ItemDataRole.UserRole + 2
 COL_TITLE, COL_LEVEL, COL_PREREQ, COL_SCORE, COL_STATE = range(5)
 
 STATE_COLOR = {
-    LOCKED: "locked", AVAILABLE: "accent", READY: "fg2",
+    LOCKED: "locked", AVAILABLE: "accent", PARTIAL: "err", READY: "fg2",
     STARTED: "warn", MASTERED: "ok",
 }
 
@@ -63,6 +63,7 @@ class ScoreDelegate(QStyledItemDelegate):
 class LibraryPage(QWidget):
     course_opened = Signal(str)
     generate_requested = Signal(list)       # liste d'identifiants
+    regenerate_requested = Signal(str)
     exercises_requested = Signal(str)
     cancel_requested = Signal(str)
     delete_requested = Signal(str)
@@ -178,15 +179,17 @@ class LibraryPage(QWidget):
                 continue
             if state == "unlocked" and not (s.unlocked and s.state != MASTERED):
                 continue
-            if state == "ungenerated" and s.generated:
+            if state == "ungenerated" and s.complete:
                 continue
-            if state == "generated" and not s.generated:
+            if state == "generated" and not s.complete:
                 continue
             if state == "weak" and not (s.attempts and not s.mastered):
                 continue
             if state == MASTERED and not s.mastered:
                 continue
             if state == LOCKED and s.unlocked:
+                continue
+            if state == PARTIAL and not s.partial:
                 continue
             if query:
                 hay = " ".join([course.title, course.summary, " ".join(course.keywords),
@@ -222,7 +225,7 @@ class LibraryPage(QWidget):
             if not ids:
                 continue
             mastered = sum(1 for c in ids if self.statuses[c].mastered)
-            generated = sum(1 for c in ids if self.statuses[c].generated)
+            generated = sum(1 for c in ids if self.statuses[c].complete)
             group = QTreeWidgetItem(self.tree)
             group.setData(0, ROLE_ID, did)
             group.setText(COL_TITLE, self.syl.domain_name(did))
@@ -275,7 +278,9 @@ class LibraryPage(QWidget):
                     item.setForeground(COL_STATE, QColor(pal["accent"]))
                 else:
                     extra = ""
-                    if s.generated and s.proofs_total:
+                    if s.partial and s.sections_total:
+                        extra = "  (%d/%d sections)" % (s.sections_done, s.sections_total)
+                    elif s.generated and s.proofs_total:
                         extra = "  (%d/%d démos)" % (s.proofs_done, s.proofs_total)
                     item.setText(COL_STATE, s.label + extra)
                     item.setForeground(COL_STATE, QColor(pal[STATE_COLOR[s.state]]))
@@ -288,8 +293,12 @@ class LibraryPage(QWidget):
             self.select(current)
         total = len(visible)
         mastered = sum(1 for c in visible if self.statuses[c].mastered)
-        generated = sum(1 for c in visible if self.statuses[c].generated)
-        self.summary.setText("%d cours  ·  %d générés  ·  %d maîtrisés" % (total, generated, mastered))
+        generated = sum(1 for c in visible if self.statuses[c].complete)
+        partial = sum(1 for c in visible if self.statuses[c].partial)
+        text = "%d cours  ·  %d générés  ·  %d maîtrisés" % (total, generated, mastered)
+        if partial:
+            text += "  ·  %d interrompu%s" % (partial, "s" if partial > 1 else "")
+        self.summary.setText(text)
 
     def select(self, course_id: str) -> None:
         for i in range(self.tree.topLevelItemCount()):
@@ -332,17 +341,26 @@ class LibraryPage(QWidget):
                 act.triggered.connect(lambda: self.cancel_requested.emit(cid))
                 menu.addAction(act)
             else:
-                label = "Régénérer le cours" if s.generated else "Générer le cours"
-                act = QAction(label, self)
-                act.triggered.connect(lambda: self.generate_requested.emit([cid]))
-                menu.addAction(act)
-                if s.generated:
+                if s.partial:
+                    act = QAction("Reprendre la génération (%d/%d sections faites)"
+                                  % (s.sections_done, s.sections_total), self)
+                    act.triggered.connect(lambda: self.generate_requested.emit([cid]))
+                    menu.addAction(act)
+                elif not s.complete:
+                    act = QAction("Générer le cours", self)
+                    act.triggered.connect(lambda: self.generate_requested.emit([cid]))
+                    menu.addAction(act)
+                if s.complete:
                     act = QAction("Régénérer seulement les exercices", self)
                     act.triggered.connect(lambda: self.exercises_requested.emit(cid))
                     menu.addAction(act)
+                if s.generated:
+                    act = QAction("Régénérer le cours entier", self)
+                    act.triggered.connect(lambda: self.regenerate_requested.emit(cid))
+                    menu.addAction(act)
 
             missing_path = [c for c in self.syl.path_to(cid)
-                            if not self.statuses[c].generated]
+                            if not self.statuses[c].complete]
             if missing_path:
                 act = QAction("Générer tout le chemin de prérequis (%d cours)" % len(missing_path), self)
                 act.triggered.connect(lambda: self.generate_requested.emit(missing_path))
@@ -355,9 +373,9 @@ class LibraryPage(QWidget):
                 menu.addAction(act)
         else:
             ids = [item.child(i).data(0, ROLE_ID) for i in range(item.childCount())]
-            todo = [c for c in ids if not self.statuses[c].generated]
+            todo = [c for c in ids if not self.statuses[c].complete]
             if todo:
-                act = QAction("Générer les %d cours non générés de ce domaine" % len(todo), self)
+                act = QAction("Générer les %d cours manquants de ce domaine" % len(todo), self)
                 act.triggered.connect(lambda: self.generate_requested.emit(todo))
                 menu.addAction(act)
             act = QAction("Tout déplier", self)

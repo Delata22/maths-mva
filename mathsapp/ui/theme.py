@@ -281,9 +281,32 @@ QScrollArea { border: none; background: %(bg)s; }
     border: 1px solid %(line)s;
     border-radius: 11px;
 }
+/* Les conteneurs d'une carte ne repeignent pas le fond, mais les boutons
+   gardent le leur : sinon un bouton principal devient invisible. */
 #Card QWidget, #Card QLabel { background: transparent; }
+#Card QPushButton { background: %(bg)s; }
+#Card QPushButton:hover { background: %(bg)s; }
+#Card QPushButton[primary="true"] {
+    background: %(accent)s; border-color: %(accent)s; color: %(accent_fg)s;
+}
+#Card QPushButton[primary="true"]:hover { background: %(accent)s; color: %(accent_fg)s; }
 #Card QPushButton[flat="true"] { background: transparent; }
 #Card QPushButton[flat="true"]:hover { background: %(bg3)s; }
+#Card QProgressBar { background: %(bg3)s; }
+#Notice {
+    background: %(warn_soft)s;
+    border-bottom: 1px solid %(warn)s;
+}
+#Notice QLabel { color: %(fg)s; background: transparent; }
+#Notice QPushButton {
+    background: transparent; border: 1px solid %(warn)s; color: %(warn)s;
+    border-radius: 7px; padding: 5px 12px; font-weight: 600;
+}
+#Notice QPushButton:hover { background: %(warn)s; color: %(bg)s; }
+#Notice QPushButton[flat="true"] {
+    border-color: transparent; color: %(muted)s; font-weight: 500;
+}
+#Notice QPushButton[flat="true"]:hover { background: transparent; color: %(fg)s; }
 #Muted { color: %(muted)s; }
 #H1 { font-size: 21px; font-weight: 700; letter-spacing: -.015em; }
 #H2 { font-size: 15px; font-weight: 650; }
