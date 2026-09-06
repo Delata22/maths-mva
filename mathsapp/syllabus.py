@@ -37,6 +37,14 @@ class Track:
     title: str
     goal: str
     extra: List[str]
+    group: str = "mva"
+
+
+@dataclass
+class TrackGroup:
+    id: str
+    name: str
+    description: str
 
 
 class Syllabus:
@@ -54,8 +62,12 @@ class Syllabus:
                 objectives=list(c["objectives"]), keywords=list(c["keywords"]),
             )
         self.order: List[str] = [c["id"] for c in data["courses"]]
+        self.track_groups: Dict[str, TrackGroup] = {
+            g["id"]: TrackGroup(**g) for g in data.get("track_groups", [])
+        }
         self.tracks: Dict[str, Track] = {
-            t["id"]: Track(id=t["id"], title=t["title"], goal=t["goal"], extra=list(t["extra"]))
+            t["id"]: Track(id=t["id"], title=t["title"], goal=t["goal"],
+                           extra=list(t["extra"]), group=t.get("group", "mva"))
             for t in data.get("tracks", [])
         }
         for cid, course in self.courses.items():
@@ -139,6 +151,13 @@ class Syllabus:
     def path_to(self, cid: str) -> List[str]:
         """Ordre d'etude recommande pour atteindre `cid` (prerequis inclus)."""
         return self.ancestors(cid) + [cid]
+
+    def tracks_in(self, group_id: str) -> List[Track]:
+        return [t for t in self.tracks.values() if t.group == group_id]
+
+    def group_name(self, group_id: str) -> str:
+        g = self.track_groups.get(group_id)
+        return g.name if g else group_id
 
     def track_path(self, track_id: str) -> List[str]:
         track = self.tracks[track_id]

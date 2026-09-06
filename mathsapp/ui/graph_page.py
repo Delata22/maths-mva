@@ -171,8 +171,10 @@ class GraphPage(QWidget):
 
         self.f_scope = QComboBox()
         self.f_scope.addItem("Tout le syllabus", ("all", None))
-        for tid, track in self.syl.tracks.items():
-            self.f_scope.addItem("Parcours : %s" % track.title, ("track", tid))
+        for gid in self.syl.track_groups:
+            for track in sorted(self.syl.tracks_in(gid), key=lambda t: t.title):
+                self.f_scope.addItem("%s — %s" % (self.syl.group_name(gid), track.title),
+                                     ("track", track.id))
         for did in self.syl.domain_order:
             self.f_scope.addItem("Domaine : %s" % self.syl.domain_name(did), ("domain", did))
         self.f_scope.currentIndexChanged.connect(self.rebuild)

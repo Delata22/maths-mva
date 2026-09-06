@@ -82,6 +82,7 @@ class Dashboard(QWidget):
 
         self._interrupted(statuses, pal)
         self._tracks(statuses, pal)
+        self._tracks_compact(statuses, pal)
         self._next(statuses, pal)
         self._review(statuses, pal)
         self._domains(statuses, pal)
@@ -148,12 +149,16 @@ class Dashboard(QWidget):
         self.root.addWidget(card)
 
     def _tracks(self, statuses: Dict[str, Status], pal: dict) -> None:
-        self._section_title("Les cours de remise à niveau de l'ENS",
+        group = "rentree"
+        tracks = self.syl.tracks_in(group)
+        if not tracks:
+            return
+        self._section_title(self.syl.group_name(group),
                             "chaque parcours = le cours cible et tout ce qu'il faut avant")
         grid = QGridLayout()
         grid.setSpacing(12)
-        for i, (tid, track) in enumerate(self.syl.tracks.items()):
-            path = self.syl.track_path(tid)
+        for i, track in enumerate(tracks):
+            path = self.syl.track_path(track.id)
             done = sum(1 for c in path if statuses[c].mastered)
             gen = sum(1 for c in path if statuses[c].complete)
             card = Card()
@@ -171,7 +176,7 @@ class Dashboard(QWidget):
             row.setSpacing(7)
             btn = QPushButton("Voir le parcours")
             btn.setProperty("flat", True)
-            btn.clicked.connect(lambda _=False, t=tid: self.show_graph.emit(t))
+            btn.clicked.connect(lambda _=False, t=track.id: self.show_graph.emit(t))
             row.addWidget(btn)
             todo = [c for c in path if not statuses[c].complete]
             if todo:
@@ -188,6 +193,50 @@ class Dashboard(QWidget):
         host = QWidget()
         host.setLayout(grid)
         self.root.addWidget(host)
+
+    def _tracks_compact(self, statuses: Dict[str, Status], pal: dict) -> None:
+        """Les parcours du M2 : trop nombreux pour des cartes, une ligne chacun."""
+        group = "mva"
+        tracks = self.syl.tracks_in(group)
+        if not tracks:
+            return
+        self._section_title(self.syl.group_name(group),
+                            "ce que chaque cours suppose acquis, et le chemin pour y arriver")
+        card = Card()
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(8)
+        for i, track in enumerate(sorted(tracks, key=lambda t: t.title)):
+            path = self.syl.track_path(track.id)
+            done = sum(1 for c in path if statuses[c].mastered)
+
+            link = QPushButton(track.title)
+            link.setProperty("flat", True)
+            link.setCursor(Qt.CursorShape.PointingHandCursor)
+            link.setStyleSheet("QPushButton{text-align:left;padding:2px 4px;}"
+                               "QPushButton:hover{color:%s;}" % pal["accent"])
+            link.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            link.clicked.connect(lambda _=False, t=track.id: self.show_graph.emit(t))
+            grid.addWidget(link, i, 0)
+
+            bar = _bar(done, len(path), pal["ok"] if done else pal["accent"])
+            bar.setMinimumWidth(140)
+            grid.addWidget(bar, i, 1)
+
+            count = QLabel("%d / %d" % (done, len(path)))
+            count.setObjectName("Muted")
+            grid.addWidget(count, i, 2)
+
+            todo = [c for c in path if not statuses[c].complete]
+            gen_btn = QPushButton("Générer (%d)" % len(todo))
+            gen_btn.setProperty("flat", True)
+            gen_btn.setEnabled(bool(todo))
+            gen_btn.clicked.connect(lambda _=False, ids=todo: self.generate_requested.emit(ids))
+            grid.addWidget(gen_btn, i, 3)
+        host = QWidget()
+        host.setLayout(grid)
+        card.lay.addWidget(host)
+        self.root.addWidget(card)
 
     def _course_row(self, cid: str, statuses: Dict[str, Status], pal: dict) -> QWidget:
         course = self.syl.get(cid)

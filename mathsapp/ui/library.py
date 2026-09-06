@@ -122,8 +122,9 @@ class LibraryPage(QWidget):
 
         self.f_track = QComboBox()
         self.f_track.addItem("Tout le syllabus", None)
-        for tid, track in self.syl.tracks.items():
-            self.f_track.addItem("Parcours : %s" % track.title, tid)
+        for gid in self.syl.track_groups:
+            for track in sorted(self.syl.tracks_in(gid), key=lambda t: t.title):
+                self.f_track.addItem("%s — %s" % (self.syl.group_name(gid), track.title), track.id)
         self.f_track.currentIndexChanged.connect(self.refresh)
         bl.addWidget(self.f_track)
 

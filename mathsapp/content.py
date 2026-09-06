@@ -212,3 +212,23 @@ def digest(course_id: str, limit: int = 9000) -> str:
             keep.append("[%s] %s" % (tag, text[:600]))
     out = "\n".join(keep)
     return out[:limit]
+
+
+def generation_estimate() -> tuple[float, float]:
+    """Durée et coût moyens d'un cours, mesurés sur ce qui a déjà été généré.
+
+    Sans historique, on prend des valeurs prudentes tirées des premiers cours
+    produits avec Opus : environ vingt minutes et cinq dollars.
+    """
+    from .paths import library_dir
+    durations, costs = [], []
+    for d in library_dir().iterdir():
+        if not d.is_dir() or d.name.startswith("_"):
+            continue
+        meta = read_meta(d.name)
+        if meta.get("duration_s") and meta.get("cost_usd"):
+            durations.append(float(meta["duration_s"]))
+            costs.append(float(meta["cost_usd"]))
+    if not durations:
+        return 1200.0, 5.0
+    return sum(durations) / len(durations), sum(costs) / len(costs)

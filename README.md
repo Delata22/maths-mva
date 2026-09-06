@@ -61,14 +61,34 @@ authentifie (`claude auth`). L'application verifie sa presence au demarrage.
 
 ### Le syllabus
 
-142 cours repartis en 16 domaines, chacun avec ses prerequis, son niveau (1 a 5)
+262 cours repartis en 26 domaines, chacun avec ses prerequis, son niveau (1 a 5)
 et ses objectifs. Le graphe de prerequis est verifie acyclique a la
-construction.
+construction, et les identifiants restent en ASCII (ils servent de noms de
+dossiers).
 
-Six **parcours** correspondent aux cours de remise a niveau de l'ENS :
-probabilites, optimisation convexe, analyse fonctionnelle, statistiques,
-analyse de Fourier, et l'introduction au deep learning. Un parcours regroupe le
-cours cible et l'integralite de ce qu'il faut savoir avant.
+Deux moities :
+
+- **les mathematiques**, de la logique propositionnelle a l'analyse
+  fonctionnelle, en passant par l'algebre lineaire, le calcul differentiel, la
+  mesure, les probabilites, les statistiques, l'optimisation convexe et
+  Fourier ;
+- **l'apprentissage**, qui s'appuie dessus : fondements et evaluation, modeles
+  classiques, theorie de l'apprentissage, bayesien et modeles graphiques,
+  apprentissage profond, modeles generatifs, vision, langage et grands modeles,
+  renforcement, transport optimal et donnees structurees, et la mise en
+  pratique avec PyTorch.
+
+Les **parcours** sont de deux familles :
+
+- *les cours de la rentree* : les cinq remises a niveau de l'ENS et
+  l'introduction au deep learning ;
+- *les cours du M2* : vision, langage, renforcement, modeles generatifs,
+  methodes a noyaux, modeles graphiques, graphes, transport optimal, fondements
+  theoriques, apprentissage sequentiel, statistique computationnelle...
+
+Un parcours regroupe le cours cible et l'integralite de ce qu'il faut savoir
+avant : le parcours « Langage, parole et grands modeles » compte 114 cours, en
+partant de la logique.
 
 Le syllabus se modifie dans `tools/build_syllabus.py`, puis :
 

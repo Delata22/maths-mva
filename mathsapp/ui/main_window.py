@@ -297,11 +297,20 @@ class MainWindow(QMainWindow):
         items = [(cid, self.syl.title(cid)) for cid in course_ids
                  if cid in self.syl.courses]
         if len(items) > 4:
+            per_course, per_cost = content.generation_estimate()
+            workers = max(1, min(4, int(settings.get("gen/concurrency") or 1)))
+            hours = len(items) * per_course / 3600.0 / workers
+            duration = ("environ %d min" % round(hours * 60) if hours < 1.5
+                        else "environ %.0f h" % hours)
             answer = QMessageBox.question(
                 self, "Générer plusieurs cours",
                 "Lancer la génération de %d cours ?\n\n"
-                "Comptez quelques minutes par cours. La file tourne en arrière-plan, "
-                "vous pouvez continuer à travailler." % len(items),
+                "Estimation d'après vos générations précédentes : %s de calcul "
+                "et de l'ordre de %.0f $ au total, à %d génération%s en parallèle.\n\n"
+                "La file tourne en arrière-plan et reprend après une coupure ; "
+                "vous pouvez l'arrêter à tout moment."
+                % (len(items), duration, len(items) * per_cost, workers,
+                   "s" if workers > 1 else ""),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:
                 return

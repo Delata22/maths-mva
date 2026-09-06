@@ -49,7 +49,14 @@ def wait_until(predicate, timeout_ms: int = 15000, step: int = 100) -> bool:
 def test_syllabus() -> None:
     from mathsapp.syllabus import load
     syl = load()
-    check("syllabus charge", len(syl.courses) == 142, "%d cours" % len(syl.courses))
+    check("syllabus charge", len(syl.courses) > 200 and len(syl.domains) > 20,
+          "%d cours, %d domaines, %d parcours"
+          % (len(syl.courses), len(syl.domains), len(syl.tracks)))
+    check("parcours rattaches a un groupe connu",
+          all(t.group in syl.track_groups for t in syl.tracks.values()),
+          str([t.id for t in syl.tracks.values() if t.group not in syl.track_groups]))
+    empty = [d for d in syl.domain_order if not syl.by_domain(d)]
+    check("aucun domaine vide", not empty, str(empty))
     rank = syl.topo_rank
     bad = [(c.id, p) for c in syl.all() for p in c.prereqs if rank(p) >= rank(c.id)]
     check("ordre topologique coherent", not bad, str(bad[:3]))
@@ -325,9 +332,13 @@ def test_views() -> None:
     window.show()
     wait(600)
     window.go(PAGE_LIBRARY)
-    check("bibliotheque construite", window.library.tree.topLevelItemCount() == 16)
+    check("bibliotheque construite",
+          window.library.tree.topLevelItemCount() == len(window.syl.domains),
+          "%d domaines affiches" % window.library.tree.topLevelItemCount())
     window.go(PAGE_GRAPH)
-    check("graphe construit", len(window.graph.scene.nodes) == 142)
+    check("graphe construit",
+          len(window.graph.scene.nodes) == len(window.syl.courses),
+          "%d noeuds" % len(window.graph.scene.nodes))
     window.go(PAGE_HOME)
     first = window.syl.topo[0]
     window.open_course(first)
