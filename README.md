@@ -90,11 +90,34 @@ Un parcours regroupe le cours cible et l'integralite de ce qu'il faut savoir
 avant : le parcours « Langage, parole et grands modeles » compte 114 cours, en
 partant de la logique.
 
-Le syllabus se modifie dans `tools/build_syllabus.py`, puis :
+Le syllabus de base se modifie dans `tools/build_syllabus.py`, puis :
 
 ```bash
 .venv/bin/python tools/build_syllabus.py
 ```
+
+### Etendre le syllabus depuis l'application
+
+Le bouton **Syllabus** (`Ctrl+N`) demande a Claude de concevoir une serie de
+cours sur un sujet absent du cursus, et de la brancher sur les prerequis deja
+presents.
+
+![Etendre le syllabus](docs/images/etendre-syllabus.png)
+
+Vous decrivez ce que vous voulez couvrir, choisissez un domaine existant ou
+laissez-en creer un, et relisez la proposition avant qu'elle soit ajoutee :
+chaque cours a sa case, ses prerequis resolus en clair, et le modele explique
+ce qu'il a couvert et ce qu'il a laisse de cote. Rien n'entre dans le syllabus
+sans validation.
+
+La proposition est nettoyee avant d'etre presentee : identifiants recalcules
+s'ils sont mal formes, doublons ecartes, prerequis inventes retires, cycles
+refuses. Ce qui a ete corrige est affiche.
+
+Vos ajouts vivent dans `library/syllabus_extra.json`, a cote de votre contenu,
+et **survivent aux mises a jour du syllabus de base**. L'onglet *Mes ajouts*
+les liste et permet de les retirer ; le contenu deja genere reste sur le disque
+et sera reutilise si vous les recreez.
 
 ### La generation
 
@@ -163,6 +186,7 @@ Un cours passe **maitrise** quand le meilleur score de QCM atteint le seuil
 | `Ctrl+1..4` | Accueil / Bibliotheque / Cours / Graphe |
 | `Ctrl+K` | Ouvrir le chat sur le cours courant |
 | `Ctrl+F` | Rechercher un cours |
+| `Ctrl+N` | Etendre le syllabus |
 | `Ctrl+G` | Afficher la file de generation |
 
 ### Le chat
@@ -255,6 +279,7 @@ clic droit > *Supprimer le contenu genere* (les scores sont conserves).
 ```
 mathsapp/
   syllabus.py        chargement du syllabus, graphe de prerequis
+  syllabus_extra.py  ajouts faits depuis l'app : fusion, validation, retrait
   status.py          verrouille / disponible / a etudier / en cours / maitrise
   store.py           SQLite : scores, statuts, notes, discussions
   content.py         lecture des cours generes et assemblage des pages

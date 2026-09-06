@@ -77,6 +77,72 @@ def test_syllabus() -> None:
         check("parcours %s ordonne" % tid, ok, "%d cours" % len(path))
 
 
+def test_syllabus_extra() -> None:
+    """Surcouche : validation, fusion, rechargement, retrait."""
+    from mathsapp import syllabus, syllabus_extra
+
+    backup = syllabus_extra.read_extra()
+    base_count = len(syllabus.load().courses)
+    try:
+        batch = {
+            "domains": [{"id": "selftest", "name": "Domaine de test",
+                         "description": "d", "color": "#123456"}],
+            "courses": [
+                {"id": "st-un", "title": "Cours un", "domain": "selftest", "level": 3,
+                 "prereqs": ["al-svd"], "summary": "s", "objectives": ["o"], "keywords": ["k"]},
+                {"id": "st-deux", "title": "Cours deux", "domain": "selftest", "level": 4,
+                 "prereqs": ["st-un", "inexistant-xyz"], "summary": "s",
+                 "objectives": ["o"], "keywords": ["k"]},
+                {"id": "AL SVD !", "title": "Décomposition en valeurs singulières (SVD)",
+                 "domain": "selftest", "level": 3, "prereqs": [], "summary": "s",
+                 "objectives": [], "keywords": []},
+            ],
+            "tracks": [{"id": "st-track", "title": "Parcours test", "goal": "st-deux",
+                        "extra": ["st-un"]}],
+        }
+        clean, notes = syllabus_extra.normalize(batch)
+        check("proposition normalisee", len(clean["courses"]) == 2,
+              "%d cours retenus" % len(clean["courses"]))
+        check("doublon ecarte",
+              any("existe déjà" in n for n in notes)
+              and all(c["id"] != "al-svd" for c in clean["courses"]),
+              str(notes[:2]))
+        check("prerequis inconnu retire",
+              all("inexistant-xyz" not in c["prereqs"] for c in clean["courses"]))
+        check("prerequis interne conserve",
+              "st-un" in dict((c["id"], c) for c in clean["courses"])["st-deux"]["prereqs"])
+
+        cyclic = {"domains": [], "courses": [
+            {"id": "cy-a", "title": "A", "domain": "ml", "level": 3, "prereqs": ["cy-b"],
+             "summary": "s", "objectives": [], "keywords": []},
+            {"id": "cy-b", "title": "B", "domain": "ml", "level": 3, "prereqs": ["cy-a"],
+             "summary": "s", "objectives": [], "keywords": []}], "tracks": []}
+        cleaned_cycle, _ = syllabus_extra.normalize(cyclic)
+        check("cycle refuse", bool(syllabus_extra.check(cleaned_cycle)),
+              str(syllabus_extra.check(cleaned_cycle)))
+
+        errors = syllabus_extra.add(clean)
+        check("fusion acceptee", not errors, str(errors))
+        syl = syllabus.reload()
+        check("cours ajoutes visibles", len(syl.courses) == base_count + 2,
+              "%d cours" % len(syl.courses))
+        check("domaine ajoute visible", "selftest" in syl.domains)
+        check("cours marque comme ajoute", syl.get("st-un").custom)
+        check("graphe coherent apres ajout",
+              syl.get("st-deux").depth > syl.get("st-un").depth)
+        check("parcours ajoute", "st-track" in syl.tracks
+              and len(syl.track_path("st-track")) > 2)
+
+        removed = syllabus_extra.remove_courses(["st-un", "st-deux"])
+        syl = syllabus.reload()
+        check("retrait effectif", removed == 2 and len(syl.courses) == base_count,
+              "%d cours" % len(syl.courses))
+        check("domaine orphelin nettoye", "selftest" not in syl.domains)
+    finally:
+        syllabus_extra.write_extra(backup)
+        syllabus.reload()
+
+
 def test_store() -> None:
     from mathsapp import status as st_mod, store
     from mathsapp.syllabus import load
@@ -374,6 +440,8 @@ def main() -> int:
 
     print("\n--- syllabus ---")
     test_syllabus()
+    print("\n--- extension du syllabus ---")
+    test_syllabus_extra()
     print("\n--- progression ---")
     test_store()
     print("\n--- assemblage des pages ---")

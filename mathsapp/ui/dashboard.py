@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton,
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
@@ -45,6 +45,7 @@ class Dashboard(QWidget):
     def __init__(self, syllabus: Syllabus, parent=None):
         super().__init__(parent)
         self.syl = syllabus
+        self._queue_lookup = None
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         self.area = QScrollArea()
@@ -56,7 +57,19 @@ class Dashboard(QWidget):
         self.root.setContentsMargins(34, 30, 34, 40)
         self.root.setSpacing(18)
 
+    def set_syllabus(self, syl: Syllabus) -> None:
+        self.syl = syl
+        self.refresh()
+
+    def set_queue_lookup(self, fn) -> None:
+        """fn(course_id) -> texte d'avancement, ou None si rien en cours."""
+        self._queue_lookup = fn
+
+    def running(self, course_id: str):
+        return self._queue_lookup(course_id) if self._queue_lookup else None
+
     def refresh(self) -> None:
+        scroll = self.area.verticalScrollBar().value()
         while self.root.count():
             item = self.root.takeAt(0)
             w = item.widget()
@@ -87,6 +100,9 @@ class Dashboard(QWidget):
         self._review(statuses, pal)
         self._domains(statuses, pal)
         self.root.addStretch(1)
+        # on garde la position de lecture : la page se rafraichit pendant les
+        # generations, et repartir en haut a chaque tick serait insupportable
+        QTimer.singleShot(0, lambda: self.area.verticalScrollBar().setValue(scroll))
 
     # ------------------------------------------------------------- sections
     def _section_title(self, text: str, hint: str = "") -> None:
@@ -129,8 +145,11 @@ class Dashboard(QWidget):
             link.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             link.clicked.connect(lambda _=False, c=cid: self.course_opened.emit(c))
             row.addWidget(link, 1)
-            info = QLabel("%d / %d sections" % (s.sections_done, s.sections_total))
+            progress = self.running(cid)
+            info = QLabel(progress or "%d / %d sections" % (s.sections_done, s.sections_total))
             info.setObjectName("Muted")
+            if progress:
+                info.setStyleSheet("color:%s;font-weight:600" % pal["accent"])
             row.addWidget(info)
             host = QWidget()
             host.setLayout(row)
@@ -138,10 +157,16 @@ class Dashboard(QWidget):
 
         actions = QHBoxLayout()
         actions.setSpacing(8)
-        btn = QPushButton("Tout reprendre (%d)" % len(ids) if len(ids) > 1 else "Reprendre")
+        todo = [cid for cid in ids if not self.running(cid)]
+        btn = QPushButton("Tout reprendre (%d)" % len(todo) if len(todo) > 1 else "Reprendre")
         btn.setProperty("primary", True)
-        btn.clicked.connect(lambda _=False, todo=list(ids): self.generate_requested.emit(todo))
+        btn.setEnabled(bool(todo))
+        btn.clicked.connect(lambda _=False, batch=list(todo): self.generate_requested.emit(batch))
         actions.addWidget(btn)
+        if not todo:
+            running = QLabel("reprise en cours")
+            running.setStyleSheet("color:%s;font-weight:600" % pal["accent"])
+            actions.addWidget(running)
         actions.addStretch(1)
         host = QWidget()
         host.setLayout(actions)
@@ -269,10 +294,16 @@ class Dashboard(QWidget):
                                 % (pal["ok"] if s.mastered else pal["warn"]))
             row.addWidget(score)
         elif not s.complete:
-            btn = QPushButton("Reprendre" if s.partial else "Générer")
-            btn.setProperty("flat", True)
-            btn.clicked.connect(lambda _=False, c=cid: self.generate_requested.emit([c]))
-            row.addWidget(btn)
+            progress = self.running(cid)
+            if progress:
+                tag = QLabel(progress)
+                tag.setStyleSheet("color:%s;font-weight:600" % pal["accent"])
+                row.addWidget(tag)
+            else:
+                btn = QPushButton("Reprendre" if s.partial else "Générer")
+                btn.setProperty("flat", True)
+                btn.clicked.connect(lambda _=False, c=cid: self.generate_requested.emit([c]))
+                row.addWidget(btn)
         else:
             tag = QLabel("à étudier")
             tag.setObjectName("Muted")

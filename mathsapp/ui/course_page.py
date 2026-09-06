@@ -257,6 +257,15 @@ class CoursePage(QWidget):
         self.tabs.addTab(self.proofs_view, "Démonstrations")
         self.tabs.addTab(notes_host, "Notes")
 
+    def set_syllabus(self, syl: Syllabus) -> None:
+        self.syl = syl
+        if self.course is not None and self.course.id not in syl.courses:
+            self.course = None
+            return
+        if self.course is not None:
+            self.course = syl.get(self.course.id)
+            self.refresh()
+
     # -------------------------------------------------------------- chargement
     def show_course(self, course_id: str) -> None:
         same = self.course is not None and self.course.id == course_id

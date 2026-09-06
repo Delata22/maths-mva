@@ -93,9 +93,7 @@ class LibraryPage(QWidget):
         bl.addWidget(self.search, 2)
 
         self.f_domain = QComboBox()
-        self.f_domain.addItem("Tous les domaines", None)
-        for did in self.syl.domain_order:
-            self.f_domain.addItem(self.syl.domain_name(did), did)
+        self._fill_domains()
         self.f_domain.currentIndexChanged.connect(self.refresh)
         bl.addWidget(self.f_domain)
 
@@ -121,10 +119,7 @@ class LibraryPage(QWidget):
         bl.addWidget(self.f_state)
 
         self.f_track = QComboBox()
-        self.f_track.addItem("Tout le syllabus", None)
-        for gid in self.syl.track_groups:
-            for track in sorted(self.syl.tracks_in(gid), key=lambda t: t.title):
-                self.f_track.addItem("%s — %s" % (self.syl.group_name(gid), track.title), track.id)
+        self._fill_tracks()
         self.f_track.currentIndexChanged.connect(self.refresh)
         bl.addWidget(self.f_track)
 
@@ -153,6 +148,33 @@ class LibraryPage(QWidget):
         root.addWidget(self.tree, 1)
 
     # ------------------------------------------------------------------ etat
+    def set_syllabus(self, syl: Syllabus) -> None:
+        """Après un ajout au syllabus : on reconstruit les filtres."""
+        self.syl = syl
+        for combo, rebuild in ((self.f_domain, self._fill_domains),
+                               (self.f_track, self._fill_tracks)):
+            previous = combo.currentData()
+            combo.blockSignals(True)
+            combo.clear()
+            rebuild()
+            index = combo.findData(previous)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.blockSignals(False)
+        self._first_build = True
+        self.refresh()
+
+    def _fill_domains(self) -> None:
+        self.f_domain.addItem("Tous les domaines", None)
+        for did in self.syl.domain_order:
+            self.f_domain.addItem(self.syl.domain_name(did), did)
+
+    def _fill_tracks(self) -> None:
+        self.f_track.addItem("Tout le syllabus", None)
+        for gid in self.syl.track_groups:
+            for track in sorted(self.syl.tracks_in(gid), key=lambda t: t.title):
+                self.f_track.addItem("%s — %s" % (self.syl.group_name(gid), track.title),
+                                     track.id)
+
     def set_queue_lookup(self, fn) -> None:
         """fn(course_id) -> texte d'avancement ou None."""
         self._queue_lookup = fn

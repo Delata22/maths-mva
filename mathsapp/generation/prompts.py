@@ -532,3 +532,133 @@ qui en differe reste correcte) :
 --- copie de l'etudiant ---
 {attempt}
 --- fin de la copie ---"""
+
+
+# ---------------------------------------------------------------- syllabus
+SYLLABUS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "domains": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "color": {"type": "string"},
+                },
+                "required": ["id", "name", "description"],
+            },
+        },
+        "courses": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "domain": {"type": "string"},
+                    "level": {"type": "integer"},
+                    "prereqs": {"type": "array", "items": {"type": "string"}},
+                    "summary": {"type": "string"},
+                    "objectives": {"type": "array", "items": {"type": "string"}},
+                    "keywords": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["id", "title", "domain", "level", "prereqs",
+                             "summary", "objectives", "keywords"],
+            },
+        },
+        "tracks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "goal": {"type": "string"},
+                    "extra": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["id", "title", "goal"],
+            },
+        },
+        "notes": {"type": "string"},
+    },
+    "required": ["courses"],
+}
+
+
+def catalogue(syl: Syllabus, max_per_domain: int = 40) -> str:
+    """Catalogue compact des cours existants, pour cabler les prerequis."""
+    lines = []
+    for did in syl.domain_order:
+        courses = syl.by_domain(did)
+        if not courses:
+            continue
+        lines.append("# %s  [%s]" % (syl.domain_name(did), did))
+        for c in courses[:max_per_domain]:
+            lines.append("  %-34s niv.%d  %s" % (c.id, c.level, c.title))
+    return "\n".join(lines)
+
+
+def syllabus_prompt(syl: Syllabus, request: str, count: int,
+                    domain_hint: Optional[str] = None,
+                    level_hint: Optional[str] = None) -> str:
+    """Demande une extension du syllabus, cablee sur les cours existants."""
+    if domain_hint:
+        where = ("Rattachez les nouveaux cours au domaine existant « %s » (identifiant "
+                 "`%s`). Ne creez pas de nouveau domaine." % (syl.domain_name(domain_hint), domain_hint))
+    else:
+        where = ("Creez UN nouveau domaine pour accueillir ces cours, avec un "
+                 "identifiant court en ASCII, un nom en francais accentue, une "
+                 "description d'une phrase et une couleur hexadecimale lisible sur "
+                 "fond clair comme sur fond sombre. Si le sujet appartient "
+                 "manifestement a un domaine deja present, utilisez-le plutot que "
+                 "d'en creer un.")
+    level = ""
+    if level_hint:
+        level = "\nNiveau vise : %s. Ajustez la profondeur en consequence.\n" % level_hint
+
+    return f"""{STYLE}
+
+Vous n'ecrivez pas un cours ici : vous concevez une EXTENSION DE SYLLABUS.
+
+DEMANDE DE L'UTILISATEUR :
+{request}
+
+COURS DEJA PRESENTS DANS LE CURSUS (identifiant, niveau, titre). Vos prerequis
+doivent pointer vers ces identifiants, ou vers des cours de votre propre
+proposition :
+
+{catalogue(syl)}
+
+TACHE : proposer environ {count} cours qui couvrent la demande, dans l'esprit
+du syllabus existant.
+{where}{level}
+
+Regles :
+- Les identifiants sont en ASCII minuscule, sans accent, mots separes par des
+  tirets, prefixes par un trigramme de domaine (par exemple `ts-stationnarite`).
+  Ils servent de noms de dossiers : aucun accent, aucun espace.
+- Tout le reste est en francais avec les accents : titres, resumes, objectifs,
+  mots-cles. Ces consignes sont ecrites sans accents pour des raisons
+  techniques, n'imitez pas ce style.
+- Ordonnez les cours du plus fondamental au plus avance. Chaque cours doit
+  avoir des prerequis coherents : ce qui est necessaire pour le suivre, ni
+  plus, ni moins. Un cours d'entree dans le sujet s'appuie sur des cours
+  existants du cursus, pas sur du vide.
+- Ne redonnez JAMAIS un cours deja present dans le catalogue ci-dessus, meme
+  sous un autre titre. Verifiez avant de proposer.
+- Le graphe doit rester acyclique.
+- `level` va de 1 (post-bac) a 5 (M2). Soyez honnete sur la difficulte.
+- `summary` : une a deux phrases qui disent ce que le cours apporte, sur le ton
+  du syllabus existant : concret, sans emphase.
+- `objectives` : 3 a 4 competences verifiables, formulees a l'infinitif.
+- `keywords` : 4 a 6 termes techniques.
+- `tracks` : proposez au plus un parcours, dont `goal` est le cours le plus
+  avance de la serie et `extra` deux ou trois autres cours importants. Omettez
+  ce champ si un parcours n'a pas de sens ici.
+- `notes` : une ou deux phrases pour dire ce que vous avez choisi de couvrir et
+  ce que vous avez laisse de cote.
+
+Repondez uniquement par l'objet JSON."""

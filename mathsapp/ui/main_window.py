@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from .. import content, settings, status as st_mod, store
 from ..generation.claude_cli import ClaudeError, check_available
 from ..generation.queue import GenerationQueue
-from ..syllabus import Syllabus, load as load_syllabus
+from ..syllabus import Syllabus, load as load_syllabus, reload as reload_syllabus
 from . import theme
 from .chat_panel import ChatPanel
 from .course_page import CoursePage
@@ -22,6 +22,7 @@ from .graph_page import GraphPage
 from .library import LibraryPage
 from .prefs import PrefsDialog
 from .queue_panel import QueuePanel
+from .syllabus_dialog import SyllabusDialog
 
 PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH = range(4)
 
@@ -44,6 +45,7 @@ class NoticeBar(QWidget):
         self.label.setWordWrap(True)
         lay.addWidget(self.label, 1)
         self.action = QPushButton("")
+        self._connected = False
         lay.addWidget(self.action)
         self.dismiss = QPushButton("Ignorer")
         self.dismiss.setProperty("flat", True)
@@ -54,11 +56,10 @@ class NoticeBar(QWidget):
     def show_message(self, text: str, action_text: str, callback) -> None:
         self.label.setText(text)
         self.action.setText(action_text)
-        try:
+        if self._connected:
             self.action.clicked.disconnect()
-        except RuntimeError:
-            pass
         self.action.clicked.connect(lambda: (self.hide(), callback()))
+        self._connected = True
         self.show()
 
 
@@ -148,6 +149,13 @@ class MainWindow(QMainWindow):
         self.btn_queue.setAutoRaise(True)
         lay.addWidget(self.btn_queue)
 
+        self.btn_syllabus = QToolButton()
+        self.btn_syllabus.setText("Syllabus")
+        self.btn_syllabus.setToolTip("Créer de nouveaux cours dans le syllabus  (Ctrl+N)")
+        self.btn_syllabus.setAutoRaise(True)
+        self.btn_syllabus.clicked.connect(self.open_syllabus_dialog)
+        lay.addWidget(self.btn_syllabus)
+
         self.btn_theme = QToolButton()
         self.btn_theme.setText("Thème")
         self.btn_theme.setAutoRaise(True)
@@ -205,6 +213,7 @@ class MainWindow(QMainWindow):
 
     def _wire(self) -> None:
         self.library.set_queue_lookup(self._queue_label)
+        self.dashboard.set_queue_lookup(self._queue_label)
         self.library.course_opened.connect(self.open_course)
         self.library.generate_requested.connect(self.enqueue)
         self.library.regenerate_requested.connect(self.regenerate)
@@ -234,7 +243,7 @@ class MainWindow(QMainWindow):
         self._library_refresh = QTimer(self)
         self._library_refresh.setSingleShot(True)
         self._library_refresh.setInterval(1500)
-        self._library_refresh.timeout.connect(self.library.refresh)
+        self._library_refresh.timeout.connect(self._refresh_current)
         self.queue.changed.connect(self._on_queue_changed)
         self.queue.job_done.connect(self._on_job_done)
 
@@ -245,6 +254,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+3"), self, lambda: self.go(PAGE_COURSE))
         QShortcut(QKeySequence("Ctrl+4"), self, lambda: self.go(PAGE_GRAPH))
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
+        QShortcut(QKeySequence("Ctrl+N"), self, self.open_syllabus_dialog)
         QShortcut(QKeySequence("Ctrl+G"), self, lambda: self.queue_dock.setVisible(
             not self.queue_dock.isVisible()))
 
@@ -320,6 +330,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 "%d génération%s ajoutée%s à la file"
                 % (added, "s" if added > 1 else "", "s" if added > 1 else ""), 5000)
+        else:
+            # sans ce retour, un second clic ne produisait rien du tout
+            self.queue_dock.setVisible(True)
+            self.statusBar().showMessage(
+                "Déjà dans la file : %s"
+                % ", ".join(t for _c, t in items[:3]), 6000)
+        self._refresh_current()
 
     def regenerate(self, course_id: str) -> None:
         answer = QMessageBox.question(
@@ -364,8 +381,16 @@ class MainWindow(QMainWindow):
             return None
         return "%s  %d %%" % (job.label.split(" - ")[0], int(job.progress * 100))
 
+    def _refresh_current(self) -> None:
+        page = self.stack.currentIndex()
+        if page == PAGE_LIBRARY:
+            self.library.refresh()
+        elif page == PAGE_HOME:
+            self.dashboard.refresh()
+
     def _on_queue_changed(self) -> None:
-        if self.stack.currentIndex() == PAGE_LIBRARY and not self._library_refresh.isActive():
+        if (self.stack.currentIndex() in (PAGE_LIBRARY, PAGE_HOME)
+                and not self._library_refresh.isActive()):
             self._library_refresh.start()
         course = self.course_page.course
         if course is not None:
@@ -488,6 +513,31 @@ class MainWindow(QMainWindow):
             self.library.refresh()
         elif index == PAGE_GRAPH:
             self.graph.rebuild()
+
+    def open_syllabus_dialog(self) -> None:
+        dialog = getattr(self, "_syllabus_dialog", None)
+        if dialog is None:
+            dialog = SyllabusDialog(self.syl, self)
+            dialog.changed.connect(self.reload_syllabus)
+            self._syllabus_dialog = dialog
+        dialog.set_syllabus(self.syl)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def reload_syllabus(self) -> None:
+        """Après un ajout ou un retrait : on relit le syllabus et on rafraîchit tout."""
+        self.syl = reload_syllabus()
+        for page in (self.library, self.course_page, self.graph, self.dashboard):
+            page.set_syllabus(self.syl)
+        self.chat.syl = self.syl
+        for window in self._proof_windows:
+            window.chat.syl = self.syl
+        dialog = getattr(self, "_syllabus_dialog", None)
+        if dialog is not None:
+            dialog.set_syllabus(self.syl)
+        self.statusBar().showMessage(
+            "Syllabus rechargé : %d cours" % len(self.syl.courses), 6000)
 
     def open_prefs(self) -> None:
         dialog = PrefsDialog(self)

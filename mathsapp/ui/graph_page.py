@@ -170,13 +170,7 @@ class GraphPage(QWidget):
         bl.setSpacing(9)
 
         self.f_scope = QComboBox()
-        self.f_scope.addItem("Tout le syllabus", ("all", None))
-        for gid in self.syl.track_groups:
-            for track in sorted(self.syl.tracks_in(gid), key=lambda t: t.title):
-                self.f_scope.addItem("%s — %s" % (self.syl.group_name(gid), track.title),
-                                     ("track", track.id))
-        for did in self.syl.domain_order:
-            self.f_scope.addItem("Domaine : %s" % self.syl.domain_name(did), ("domain", did))
+        self._fill_scope()
         self.f_scope.currentIndexChanged.connect(self.rebuild)
         bl.addWidget(self.f_scope)
 
@@ -211,6 +205,27 @@ class GraphPage(QWidget):
         self.hint.setObjectName("Muted")
         self.hint.setContentsMargins(14, 6, 14, 8)
         root.addWidget(self.hint)
+
+    def _fill_scope(self) -> None:
+        self.f_scope.addItem("Tout le syllabus", ("all", None))
+        for gid in self.syl.track_groups:
+            for track in sorted(self.syl.tracks_in(gid), key=lambda t: t.title):
+                self.f_scope.addItem("%s — %s" % (self.syl.group_name(gid), track.title),
+                                     ("track", track.id))
+        for did in self.syl.domain_order:
+            self.f_scope.addItem("Domaine : %s" % self.syl.domain_name(did), ("domain", did))
+
+    def set_syllabus(self, syl: Syllabus) -> None:
+        self.syl = syl
+        self.scene.syl = syl
+        previous = self.f_scope.currentData()
+        self.f_scope.blockSignals(True)
+        self.f_scope.clear()
+        self._fill_scope()
+        index = self.f_scope.findData(previous)
+        self.f_scope.setCurrentIndex(index if index >= 0 else 0)
+        self.f_scope.blockSignals(False)
+        self.rebuild()
 
     # ------------------------------------------------------------- rendu
     def _visible_ids(self) -> List[str]:

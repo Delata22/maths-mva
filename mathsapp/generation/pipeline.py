@@ -269,3 +269,30 @@ def regenerate_exercises(course_id: str,
     content.write_json(course_id, content.META, meta)
     on_progress("Terminé", 1.0)
     return data
+
+
+def propose_syllabus(request: str, count: int = 10,
+                     domain_hint: Optional[str] = None,
+                     level_hint: Optional[str] = None,
+                     model: Optional[str] = None,
+                     on_progress: ProgressCb = _noop,
+                     cancel: CancelCb = _never,
+                     syl: Optional[Syllabus] = None) -> tuple[dict, List[str], str]:
+    """Propose une extension du syllabus. Retourne (proposition, remarques, notes)."""
+    from .. import syllabus_extra
+    syl = syl or load_syllabus()
+    model = model or str(settings.get("model/course"))
+    on_progress("Conception du syllabus", 0.15)
+    raw, res = cc.run_json(
+        prompts.syllabus_prompt(syl, request, count, domain_hint, level_hint),
+        model=model,
+        system=("Vous concevez des syllabus de mathematiques et d'apprentissage. "
+                "Vous repondez uniquement en JSON valide."),
+        schema=prompts.SYLLABUS_SCHEMA,
+        cancel=cancel,
+        on_progress=lambda n: on_progress("Conception du syllabus", min(0.9, 0.15 + n / 14000.0)),
+        on_notice=lambda msg: on_progress("Conception du syllabus — %s" % msg, 0.15),
+    )
+    batch, notes = syllabus_extra.normalize(raw)
+    on_progress("Terminé", 1.0)
+    return batch, notes, (raw.get("notes") or "").strip()

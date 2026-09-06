@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Dict, Iterable, List, Optional
 
-from .paths import SYLLABUS_FILE
+from . import syllabus_extra
 
 
 @dataclass
@@ -19,6 +19,7 @@ class Course:
     summary: str
     objectives: List[str]
     keywords: List[str]
+    custom: bool = False
     dependents: List[str] = field(default_factory=list)
     depth: int = 0
 
@@ -29,6 +30,7 @@ class Domain:
     name: str
     description: str
     color: str
+    custom: bool = False
 
 
 @dataclass
@@ -38,6 +40,7 @@ class Track:
     goal: str
     extra: List[str]
     group: str = "mva"
+    custom: bool = False
 
 
 @dataclass
@@ -60,6 +63,7 @@ class Syllabus:
                 id=c["id"], title=c["title"], domain=c["domain"], level=c["level"],
                 prereqs=list(c["prereqs"]), summary=c["summary"],
                 objectives=list(c["objectives"]), keywords=list(c["keywords"]),
+                custom=bool(c.get("custom")),
             )
         self.order: List[str] = [c["id"] for c in data["courses"]]
         self.track_groups: Dict[str, TrackGroup] = {
@@ -67,7 +71,8 @@ class Syllabus:
         }
         self.tracks: Dict[str, Track] = {
             t["id"]: Track(id=t["id"], title=t["title"], goal=t["goal"],
-                           extra=list(t["extra"]), group=t.get("group", "mva"))
+                           extra=list(t["extra"]), group=t.get("group", "mva"),
+                           custom=bool(t.get("custom")))
             for t in data.get("tracks", [])
         }
         for cid, course in self.courses.items():
@@ -172,5 +177,11 @@ class Syllabus:
 
 @lru_cache(maxsize=1)
 def load() -> Syllabus:
-    with open(SYLLABUS_FILE, "r", encoding="utf-8") as fh:
-        return Syllabus(json.load(fh))
+    """Syllabus de base, augmenté des ajouts faits depuis l'application."""
+    return Syllabus(syllabus_extra.merged())
+
+
+def reload() -> Syllabus:
+    """À appeler après avoir modifié les ajouts de l'utilisateur."""
+    load.cache_clear()
+    return load()
