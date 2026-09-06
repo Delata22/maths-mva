@@ -379,7 +379,8 @@ class MainWindow(QMainWindow):
         job = self.queue.job_for(course_id)
         if job is None:
             return None
-        return "%s  %d %%" % (job.label.split(" - ")[0], int(job.progress * 100))
+        short = job.label.split(" — ")[0].split(" · ")[0]
+        return "%s  %d %%" % (short, int(job.progress * 100))
 
     def _refresh_current(self) -> None:
         page = self.stack.currentIndex()

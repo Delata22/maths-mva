@@ -21,6 +21,15 @@ def _noop(_label: str, _frac: float) -> None:
     pass
 
 
+def _fmt_thousands(n: int) -> str:
+    return "{:,}".format(n).replace(",", " ")
+
+
+def _fmt_clock(seconds: float) -> str:
+    seconds = int(seconds)
+    return "%d:%02d" % (seconds // 60, seconds % 60)
+
+
 def _never() -> bool:
     return False
 
@@ -83,6 +92,7 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
     parts: List[Optional[str]] = [None] * n
     costs: List[float] = [0.0] * n
     chars: Dict[int, int] = {}
+    started_at: Dict[int, float] = {}
 
     for i in range(n):
         cached = content.read_section(course_id, i, fingerprint)
@@ -98,16 +108,36 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
         """Ecrit le corps du cours avec ce qui est deja pret."""
         content.write_body(course_id, "\n\n".join(p for p in parts if p))
 
+    def expected_length() -> float:
+        """Longueur attendue d'une section, mesurée plutôt que devinée.
+
+        L'estimation etait figee a 9000 caracteres alors qu'une section en fait
+        environ 28000 : la barre saturait apres un tiers du travail et donnait
+        l'impression que la generation etait bloquee.
+        """
+        written = sorted(len(p) for p in parts if p)
+        if written:
+            return max(8000.0, float(written[len(written) // 2]))
+        return 26000.0
+
     def report() -> None:
-        # avancement : sections terminees, plus les caracteres recus pour
-        # celles en cours (une section fait ~9000 caracteres)
-        partial = sum(min(1.0, chars.get(i, 0) / 9000.0) for i in todo if parts[i] is None)
+        target = expected_length()
+        partial = sum(min(0.98, chars.get(i, 0) / target)
+                      for i in todo if parts[i] is None)
         frac = 0.10 + 0.72 * (done_count + partial) / max(1, n)
-        running = [titles[i] for i in todo if parts[i] is None and chars.get(i)]
-        label = ("Section %d/%d — %s" % (done_count + 1, n, running[0])
-                 if running else "Sections %d/%d" % (done_count, n))
-        if len(running) > 1:
-            label += "  (+%d en parallèle)" % (len(running) - 1)
+        running = [i for i in todo if parts[i] is None and chars.get(i)]
+        if running:
+            first = running[0]
+            elapsed = time.time() - started_at.get(first, time.time())
+            # on affiche des caracteres et un chronometre : meme quand la barre
+            # bouge peu, on doit pouvoir verifier d'un coup d'oeil que ca avance
+            label = ("Section %d/%d — %s · %s caractères · %s"
+                     % (first + 1, n, titles[first],
+                        _fmt_thousands(chars.get(first, 0)), _fmt_clock(elapsed)))
+            if len(running) > 1:
+                label += "  (+%d en parallèle)" % (len(running) - 1)
+        else:
+            label = "Sections %d/%d" % (done_count, n)
         on_progress(label, frac)
 
     if done_count:
@@ -117,6 +147,10 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
     def work(index: int) -> None:
         nonlocal done_count
         _check(cancel)
+        with lock:
+            started_at[index] = time.time()
+            chars.setdefault(index, 0)
+        report()
 
         def progress(count: int, _i=index) -> None:
             with lock:
