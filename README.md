@@ -230,6 +230,37 @@ versions precedentes et Claude dit si le point signale est regle.
 
 ---
 
+## Savoir si ca genere ou si c'est plante
+
+L'application montre en permanence, dans la barre de statut, un point de
+couleur avec le nombre de generations et l'age du dernier signe de vie :
+
+- **vert** : des donnees arrivent
+- **orange** : plus rien depuis un moment, ce qui reste normal sur une section
+  longue
+- **rouge** : silence anormal ; un bandeau le signale, et l'appel sera
+  interrompu puis relance tout seul
+
+La file de generation (`Ctrl+G`) detaille la meme chose par cours : etape en
+cours, nombre de caracteres deja recus, chronometre, et age du dernier signe de
+vie. Cet affichage se met a jour toutes les deux secondes meme quand rien
+n'arrive : c'est ce qui permet de distinguer *lent* de *bloque*.
+
+Sous le capot, chaque appel est surveille : au-dela de quatre minutes de
+silence complet (reglable dans les preferences), le processus et toute sa
+descendance sont tues, l'echec est traite comme une panne reseau, et l'appel
+est relance. Les sections deja ecrites ne sont jamais reperdues.
+
+Depuis un terminal, meme pendant que l'application tourne :
+
+```bash
+python tools/status.py           # etat a l'instant t
+python tools/status.py --watch   # rafraichi toutes les 5 s
+```
+
+Il liste les appels au modele en cours et sur quoi ils portent, la derniere
+ecriture sur le disque, les cours incomplets, et termine par un verdict.
+
 ## Generation en ligne de commande
 
 Pratique pour lancer un gros lot et laisser tourner :
@@ -239,6 +270,7 @@ python tools/generate.py al-svd cd-hessienne     # des cours precis
 python tools/generate.py --path opt-dualite-kkt  # un cours et tous ses prerequis
 python tools/generate.py --track mva-optimisation
 python tools/generate.py --list
+python tools/generate.py --resume                # reprendre ce qui a ete interrompu
 ```
 
 ## Outils de developpement

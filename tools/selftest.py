@@ -335,6 +335,24 @@ def test_queue() -> None:
           order.index("Delta") < order.index("Beta") < order.index("Alpha"), str(order))
     check("bouton de relance visible", panel.btn_retry.isVisible() or panel.btn_retry.isVisibleTo(panel))
 
+    import time as _time
+    from mathsapp.generation.queue import SILENT_AFTER, SLOW_AFTER
+    live = queue.jobs[2]                      # celui marque RUNNING
+    live.started_at = _time.time() - 120
+    live.last_activity = _time.time()
+    check("travail actif considere vivant", live.health == "vivant", live.health)
+    live.last_activity = _time.time() - (SLOW_AFTER + 5)
+    check("silence moyen signale comme lent", live.health == "lent", live.health)
+    live.last_activity = _time.time() - (SILENT_AFTER + 5)
+    check("silence long signale comme muet", live.health == "muet", live.health)
+    state, silence, worst = queue.health()
+    check("sante globale remontee",
+          state == "muet" and worst is live and silence > SILENT_AFTER,
+          "%s depuis %.0f s" % (state, silence))
+    live.last_activity = _time.time()
+    check("retour a la normale", queue.health()[0] == "vivant")
+    check("duree ecoulee mesuree", 115 < live.elapsed < 130, "%.0f s" % live.elapsed)
+
     before = len(queue.jobs)
     queue.retry("b")
     job = queue.job_for("b")
@@ -389,6 +407,57 @@ def test_resume() -> None:
         for sub in sorted(d.rglob("*"), reverse=True):
             sub.rmdir() if sub.is_dir() else sub.unlink()
         d.rmdir()
+
+
+def test_watchdog() -> None:
+    """Un flux muet doit etre interrompu, et l'annulation doit rester possible."""
+    import stat
+    import threading
+    import time as _time
+    from mathsapp.generation import claude_cli as cc
+    from mathsapp.paths import library_dir
+
+    fake = library_dir() / "_views" / "fake_hang.sh"
+    fake.parent.mkdir(parents=True, exist_ok=True)
+    fake.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [ \"$1\" = \"--version\" ]; then echo '0.0.0 (fake)'; exit 0; fi\n"
+        "echo '{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\","
+        "\"delta\":{\"type\":\"text_delta\",\"text\":\"debut\"}}}'\n"
+        "sleep 600\n", encoding="utf-8")
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+    # On vise le faux binaire par parametre : toucher aux preferences
+    # interromprait une generation en cours dans l'application ouverte.
+    opts = {"exe": str(fake), "stall_timeout": 4}
+    try:
+        start = _time.time()
+        message = ""
+        try:
+            cc.run("test", "sonnet", retries=1, **opts)
+        except cc.ClaudeError as exc:
+            message = str(exc)
+        elapsed = _time.time() - start
+        check("flux muet interrompu", "silence" in message.lower(), message[:60])
+        check("interruption rapide", elapsed < 20, "%.0f s" % elapsed)
+        check("panne muette jugee transitoire", cc.is_transient(message))
+
+        stop = [False]
+        threading.Timer(2.0, lambda: stop.__setitem__(0, True)).start()
+        start = _time.time()
+        cancelled = False
+        try:
+            cc.run("test", "sonnet", cancel=lambda: stop[0], retries=3, **opts)
+        except cc.Cancelled:
+            cancelled = True
+        except cc.ClaudeError:
+            pass
+        check("annulation possible pendant un blocage",
+              cancelled and _time.time() - start < 12,
+              "%.0f s" % (_time.time() - start))
+    finally:
+        if fake.exists():
+            fake.unlink()
 
 
 def test_views() -> None:
@@ -454,6 +523,8 @@ def main() -> int:
     test_resume()
     print("\n--- file de generation ---")
     test_queue()
+    print("\n--- chien de garde ---")
+    test_watchdog()
     print("\n--- vues ---")
     test_views()
     if "--chat" in sys.argv:

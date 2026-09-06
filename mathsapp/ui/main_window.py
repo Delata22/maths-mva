@@ -98,9 +98,20 @@ class MainWindow(QMainWindow):
         self._shortcuts()
 
         self.statusBar().showMessage("Prêt")
+        self.liveness = QLabel("")
+        self.liveness.setToolTip("État des générations en cours")
+        self.statusBar().addPermanentWidget(self.liveness)
         self.status_info = QLabel("")
         self.status_info.setObjectName("Muted")
         self.statusBar().addPermanentWidget(self.status_info)
+
+        # Battement independant : il doit tourner meme quand plus rien n'arrive,
+        # sinon on ne peut pas distinguer « lent » de « plante ».
+        self._pulse = QTimer(self)
+        self._pulse.setInterval(2000)
+        self._pulse.timeout.connect(self._update_liveness)
+        self._pulse.start()
+        self._silence_warned = False
 
         QTimer.singleShot(300, self._check_cli)
         QTimer.singleShot(900, self._check_interrupted)
@@ -382,6 +393,39 @@ class MainWindow(QMainWindow):
         short = job.label.split(" — ")[0].split(" · ")[0]
         return "%s  %d %%" % (short, int(job.progress * 100))
 
+    def _update_liveness(self) -> None:
+        """Indicateur permanent : ce qui tourne, et depuis quand c'est muet."""
+        from .queue_panel import _age
+        pal = theme.palette()
+        running = self.queue.running_jobs()
+        waiting = self.queue.active_count() - len(running)
+        if not running:
+            self.liveness.setText("")
+            self._silence_warned = False
+            return
+        health, silence, job = self.queue.health()
+        colors = {"vivant": pal["ok"], "lent": pal["warn"], "muet": pal["err"]}
+        word = {"vivant": "actif il y a", "lent": "rien depuis", "muet": "muet depuis"}
+        count = "%d génération%s" % (len(running), "s" if len(running) > 1 else "")
+        if waiting > 0:
+            count += " (+%d en attente)" % waiting
+        self.liveness.setText(
+            "<span style='color:%s'>●</span> %s · %s %s"
+            % (colors.get(health, pal["muted"]), count, word.get(health, ""), _age(silence)))
+        self.liveness.setToolTip(
+            "%s\nDémarré il y a %s, dernier signe de vie il y a %s."
+            % (job.label, _age(job.elapsed), _age(silence)) if job else "")
+
+        if health == "muet" and not self._silence_warned:
+            self._silence_warned = True
+            self.notice.show_message(
+                "« %s » n'a plus donné signe de vie depuis %s. L'appel sera "
+                "interrompu et relancé automatiquement s'il reste muet."
+                % (job.title, _age(silence)),
+                "Ouvrir la file", lambda: self.queue_dock.setVisible(True))
+        elif health != "muet":
+            self._silence_warned = False
+
     def _refresh_current(self) -> None:
         page = self.stack.currentIndex()
         if page == PAGE_LIBRARY:
@@ -398,9 +442,7 @@ class MainWindow(QMainWindow):
             job = self.queue.job_for(course.id)
             self.course_page.set_generation_progress(
                 job is not None, job.progress if job else 0.0, job.label if job else "")
-        active = self.queue.active_count()
-        self.status_info.setText(
-            "" if not active else "%d génération%s en cours" % (active, "s" if active > 1 else ""))
+        self._update_liveness()
 
     def _on_job_done(self, course_id: str, _kind: str, ok: bool, message: str) -> None:
         self._library_refresh.stop()

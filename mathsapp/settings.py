@@ -18,6 +18,7 @@ DEFAULTS = {
     "claude/binary": "claude",
     "claude/timeout": 1800,
     "claude/retries": 3,
+    "claude/stall_timeout": 240,
 }
 
 

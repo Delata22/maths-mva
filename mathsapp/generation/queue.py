@@ -1,11 +1,12 @@
 """File d'attente de generation, executee en arriere-plan."""
 from __future__ import annotations
 
+import time
 import traceback
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
 
 from .. import settings
 from ..syllabus import load as load_syllabus
@@ -21,6 +22,12 @@ KIND_LABEL = {
 }
 
 
+# Au-dela de ce silence, on considere que l'appel ne repond plus. Le chien de
+# garde du CLI l'interrompra de son cote ; ici on le signale a l'utilisateur.
+SLOW_AFTER = 75.0
+SILENT_AFTER = 180.0
+
+
 @dataclass
 class Job:
     course_id: str
@@ -31,10 +38,39 @@ class Job:
     label: str = "En attente"
     error: str = ""
     cancel_requested: bool = False
+    queued_at: float = field(default_factory=time.time)
+    started_at: float = 0.0
+    last_activity: float = 0.0
 
     @property
     def active(self) -> bool:
         return self.state in (QUEUED, RUNNING)
+
+    @property
+    def silent_for(self) -> float:
+        """Secondes ecoulees depuis le dernier signe de vie."""
+        if self.state != RUNNING or not self.last_activity:
+            return 0.0
+        return max(0.0, time.time() - self.last_activity)
+
+    @property
+    def elapsed(self) -> float:
+        if not self.started_at:
+            return 0.0
+        end = time.time() if self.active else max(self.last_activity, self.started_at)
+        return max(0.0, end - self.started_at)
+
+    @property
+    def health(self) -> str:
+        """« vivant », « lent » ou « muet » — ce qu'on affiche a l'utilisateur."""
+        if self.state != RUNNING:
+            return "inactif"
+        silence = self.silent_for
+        if silence > SILENT_AFTER:
+            return "muet"
+        if silence > SLOW_AFTER:
+            return "lent"
+        return "vivant"
 
 
 class _Signals(QObject):
@@ -55,10 +91,13 @@ class _Task(QRunnable):
             self.signals.finished.emit(job.course_id, job.kind, False, "Annulé")
             return
         job.state = RUNNING
+        job.started_at = time.time()
+        job.last_activity = job.started_at
 
         def on_progress(label: str, frac: float) -> None:
             job.label = label
             job.progress = max(0.0, min(1.0, frac))
+            job.last_activity = time.time()
             self.signals.progress.emit(job.course_id, job.kind, job.progress, label)
 
         def cancel() -> bool:
@@ -113,6 +152,12 @@ class GenerationQueue(QObject):
         self._signals.progress.connect(self._on_progress)
         self._signals.finished.connect(self._on_finished)
         self._pool = QThreadPool(self)
+        # La progression arrive a chaque fragment de texte : sans etranglement,
+        # l'interface se reconstruirait plusieurs fois par seconde.
+        self._notify = QTimer(self)
+        self._notify.setSingleShot(True)
+        self._notify.setInterval(400)
+        self._notify.timeout.connect(self.changed.emit)
         self.apply_concurrency()
 
     def apply_concurrency(self) -> None:
@@ -131,6 +176,17 @@ class GenerationQueue(QObject):
 
     def active_count(self) -> int:
         return sum(1 for j in self.jobs if j.active)
+
+    def running_jobs(self) -> List[Job]:
+        return [j for j in self.jobs if j.state == RUNNING]
+
+    def health(self) -> tuple:
+        """(etat global, plus longue periode de silence, travail concerne)."""
+        running = self.running_jobs()
+        if not running:
+            return ("inactif", 0.0, None)
+        worst = max(running, key=lambda j: j.silent_for)
+        return (worst.health, worst.silent_for, worst)
 
     def enqueue(self, course_id: str, title: str, kind: str = "course") -> Optional[Job]:
         key = (course_id, kind)
@@ -192,12 +248,14 @@ class GenerationQueue(QObject):
     # -------------------------------------------------------------- signaux
     @Slot(str, str, float, str)
     def _on_progress(self, _cid: str, _kind: str, _frac: float, _label: str) -> None:
-        self.changed.emit()
+        if not self._notify.isActive():
+            self._notify.start()
 
     @Slot(str, str, bool, str)
     def _on_finished(self, course_id: str, kind: str, ok: bool, message: str) -> None:
         job = self._by_key.get((course_id, kind))
         if job is not None:
+            job.last_activity = time.time()
             if ok:
                 job.state = DONE
                 job.progress = 1.0

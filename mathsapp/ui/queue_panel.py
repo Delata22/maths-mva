@@ -1,7 +1,7 @@
 """Panneau de la file de generation."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -12,6 +12,15 @@ from PySide6.QtWidgets import (
 from ..generation.queue import (
     CANCELLED, DONE, ERROR, KIND_LABEL, QUEUED, RUNNING, GenerationQueue,
 )
+
+HEALTH_COLOR = {"vivant": "ok", "lent": "warn", "muet": "err", "inactif": "muted"}
+
+
+def _age(seconds: float) -> str:
+    seconds = int(seconds)
+    if seconds < 60:
+        return "%d s" % seconds
+    return "%d min %02d" % (seconds // 60, seconds % 60)
 from . import theme
 
 
@@ -50,8 +59,8 @@ class QueuePanel(QWidget):
         root.addWidget(bar)
 
         self.tree = QTreeWidget()
-        self.tree.setColumnCount(4)
-        self.tree.setHeaderLabels(["Cours", "Type", "Étape", "Avancement"])
+        self.tree.setColumnCount(5)
+        self.tree.setHeaderLabels(["Cours", "Type", "Étape", "Activité", "Avancement"])
         self.tree.setRootIsDecorated(False)
         self.tree.itemDoubleClicked.connect(
             lambda item, _c: self.course_opened.emit(item.data(0, Qt.ItemDataRole.UserRole)))
@@ -62,12 +71,25 @@ class QueuePanel(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.tree.setColumnWidth(1, 130)
-        self.tree.setColumnWidth(3, 150)
+        self.tree.setColumnWidth(3, 170)
+        self.tree.setColumnWidth(4, 150)
         root.addWidget(self.tree, 1)
+
+        # Le temps passe meme quand rien n'arrive : sans ce battement, l'age du
+        # dernier signe de vie resterait fige et on ne saurait pas si ca avance.
+        self._tick = QTimer(self)
+        self._tick.setInterval(2000)
+        self._tick.timeout.connect(self._on_tick)
+        self._tick.start()
 
         self.queue.changed.connect(self.refresh)
         self.refresh()
+
+    def _on_tick(self) -> None:
+        if self.queue.running_jobs():
+            self.refresh()
 
     def _retry(self, course_id: str, kind: str) -> None:
         self.queue.retry(course_id, kind)
@@ -115,27 +137,47 @@ class QueuePanel(QWidget):
             if job.error:
                 item.setToolTip(2, job.error)
             if job.state == RUNNING:
+                health = job.health
+                mark = {"vivant": "●", "lent": "●", "muet": "▲"}.get(health, "●")
+                if health == "vivant":
+                    text = "%s  actif il y a %s" % (mark, _age(job.silent_for))
+                elif health == "lent":
+                    text = "%s  rien depuis %s" % (mark, _age(job.silent_for))
+                else:
+                    text = "%s  muet depuis %s" % (mark, _age(job.silent_for))
+                item.setText(3, text)
+                item.setForeground(3, QColor(pal[HEALTH_COLOR[health]]))
+                item.setToolTip(3, "Démarré il y a %s.\nDernier signe de vie il y a %s."
+                                % (_age(job.elapsed), _age(job.silent_for)))
                 bar = QProgressBar()
                 bar.setRange(0, 1000)
                 bar.setValue(int(job.progress * 1000))
                 bar.setTextVisible(False)
                 bar.setFixedHeight(6)
-                self.tree.setItemWidget(item, 3, bar)
+                self.tree.setItemWidget(item, 4, bar)
             elif job.state in (ERROR, CANCELLED):
                 button = QPushButton("Relancer")
                 button.setProperty("flat", True)
                 button.clicked.connect(
                     lambda _=False, c=job.course_id, k=job.kind: self._retry(c, k))
-                self.tree.setItemWidget(item, 3, button)
+                self.tree.setItemWidget(item, 4, button)
             else:
                 labels = {DONE: "terminé", QUEUED: "en attente"}
-                item.setText(3, labels.get(job.state, ""))
-                item.setForeground(3, QColor(pal["muted"]))
+                item.setText(4, labels.get(job.state, ""))
+                item.setForeground(4, QColor(pal["muted"]))
+                if job.state == DONE and job.elapsed:
+                    item.setText(3, "en %s" % _age(job.elapsed))
+                    item.setForeground(3, QColor(pal["muted"]))
 
         active = self.queue.active_count()
         failed = sum(1 for j in self.queue.jobs if j.state == ERROR)
         if active:
             text = "%d génération%s en cours ou en attente" % (active, "s" if active > 1 else "")
+            health, silence, _job = self.queue.health()
+            if health == "muet":
+                text += "  ·  plus aucun signe de vie depuis %s" % _age(silence)
+            elif health == "lent":
+                text += "  ·  dernier signe de vie il y a %s" % _age(silence)
         else:
             text = "Aucune génération en cours"
         if failed:

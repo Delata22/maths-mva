@@ -71,6 +71,23 @@ class PrefsDialog(QDialog):
         self.timeout.setValue(int(settings.get("claude/timeout")))
         gf.addRow("Délai maximum par appel", self.timeout)
 
+        self.stall = QSpinBox()
+        self.stall.setRange(60, 1800)
+        self.stall.setSingleStep(30)
+        self.stall.setSuffix(" s")
+        self.stall.setValue(int(settings.get("claude/stall_timeout")))
+        self.stall.setToolTip(
+            "Silence au-delà duquel un appel est considéré comme perdu : il est "
+            "interrompu, puis relancé automatiquement. Une section longue peut "
+            "rester muette une à deux minutes, ne descendez pas trop bas.")
+        gf.addRow("Silence toléré", self.stall)
+
+        self.retries = QSpinBox()
+        self.retries.setRange(1, 6)
+        self.retries.setValue(int(settings.get("claude/retries")))
+        self.retries.setToolTip("Nombre de tentatives sur une erreur réseau.")
+        gf.addRow("Tentatives par appel", self.retries)
+
         self.binary = QLineEdit(str(settings.get("claude/binary")))
         gf.addRow("Binaire claude", self.binary)
         self.test = QPushButton("Tester le CLI")
@@ -122,6 +139,8 @@ class PrefsDialog(QDialog):
         settings.put("gen/section_parallel", self.section_parallel.value())
         settings.put("gen/max_sections", self.sections.value())
         settings.put("claude/timeout", self.timeout.value())
+        settings.put("claude/stall_timeout", self.stall.value())
+        settings.put("claude/retries", self.retries.value())
         settings.put("claude/binary", self.binary.text().strip() or "claude")
         settings.put("ui/mastery_threshold", self.threshold.value())
         theme.set_name(self.theme.currentData())
