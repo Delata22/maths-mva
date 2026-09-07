@@ -151,6 +151,30 @@ Deux mecanismes rendent cela supportable :
   fichier, marque par une empreinte du plan. Une generation interrompue reprend
   ou elle s'etait arretee. Si le plan change, le cache est invalide.
 
+### Le QCM : choisir ses questions, plusieurs series
+
+L'onglet QCM s'ouvre sur la liste des questions plutot que sur la premiere
+question. Chacune porte son resultat precedent — reussie, ratee, jamais faite —
+et se coche individuellement. Trois raccourcis : *tout selectionner*,
+*mes erreurs*, *jamais faites*. On refait donc les trois questions ratees sans
+reprendre les quinze.
+
+Une session portant sur une selection met a jour le suivi de chaque question,
+mais ne compte pas comme un score du cours : refaire trois questions ratees ne
+doit pas faire chuter la moyenne.
+
+Le bouton **+ Nouvelle serie** demande une serie supplementaire : le modele
+recoit les questions deja posees et doit couvrir en priorite ce qu'elles
+laissent de cote. Les series s'empilent, chacune avec son propre suivi.
+
+Certaines questions sont de vrais **exercices** : un enonce autosuffisant qu'on
+ne resout pas de tete, ou les quatre propositions ne donnent que le resultat
+final. Elles sont signalees, ouvrent un brouillon, et leurs propositions
+restent masquees tant qu'on n'a pas cherche — sans quoi on remonte la solution
+depuis les reponses. Un item marque exercice mais qui se resout en une ligne
+est automatiquement requalifie en question directe : le badge doit vouloir dire
+« prends une feuille ».
+
 ### L'equilibre des QCM
 
 Un QCM ou la bonne reponse est plus longue et plus argumentee que les trois
@@ -344,7 +368,8 @@ library/
     sheet.html       fiche de revision
     plan.json        plan et resultats laisses en exercice
     sections/        une section par fichier (reprise de generation)
-    exercises.json   QCM et demonstrations
+    exercises.json   QCM et demonstrations (serie 1)
+    quizzes.json     series de QCM supplementaires
     meta.json        modele, duree, cout
   progress.db        scores, statuts, notes, fils de discussion
 ```

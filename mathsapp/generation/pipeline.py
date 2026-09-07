@@ -239,6 +239,25 @@ def _plain(html_text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html_text)).strip()
 
 
+def retag_exercises(qcm: List[dict], min_chars: int = 200) -> int:
+    """Un « exercice » qui se resout de tete n'en est pas un.
+
+    Le badge doit vouloir dire quelque chose : prends une feuille. On requalifie
+    donc en question directe tout item marque exercice dont l'enonce est court
+    ou dont la difficulte est faible.
+    """
+    changed = 0
+    for question in qcm:
+        if question.get("kind") != "exercice":
+            continue
+        short = len(_plain(question.get("question", ""))) < min_chars
+        easy = int(question.get("difficulty") or 1) < 3
+        if short or easy:
+            question["kind"] = "direct"
+            changed += 1
+    return changed
+
+
 def _shufflable(question: dict) -> bool:
     return not any(_POSITIONAL_RE.search(_plain(c)) for c in question.get("choices", []))
 
@@ -349,6 +368,7 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
         raise cc.ClaudeError("Aucune question renvoyée.")
     for i, q in enumerate(qcm):
         q.setdefault("id", "q%d" % (i + 1))
+        q["kind"] = "exercice" if str(q.get("kind", "")).lower().startswith("ex") else "direct"
         q["difficulty"] = int(q.get("difficulty") or 1)
         choices = q.get("choices") or []
         try:
@@ -365,6 +385,7 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
     qcm.sort(key=lambda q: q["difficulty"])
     proofs.sort(key=lambda d: d["difficulty"])
 
+    retag_exercises(qcm)
     cost = res.cost_usd
     _fixed, repair_cost = repair_qcm_balance(syl, course_id, qcm, model,
                                              on_progress, cancel)
@@ -374,6 +395,66 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
     data = {"qcm": qcm, "proofs": proofs}
     content.write_json(course_id, content.EXOS, data)
     return data, cost
+
+
+def generate_quiz_set(course_id: str, model: Optional[str] = None,
+                      on_progress: ProgressCb = _noop,
+                      cancel: CancelCb = _never,
+                      syl: Optional[Syllabus] = None) -> tuple[str, float]:
+    """Produit une serie de QCM supplementaire. Retourne (identifiant, cout)."""
+    syl = syl or load_syllabus()
+    course = syl.get(course_id)
+    if course is None:
+        raise ValueError("cours inconnu : %s" % course_id)
+    plan = content.read_plan(course_id)
+    if plan is None or not content.has_course(course_id):
+        raise ValueError("Le cours doit être rédigé avant une série de QCM.")
+    model = model or str(settings.get("model/exercises"))
+    existing = content.all_questions(course_id)
+    on_progress("Nouvelle série de questions", 0.1)
+    data, res = cc.run_json(
+        prompts.extra_quiz_prompt(syl, course, plan, content.digest(course_id), existing),
+        model=model,
+        system=("Vous concevez des exercices de mathematiques. Vous repondez "
+                "uniquement en JSON valide."),
+        schema={"type": "object",
+                "properties": {"qcm": prompts.EXERCISES_SCHEMA["properties"]["qcm"]},
+                "required": ["qcm"]},
+        cancel=cancel,
+        on_progress=lambda n: on_progress("Nouvelle série de questions",
+                                          min(0.85, 0.1 + n / 16000.0)),
+        on_notice=lambda msg: on_progress("Nouvelle série — %s" % msg, 0.1),
+    )
+    qcm = data.get("qcm") or []
+    if not qcm:
+        raise cc.ClaudeError("Aucune question renvoyée.")
+
+    set_id = content.next_quiz_set_id(course_id)
+    known = {q["id"] for q in existing}
+    for i, q in enumerate(qcm):
+        base = str(q.get("id") or "q%d" % (i + 1))
+        q["id"] = base if base not in known else "s%s-%s" % (set_id, base)
+        known.add(q["id"])
+        q["kind"] = "exercice" if str(q.get("kind", "")).lower().startswith("ex") else "direct"
+        q["difficulty"] = max(1, min(5, int(q.get("difficulty") or 1)))
+        choices = q.get("choices") or []
+        try:
+            q["answer"] = int(q.get("answer", 0))
+        except (TypeError, ValueError):
+            q["answer"] = 0
+        if not (0 <= q["answer"] < len(choices)):
+            q["answer"] = 0
+    qcm.sort(key=lambda q: q["difficulty"])
+
+    retag_exercises(qcm)
+    cost = res.cost_usd
+    _fixed, repair_cost = repair_qcm_balance(syl, course_id, qcm, model, on_progress, cancel)
+    cost += repair_cost
+    rebalance_positions(qcm, seed=abs(hash(course_id + set_id)) % 10000)
+
+    content.add_quiz_set(course_id, qcm)
+    on_progress("Terminé", 1.0)
+    return set_id, cost
 
 
 def generate_sheet(course_id: str, model: Optional[str] = None,

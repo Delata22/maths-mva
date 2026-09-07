@@ -122,6 +122,13 @@
   }
   #previewbox:empty { display: none; }
   #previewbox .katex-display { white-space: normal; margin: .5em 0; }
+  .orphan {
+    white-space: normal; margin: -4px 0 12px; padding: 8px 11px;
+    border-left: 3px solid var(--warn); background: var(--warn-soft);
+    border-radius: 7px; font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 12.5px; color: var(--fg-soft);
+  }
+  .orphan .btn { padding: 3px 9px; font-size: 12px; margin-left: 6px; }
   .keyhelp {
     margin-top: 8px; color: var(--muted);
     font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; line-height: 1.6;
@@ -176,6 +183,9 @@ var PALETTE = [
     ['\\neg', '\\neg #'], ['\\land', ' \\land '], ['\\lor', ' \\lor '],
     ['\\Rightarrow', ' \\Rightarrow '], ['\\Leftarrow', ' \\Leftarrow '],
     ['\\iff', ' \\iff '], ['\\mid', ' \\mid '],
+    ['\\equiv', ' \\equiv '], ['\\not\\equiv', ' \\not\\equiv '],
+    ['\\oplus', ' \\oplus '], ['\\vdash', ' \\vdash '],
+    ['\\models', ' \\models '], ['a \\bmod n', ' \\pmod{#}'],
     ['\\top', '\\top'], ['\\bot', '\\bot'], ['\\square', '\\square']
   ]],
   ['Ensembles', [
@@ -183,6 +193,8 @@ var PALETTE = [
     ['\\subseteq', ' \\subseteq '], ['\\supset', ' \\supset '],
     ['\\cup', ' \\cup '], ['\\cap', ' \\cap '], ['\\setminus', ' \\setminus '],
     ['\\emptyset', '\\emptyset'], ['\\times', ' \\times '],
+    ['\\subsetneq', ' \\subsetneq '], ['\\sqcup', ' \\sqcup '],
+    ['\\mathcal{P}(E)', '\\mathcal{P}(#)'], ['\\complement', '\\complement '],
     ['\\{\\}', '\\{ # \\}'], ['\\mathbb{R}', '\\R'], ['\\mathbb{N}', '\\N'],
     ['\\mathbb{Z}', '\\Z'], ['\\mathbb{Q}', '\\Q'], ['\\mathbb{C}', '\\C'],
     ['\\mathbb{E}', '\\E'], ['\\mathbb{P}', '\\P']
@@ -191,6 +203,7 @@ var PALETTE = [
     ['\\to', ' \\to '], ['\\mapsto', ' \\mapsto '], ['\\infty', '\\infty'],
     ['\\leq', ' \\leq '], ['\\geq', ' \\geq '], ['\\neq', ' \\neq '],
     ['\\approx', ' \\approx '], ['\\sim', ' \\sim '], ['\\ll', ' \\ll '],
+    ['\\simeq', ' \\simeq '], ['\\propto', ' \\propto '],
     ['\\lim_{n}', '\\lim_{# \\to +\\infty} '], ['\\sum_{}^{}', '\\sum_{#}^{} '],
     ['\\prod_{}^{}', '\\prod_{#}^{} '], ['\\int_{}^{}', '\\int_{#}^{} '],
     ['\\partial', '\\partial '], ['\\nabla', '\\nabla '], ['\\varepsilon', '\\eps'],
@@ -207,7 +220,8 @@ var PALETTE = [
     ['\\begin{pmatrix}a\\end{pmatrix}', '\\begin{pmatrix} # \\end{pmatrix}']
   ]],
   ['Grec', [
-    ['\\alpha', '\\alpha '], ['\\beta', '\\beta '], ['\\gamma', '\\gamma '],
+    ['\\Phi', '\\Phi '], ['\\Psi', '\\Psi '], ['\\alpha', '\\alpha '],
+    ['\\beta', '\\beta '], ['\\gamma', '\\gamma '],
     ['\\delta', '\\delta '], ['\\varepsilon', '\\eps'], ['\\zeta', '\\zeta '],
     ['\\eta', '\\eta '], ['\\theta', '\\theta '], ['\\lambda', '\\lambda '],
     ['\\mu', '\\mu '], ['\\nu', '\\nu '], ['\\xi', '\\xi '], ['\\pi', '\\pi '],
@@ -217,7 +231,7 @@ var PALETTE = [
     ['\\Lambda', '\\Lambda '], ['\\Sigma', '\\Sigma '], ['\\Omega', '\\Omega ']
   ]],
   ['Structure', [
-    ['$x$', '$#$'], ['$$x$$', '$$\n#\n$$'], ['\\frac{a}{b}', '\\frac{#}{}'],
+    ['\\$x\\$', '$#$'], ['\\$\\$x\\$\\$', '$$\n#\n$$'], ['\\frac{a}{b}', '\\frac{#}{}'],
     ['\\sqrt{x}', '\\sqrt{#}'], ['x^{n}', '^{#}'], ['x_{i}', '_{#}'],
     ['\\begin{cases}a\\end{cases}', '\\begin{cases} # \\\\ \\end{cases}'],
     ['\\text{texte}', '\\text{#}'], ['\\quad', ' \\quad '],
@@ -238,14 +252,55 @@ var AUTO = {
   'inf': '\\infty', 'qqs': '\\forall', 'ex': '\\exists'
 };
 
+/** Le curseur est-il a l'interieur d'une zone mathematique ? */
+function insideMath(text, pos) {
+  var i = 0, state = 'text';
+  while (i < pos) {
+    if (text[i] === '\\') { i += 2; continue; }      // \$ echappe
+    if (text[i] === '$') {
+      if (text[i + 1] === '$') {
+        state = (state === 'display') ? 'text' : 'display';
+        i += 2; continue;
+      }
+      state = (state === 'inline') ? 'text' : 'inline';
+    }
+    i++;
+  }
+  return state !== 'text';
+}
+
+/** Un fragment qui a besoin d'etre entoure de $ pour etre compose. */
+function isMathSnippet(tpl) {
+  return tpl.indexOf('$') === -1 && /\\[a-zA-Z]|[\^_{}]/.test(tpl);
+}
+
 function insert(tpl) {
   var ta = document.getElementById('draft');
   if (!ta) return;
   var start = ta.selectionStart, end = ta.selectionEnd;
   var selected = ta.value.slice(start, end);
-  var text = tpl.indexOf('#') === -1 ? tpl : tpl.replace('#', selected);
+
+  // Un symbole insere hors des delimiteurs ne serait jamais compose : on
+  // ouvre la zone mathematique a la place de l'utilisateur. Et si le curseur
+  // sort tout juste d'une zone, on la prolonge au lieu d'en ouvrir une
+  // seconde : deux insertions de suite doivent donner $a b$, pas $a$$b$.
+  var head = start;
+  if (isMathSnippet(tpl) && !insideMath(ta.value, start)) {
+    var merge = start > 0 && ta.value[start - 1] === '$'
+                && insideMath(ta.value, start - 1);
+    var snippet = tpl.replace(/^ | $/g, '');
+    if (merge) {
+      head = start - 1;                       // on retire le $ fermant
+      tpl = ' ' + snippet + '$';
+    } else {
+      tpl = '$' + snippet + '$';
+    }
+  }
+
   var caret = tpl.indexOf('#');
-  ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  var text = caret === -1 ? tpl : tpl.replace('#', selected);
+  ta.value = ta.value.slice(0, head) + text + ta.value.slice(end);
+  start = head;
   var pos = caret === -1 ? start + text.length
                          : start + caret + selected.length;
   ta.focus();
@@ -299,14 +354,65 @@ function previewHtml(text) {
   });
 }
 
+/** Commandes LaTeX ecrites hors de toute zone mathematique. */
+function orphanCommands(text) {
+  var out = [], re = /\\[a-zA-Z]+/g, m;
+  while ((m = re.exec(text)) !== null) {
+    if (!insideMath(text, m.index) && out.indexOf(m[0]) === -1) out.push(m[0]);
+  }
+  return out;
+}
+
 function renderPreview() {
   var box = document.getElementById('previewbox');
   var ta = document.getElementById('draft');
   if (!box || !ta || !box.classList.contains('open')) return;
   var text = ta.value.trim();
-  box.innerHTML = text ? previewHtml(ta.value)
-                       : '<span style="color:var(--muted)">Rien à afficher.</span>';
-  if (text) typeset(box);
+  if (!text) {
+    box.innerHTML = '<span style="color:var(--muted)">Rien à afficher.</span>';
+    return;
+  }
+  var orphans = orphanCommands(ta.value);
+  var warn = '';
+  if (orphans.length) {
+    warn = '<div class="orphan">' + orphans.slice(0, 6).map(esc).join(', ')
+      + (orphans.length > 6 ? '…' : '')
+      + ' — écrit hors des délimiteurs, donc affiché tel quel. '
+      + '<button class="btn" id="wrapmath">Entourer de $…$</button></div>';
+  }
+  box.innerHTML = warn + previewHtml(ta.value);
+  typeset(box);
+  var fix = document.getElementById('wrapmath');
+  if (fix) fix.addEventListener('click', wrapOrphans);
+}
+
+/** Entoure de $ … $ les suites de commandes laissees hors zone mathematique. */
+function wrapOrphans() {
+  var ta = document.getElementById('draft');
+  if (!ta) return;
+  var src = ta.value, out = '', i = 0;
+  while (i < src.length) {
+    if (src[i] === '\\' && /[a-zA-Z]/.test(src[i + 1] || '')
+        && !insideMath(src, i)) {
+      // on avale la suite : commandes, symboles et espaces qui les separent
+      var j = i;
+      while (j < src.length) {
+        var rest = src.slice(j);
+        var token = rest.match(/^(\\[a-zA-Z]+|[A-Za-z0-9]|[\^_{}()\[\],.+\-*\/=<>|]|\s(?=\S))/);
+        if (!token) break;
+        j += token[0].length;
+      }
+      var chunk = src.slice(i, j).replace(/\s+$/, '');
+      out += '$' + chunk + '$';
+      i = i + chunk.length;
+    } else {
+      out += src[i];
+      i++;
+    }
+  }
+  ta.value = out;
+  ta.dispatchEvent(new Event('input'));
+  renderPreview();
 }
 
 function renderList() {
@@ -472,8 +578,9 @@ function open(i) {
       if (!repl) return;
       ev.preventDefault();
       var start = pos - m[1].length;
-      ta.value = ta.value.slice(0, start) + repl + ' ' + ta.value.slice(pos);
-      var caret = start + repl.length + 1;
+      var out = insideMath(ta.value, start) ? repl : '$' + repl + '$';
+      ta.value = ta.value.slice(0, start) + out + ' ' + ta.value.slice(pos);
+      var caret = start + out.length + 1;
       ta.setSelectionRange(caret, caret);
       markSaving();
     }

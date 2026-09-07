@@ -63,6 +63,66 @@
   button.btn:disabled { opacity: .45; cursor: default; }
   button.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
   button.btn.ghost:hover { color: var(--accent); }
+  /* ------------------------------------------------------------ menu */
+  .sets { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .set-tab {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight: 600;
+    padding: 5px 13px; border-radius: 999px; border: 1px solid var(--line);
+    background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .set-tab:hover { color: var(--fg); border-color: var(--line-strong); }
+  .set-tab.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .set-tab.add { border-style: dashed; }
+  .menu-sum {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px;
+    color: var(--muted); margin-bottom: 12px;
+  }
+  .quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .qrow {
+    display: flex; align-items: flex-start; gap: 11px;
+    padding: 9px 10px; border-radius: 9px; border: 1px solid transparent;
+    cursor: pointer; border-bottom: 1px solid var(--line);
+  }
+  .qrow:hover { background: var(--bg-soft); }
+  .qrow.sel { background: var(--accent-soft); border-color: var(--line); }
+  .qrow .box {
+    flex: none; width: 15px; height: 15px; margin-top: 3px; border-radius: 4px;
+    border: 1.5px solid var(--line-strong); display: flex; align-items: center;
+    justify-content: center; font-size: 10px; color: #fff;
+  }
+  .qrow.sel .box { background: var(--accent); border-color: var(--accent); }
+  .qrow .txt { flex: 1; min-width: 0; font-size: .95em; line-height: 1.45; }
+  .qrow .meta {
+    display: flex; gap: 9px; align-items: center; margin-top: 3px;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; color: var(--muted);
+  }
+  .pill {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.ko { color: var(--warn); border-color: var(--warn); }
+  .pill.new { color: var(--muted); }
+  .pill.ex { color: var(--violet); border-color: var(--violet); }
+  .sticky-go {
+    position: sticky; bottom: 0; padding: 14px 0; margin-top: 10px;
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+    display: flex; gap: 10px; align-items: center;
+  }
+  /* --------------------------------------------------------- exercice */
+  .exo-note {
+    margin: 0 0 14px; padding: 9px 13px; border-radius: 9px;
+    border-left: 3px solid var(--violet); background: var(--violet-soft);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; color: var(--fg-soft);
+  }
+  #scratch {
+    width: 100%; min-height: 130px; resize: vertical; margin-bottom: 14px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 1.55;
+    padding: 10px 12px; border-radius: 9px; border: 1.5px dashed var(--line-strong);
+    background: var(--bg-soft); color: var(--fg);
+  }
+  #scratch:focus { outline: none; border-color: var(--accent); border-style: solid; }
   #result { text-align: center; padding: 40px 0 20px; }
   #result .big { font-size: 3.4em; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
   #result .sub { color: var(--muted); font-family: ui-sans-serif, system-ui, sans-serif; margin-top: .3em; }
@@ -86,7 +146,9 @@
 <body>
 <div id="shell"></div>
 <script>
-var DATA = __DATA__;
+var SETS = __SETS__;
+var HISTORY = __HISTORY__;
+var DATA = { qcm: [] };
 var bridge = null;
 var MACROS = {
   '\\R': '\\mathbb{R}', '\\N': '\\mathbb{N}', '\\Z': '\\mathbb{Z}',
@@ -117,9 +179,129 @@ if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTrans
 var shell = document.getElementById('shell');
 var idx = 0, answers = [], validated = false, chosen = -1;
 var LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+var setIndex = 0;          // serie courante
+var selection = [];        // indices des questions retenues
+var partial = false;       // session sur une selection seulement
+
+function currentSet() { return SETS[setIndex] || { id: '1', title: '', qcm: [] }; }
+function hist(qid) {
+  var h = HISTORY[currentSet().id] || {};
+  return h[qid] || null;
+}
+function statusOf(q) {
+  var h = hist(q.id);
+  if (!h || !h.tries) return 'new';
+  return h.ok ? 'ok' : 'ko';
+}
+function plain(html) {
+  var d = document.createElement('div');
+  d.innerHTML = html;
+  return d.innerText.trim();
+}
 
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)); }
 function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+
+function renderMenu() {
+  var set = currentSet();
+  var qs = set.qcm;
+  var counts = { ok: 0, ko: 0, new: 0 };
+  qs.forEach(function (q) { counts[statusOf(q)]++; });
+
+  var h = '<div class="sets">';
+  SETS.forEach(function (s, i) {
+    h += '<button class="set-tab' + (i === setIndex ? ' on' : '') + '" data-set="' + i + '">'
+      + esc(s.title) + ' <span style="opacity:.65">' + s.qcm.length + '</span></button>';
+  });
+  h += '<button class="set-tab add" id="newset">+ Nouvelle série</button></div>';
+
+  h += '<div class="menu-sum">' + qs.length + ' questions &nbsp;·&nbsp; '
+    + counts.ok + ' réussies &nbsp;·&nbsp; ' + counts.ko + ' ratées &nbsp;·&nbsp; '
+    + counts.new + ' jamais faites</div>';
+
+  h += '<div class="quick">'
+    + '<button class="btn" data-pick="all">Tout sélectionner</button>'
+    + (counts.ko ? '<button class="btn" data-pick="ko">Mes erreurs (' + counts.ko + ')</button>' : '')
+    + (counts.new ? '<button class="btn" data-pick="new">Jamais faites (' + counts.new + ')</button>' : '')
+    + '<button class="btn ghost" data-pick="none">Tout désélectionner</button>'
+    + '</div>';
+
+  qs.forEach(function (q, i) {
+    var st = statusOf(q);
+    var label = { ok: 'réussie', ko: 'ratée', new: 'jamais faite' }[st];
+    var h2 = hist(q.id);
+    h += '<div class="qrow' + (selection.indexOf(i) >= 0 ? ' sel' : '') + '" data-i="' + i + '">'
+      + '<span class="box">✓</span><div class="txt">' + q.question
+      + '<div class="meta"><span class="diff">' + stars(q.difficulty) + '</span>'
+      + '<span class="pill ' + st + '">' + label + '</span>'
+      + (q.kind === 'exercice' ? '<span class="pill ex">exercice</span>' : '')
+      + (h2 && h2.tries > 1 ? '<span>' + h2.okCount + '/' + h2.tries + '</span>' : '')
+      + (q.section ? '<span>' + esc(q.section) + '</span>' : '')
+      + '</div></div></div>';
+  });
+
+  h += '<div class="sticky-go"><button class="btn primary" id="go">Commencer</button>'
+    + '<span id="gocount" style="color:var(--muted);font-size:13px"></span></div>';
+
+  shell.innerHTML = h;
+  typeset(shell);
+  updateGo();
+
+  Array.prototype.forEach.call(shell.querySelectorAll('.qrow'), function (el) {
+    el.addEventListener('click', function () {
+      var i = parseInt(el.getAttribute('data-i'), 10);
+      var at = selection.indexOf(i);
+      if (at >= 0) selection.splice(at, 1); else selection.push(i);
+      el.classList.toggle('sel');
+      updateGo();
+    });
+  });
+  Array.prototype.forEach.call(shell.querySelectorAll('[data-pick]'), function (b) {
+    b.addEventListener('click', function () {
+      var mode = b.getAttribute('data-pick');
+      selection = [];
+      qs.forEach(function (q, i) {
+        if (mode === 'all' || (mode === 'ko' && statusOf(q) === 'ko')
+            || (mode === 'new' && statusOf(q) === 'new')) selection.push(i);
+      });
+      renderMenu();
+    });
+  });
+  Array.prototype.forEach.call(shell.querySelectorAll('[data-set]'), function (b) {
+    b.addEventListener('click', function () {
+      setIndex = parseInt(b.getAttribute('data-set'), 10);
+      selection = [];
+      renderMenu();
+    });
+  });
+  document.getElementById('newset').addEventListener('click', function () {
+    if (bridge) bridge.newQuizSet();
+    this.textContent = 'Série demandée…';
+    this.disabled = true;
+  });
+  document.getElementById('go').addEventListener('click', startQuiz);
+}
+
+function updateGo() {
+  var go = document.getElementById('go');
+  var count = document.getElementById('gocount');
+  if (!go) return;
+  go.disabled = selection.length === 0;
+  go.textContent = selection.length === currentSet().qcm.length
+    ? 'Faire la série entière' : 'Commencer (' + selection.length + ')';
+  count.textContent = selection.length ? '' : 'choisissez au moins une question';
+}
+
+function startQuiz() {
+  if (!selection.length) return;
+  var qs = currentSet().qcm;
+  selection.sort(function (a, b) { return a - b; });
+  DATA = { qcm: selection.map(function (i) { return qs[i]; }) };
+  partial = selection.length < qs.length;
+  idx = 0; answers = [];
+  render();
+  window.scrollTo(0, 0);
+}
 
 function render() {
   if (idx >= DATA.qcm.length) return renderResult();
@@ -133,15 +315,23 @@ function render() {
   h += '<span>' + correct + ' bonne' + (correct > 1 ? 's' : '') + '</span>';
   h += '</div>';
   if (q.section) h += '<p style="margin:-10px 0 14px"><span class="badge">' + esc(q.section) + '</span></p>';
+  var isExo = q.kind === 'exercice';
+  if (isExo) {
+    h += '<div class="exo-note">Exercice : à chercher pour de bon avant de regarder '
+      + 'les propositions. Elles ne donnent que le résultat final.</div>';
+  }
   h += '<div class="qtext">' + q.question + '</div>';
-  h += '<div id="choices">';
+  if (isExo) h += '<textarea id="scratch" placeholder="Brouillon — vos calculs, effacé en changeant de question."></textarea>';
+  h += '<div id="choices"' + (isExo ? ' hidden' : '') + '>';
   q.choices.forEach(function (c, i) {
     h += '<div class="choice" data-i="' + i + '"><span class="k">' + LETTERS[i] + '</span><div class="c">' + c + '</div></div>';
   });
   h += '</div><div id="verdict"></div>';
   h += '<div class="actions">';
-  h += '<button class="btn primary" id="go" disabled>Valider</button>';
+  if (isExo) h += '<button class="btn" id="reveal">Afficher les propositions</button>';
+  h += '<button class="btn primary" id="go"' + (isExo ? ' hidden' : '') + ' disabled>Valider</button>';
   h += '<button class="btn ghost" id="ask">Demander à Claude</button>';
+  h += '<button class="btn ghost" id="back">Retour à la liste</button>';
   h += '</div>';
   shell.innerHTML = h;
   typeset(shell);
@@ -157,6 +347,17 @@ function render() {
     });
   });
   document.getElementById('go').addEventListener('click', onGo);
+  document.getElementById('back').addEventListener('click', function () {
+    renderMenu(); window.scrollTo(0, 0);
+  });
+  var revealBtn = document.getElementById('reveal');
+  if (revealBtn) {
+    revealBtn.addEventListener('click', function () {
+      document.getElementById('choices').hidden = false;
+      document.getElementById('go').hidden = false;
+      this.remove();
+    });
+  }
   document.getElementById('ask').addEventListener('click', function () {
     if (!bridge) return;
     var el = document.createElement('div');
@@ -230,14 +431,37 @@ function renderResult() {
     h += '</div>';
   }
   h += '<div class="actions" style="justify-content:center">'
-    + '<button class="btn primary" id="again">Recommencer</button>'
-    + (missed.length ? '<button class="btn" id="review">Revoir mes erreurs avec Claude</button>' : '')
+    + '<button class="btn primary" id="menu">Retour à la liste</button>'
+    + (missed.length ? '<button class="btn" id="redo">Refaire mes ' + missed.length + ' erreurs</button>' : '')
+    + '<button class="btn" id="again">Recommencer</button>'
+    + (missed.length ? '<button class="btn ghost" id="review">Revoir mes erreurs avec Claude</button>' : '')
     + '</div>';
   shell.innerHTML = h;
   typeset(shell);
-  if (bridge) bridge.quizFinished(JSON.stringify({ total: total, correct: correct, answers: answers }));
+  if (bridge) bridge.quizFinished(JSON.stringify({
+    total: total, correct: correct, answers: answers,
+    setId: currentSet().id, partial: partial
+  }));
+  answers.forEach(function (a) {
+    if (!a) return;
+    var store = HISTORY[currentSet().id] = HISTORY[currentSet().id] || {};
+    var prev = store[a.id] || { tries: 0, okCount: 0 };
+    store[a.id] = { ok: a.ok, tries: prev.tries + 1,
+                    okCount: prev.okCount + (a.ok ? 1 : 0) };
+  });
   document.getElementById('again').addEventListener('click', function () {
     idx = 0; answers = []; render(); window.scrollTo(0, 0);
+  });
+  document.getElementById('menu').addEventListener('click', function () {
+    renderMenu(); window.scrollTo(0, 0);
+  });
+  var redo = document.getElementById('redo');
+  if (redo) redo.addEventListener('click', function () {
+    var ids = missed.map(function (i) { return DATA.qcm[i].id; });
+    var qs = currentSet().qcm;
+    selection = [];
+    qs.forEach(function (q, i) { if (ids.indexOf(q.id) >= 0) selection.push(i); });
+    startQuiz();
   });
   Array.prototype.forEach.call(shell.querySelectorAll('[data-jump]'), function (a) {
     a.addEventListener('click', function () {
@@ -260,8 +484,9 @@ function renderResult() {
 }
 
 window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
-window.restartQuiz = function () { idx = 0; answers = []; render(); window.scrollTo(0, 0); };
-render();
+window.restartQuiz = function () { renderMenu(); window.scrollTo(0, 0); };
+selection = currentSet().qcm.map(function (_q, i) { return i; });
+renderMenu();
 </script>
 </body>
 </html>

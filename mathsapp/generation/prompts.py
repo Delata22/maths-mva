@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Dict, List, Optional
 
 from ..syllabus import Course, Syllabus
@@ -323,6 +324,7 @@ EXERCISES_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "id": {"type": "string"},
+                    "kind": {"type": "string"},
                     "difficulty": {"type": "integer"},
                     "question": {"type": "string"},
                     "choices": {"type": "array", "items": {"type": "string"}},
@@ -330,7 +332,8 @@ EXERCISES_SCHEMA = {
                     "explanation": {"type": "string"},
                     "section": {"type": "string"},
                 },
-                "required": ["id", "difficulty", "question", "choices", "answer", "explanation"],
+                "required": ["id", "kind", "difficulty", "question", "choices",
+                             "answer", "explanation"],
             },
         },
         "proofs": {
@@ -392,6 +395,47 @@ TACHE : produire un JSON avec deux tableaux, `qcm` et `proofs`.
   - 3 de difficulte 4 : cas limite, contre-exemple, hypothese qu'on retire.
   - 3 de difficulte 5 : question qui demande du recul, ou un raisonnement
     en plusieurs etapes.
+
+DEUX TYPES DE QUESTIONS, indiques par le champ `kind`.
+
+  `kind: "direct"` (10 questions) : on repond de tete ou en un pas. L'enonce
+  tient en une ou deux phrases.
+
+  `kind: "exercice"` (5 questions, UNIQUEMENT aux difficultes 3, 4 et 5) : un
+  vrai exercice, celui qu'on fait sur une feuille. Le lecteur doit poser des
+  calculs, verifier des hypotheses, mener un raisonnement en plusieurs etapes,
+  avant de pouvoir choisir. Les quatre propositions ne donnent que le resultat
+  final.
+
+  Le critere est simple : si on peut repondre de tete ou en une ligne, ce n'est
+  PAS un exercice, c'est une question directe. Mettez alors `kind: "direct"`.
+
+  Contre-exemple, a ne pas produire :
+      « Soit f(x,y,z) = xyz. Calculez le gradient en (1,2,3). »
+    Trois derivees immediates, aucune decision a prendre. C'est une question
+    directe deguisee.
+
+  Exemple de ce qui est attendu :
+      « Soit f la fonction definie sur R^2 par f(x,y) = x^3 - 3xy + y^3.
+        Determinez tous les points critiques de f, puis, en etudiant la
+        hessienne en chacun, dites lesquels sont des minimums locaux.
+        Combien y en a-t-il, et en quel(s) point(s) ? »
+    Il faut resoudre un systeme, calculer une hessienne, etudier son signe en
+    deux points, conclure. Les propositions sont : « un seul, en (1,1) »,
+    « deux, en (0,0) et (1,1) », « aucun », « un seul, en (0,0) ».
+
+  Regles :
+    * l'enonce fait au moins trois phrases, ou comporte une formule centree,
+      et il est autosuffisant : toutes les donnees necessaires y figurent ;
+    * il demande un resultat precis et verifiable (une valeur, un nombre, un
+      point, une reponse oui/non assortie d'une raison), pas une dissertation ;
+    * les distracteurs sont les resultats qu'on obtient en commettant une
+      erreur precise et frequente en chemin — signe oublie, hypothese non
+      verifiee, point critique manque, facteur absent — pas des valeurs prises
+      au hasard ;
+    * les propositions ne contiennent QUE le resultat, jamais la demarche ;
+    * l'explication deroule la solution etape par etape, et dit a quelle
+      erreur mene chaque distracteur.
   - 4 propositions par question, une seule correcte, `answer` = son index (0-3).
   - Les mauvaises reponses doivent correspondre a des erreurs REELLES et
     plausibles (confusion classique, quantificateur inverse, hypothese
@@ -853,3 +897,38 @@ QUESTIONS À CORRIGER :
 
 Répondez uniquement par l'objet JSON, avec pour chaque question son `id`, ses
 quatre `choices` et l'index `answer`."""
+
+
+def extra_quiz_prompt(syl: Syllabus, course: Course, plan: dict, digest: str,
+                      existing: List[dict], count: int = 15) -> str:
+    """Une serie de QCM supplementaire, qui ne redit pas la precedente."""
+    seen = "\n".join(
+        "  - [%s] %s" % (q.get("kind", "direct"),
+                         re.sub(r"<[^>]+>", " ", q.get("question", ""))[:160])
+        for q in existing)
+    return f"""{STYLE}
+
+Vous produisez une SERIE SUPPLEMENTAIRE de questions pour un cours dont une
+serie existe deja. Elle doit permettre de se retester sans retomber sur les
+memes items.
+
+{_context(syl, course)}
+
+PLAN DU COURS :
+{json.dumps([{"titre": s["title"], "contenu": s["content"]} for s in plan["sections"]], ensure_ascii=False, indent=1)}
+
+EXTRAITS DU COURS :
+{digest}
+
+QUESTIONS DEJA POSEES — n'en reprenez aucune, ni sous une autre formulation,
+ni en changeant seulement les valeurs numeriques :
+{seen}
+
+TACHE : produire {count} nouvelles questions, avec la meme repartition de
+difficulte et les memes regles que la premiere serie, dont 5 de type
+`exercice`. Couvrez en priorite les points du cours que la serie precedente
+laisse de cote, et abordez sous un autre angle ceux qu'elle traite deja.
+
+Repondez uniquement par un objet JSON de la forme {{"qcm": [...]}}, avec les
+memes champs que la premiere serie : id, kind, difficulty, question, choices,
+answer, explanation, section."""

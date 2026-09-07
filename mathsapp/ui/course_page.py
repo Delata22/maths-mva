@@ -175,6 +175,7 @@ class CoursePage(QWidget):
     regenerate_requested = Signal(str)
     exercises_requested = Signal(str)
     sheet_requested = Signal(str)
+    quiz_set_requested = Signal(str)
     sheet_export_requested = Signal(str)
     cancel_requested = Signal(str)
 
@@ -252,6 +253,8 @@ class CoursePage(QWidget):
         self.quiz_view = WebView(with_bridge=True)
         self.quiz_view.bridge.quiz_finished.connect(self._on_quiz_finished)
         self.quiz_view.bridge.ask_requested.connect(self._forward_ask)
+        self.quiz_view.bridge.quiz_set_requested.connect(
+            lambda: self.quiz_set_requested.emit(self.course.id) if self.course else None)
 
         self.proofs_view = WebView(with_bridge=True)
         self.proofs_view.bridge.proof_status_changed.connect(self._on_proof_status)
@@ -432,11 +435,13 @@ class CoursePage(QWidget):
             self._loaded_tabs.add(index)
 
     def _load_quiz(self) -> None:
-        data = content.read_exercises(self.course.id) or {"qcm": []}
+        sets = content.quiz_sets(self.course.id)
+        history = store.question_history(self.course.id)
         tpl = (ASSETS_DIR / "quiz.html").read_text(encoding="utf-8")
         page = (tpl.replace("__THEME__", theme.name())
                    .replace("__ASSETS__", content.assets_url())
-                   .replace("__DATA__", json.dumps(data, ensure_ascii=False)))
+                   .replace("__SETS__", json.dumps(sets, ensure_ascii=False))
+                   .replace("__HISTORY__", json.dumps(history, ensure_ascii=False)))
         path = _page_path("quiz_%s.html" % self.course.id)
         path.write_text(page, encoding="utf-8")
         self.quiz_view.load_file(path)
@@ -454,6 +459,12 @@ class CoursePage(QWidget):
         path = _page_path("proofs_%s.html" % self.course.id)
         path.write_text(page, encoding="utf-8")
         self.proofs_view.load_file(path)
+
+    def reload_quiz(self) -> None:
+        """Apres l'ajout d'une serie : on recharge la page de QCM."""
+        self._loaded_tabs.discard(TAB_QUIZ)
+        if self.tabs.currentIndex() == TAB_QUIZ:
+            self._on_tab(TAB_QUIZ)
 
     def reload_content(self) -> None:
         """Force le rechargement des vues web (apres une (re)generation)."""
@@ -554,7 +565,9 @@ class CoursePage(QWidget):
         except json.JSONDecodeError:
             return
         store.record_attempt(self.course.id, int(data.get("total", 0)),
-                             int(data.get("correct", 0)), data)
+                             int(data.get("correct", 0)), data,
+                             set_id=str(data.get("setId") or "1"),
+                             partial=bool(data.get("partial")))
         self.refresh()
 
     def _on_proof_status(self, proof_id: str, value: str) -> None:

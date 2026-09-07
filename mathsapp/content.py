@@ -5,6 +5,7 @@ import html
 import json
 import pathlib
 import re
+import time
 from typing import List, Optional
 
 from .paths import ASSETS_DIR, course_dir
@@ -14,6 +15,7 @@ SHEET = "sheet.html"
 SECTIONS = "sections"
 PLAN = "plan.json"
 EXOS = "exercises.json"
+QUIZZES = "quizzes.json"
 META = "meta.json"
 
 
@@ -133,6 +135,60 @@ def read_plan(course_id: str):
 
 def read_exercises(course_id: str):
     return read_json(course_id, EXOS)
+
+
+def quiz_sets(course_id: str) -> List[dict]:
+    """Les series de QCM d'un cours.
+
+    La premiere vient de exercises.json, produite avec le cours ; les suivantes
+    vivent dans quizzes.json, pour ne pas toucher au fichier d'origine.
+    """
+    sets: List[dict] = []
+    base = read_exercises(course_id)
+    if base and base.get("qcm"):
+        sets.append({"id": "1", "title": "Série 1", "qcm": base["qcm"]})
+    extra = read_json(course_id, QUIZZES) or {}
+    for item in extra.get("sets", []):
+        if item.get("qcm"):
+            sets.append({"id": str(item.get("id") or len(sets) + 1),
+                         "title": item.get("title") or "Série %d" % (len(sets) + 1),
+                         "qcm": item["qcm"]})
+    return sets
+
+
+def next_quiz_set_id(course_id: str) -> str:
+    return str(len(quiz_sets(course_id)) + 1)
+
+
+def add_quiz_set(course_id: str, qcm: List[dict], title: Optional[str] = None) -> str:
+    extra = read_json(course_id, QUIZZES) or {"sets": []}
+    extra.setdefault("sets", [])
+    set_id = next_quiz_set_id(course_id)
+    extra["sets"].append({
+        "id": set_id,
+        "title": title or "Série %s" % set_id,
+        "created_at": time.time(),
+        "qcm": qcm,
+    })
+    write_json(course_id, QUIZZES, extra)
+    return set_id
+
+
+def delete_quiz_set(course_id: str, set_id: str) -> bool:
+    if set_id == "1":
+        return False
+    extra = read_json(course_id, QUIZZES) or {"sets": []}
+    before = len(extra.get("sets", []))
+    extra["sets"] = [s for s in extra.get("sets", []) if str(s.get("id")) != str(set_id)]
+    write_json(course_id, QUIZZES, extra)
+    return len(extra["sets"]) < before
+
+
+def all_questions(course_id: str) -> List[dict]:
+    out: List[dict] = []
+    for item in quiz_sets(course_id):
+        out.extend(item["qcm"])
+    return out
 
 
 def read_meta(course_id: str):

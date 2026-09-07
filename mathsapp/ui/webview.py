@@ -16,6 +16,7 @@ class Bridge(QObject):
     proof_status_changed = Signal(str, str)       # id, statut
     proof_draft_changed = Signal(str, str)        # id, texte du brouillon
     proof_review_requested = Signal(str, str)     # id, charge utile JSON
+    quiz_set_requested = Signal()                 # nouvelle serie de QCM
 
     @Slot(str, str)
     def askAbout(self, text: str, heading: str) -> None:  # noqa: N802 (appele par JS)
@@ -28,6 +29,10 @@ class Bridge(QObject):
     @Slot(str)
     def quizFinished(self, payload: str) -> None:  # noqa: N802
         self.quiz_finished.emit(payload)
+
+    @Slot()
+    def newQuizSet(self) -> None:  # noqa: N802
+        self.quiz_set_requested.emit()
 
     @Slot(str, str)
     def setProofStatus(self, proof_id: str, value: str) -> None:  # noqa: N802

@@ -255,6 +255,50 @@ def test_section_context() -> None:
           plan["sections"][0].get("content", "zzz")[:40] in prompt)
 
 
+def test_quiz_sets() -> None:
+    """Series multiples, suivi par question, sessions partielles."""
+    from mathsapp import content, store
+    from mathsapp.generation import pipeline
+    from mathsapp.syllabus import load
+
+    syl = load()
+    cid = next((c.id for c in syl.all() if content.has_exercises(c.id)), None)
+    if cid is None:
+        return
+    sets = content.quiz_sets(cid)
+    check("serie 1 issue des exercices du cours",
+          sets and sets[0]["id"] == "1" and len(sets[0]["qcm"]) > 0,
+          "%d serie(s)" % len(sets))
+    check("identifiants de question uniques",
+          len({q["id"] for q in content.all_questions(cid)})
+          == len(content.all_questions(cid)))
+
+    # suivi par question, sans polluer les scores du cours
+    before = len(store.attempts(cid))
+    qs = sets[0]["qcm"][:3]
+    detail = {"answers": [{"id": q["id"], "ok": i != 1} for i, q in enumerate(qs)]}
+    store.record_attempt(cid, 3, 2, detail, set_id="1", partial=True)
+    history = store.question_history(cid).get("1", {})
+    check("resultat par question enregistre",
+          all(q["id"] in history for q in qs), "%d suivis" % len(history))
+    check("session partielle ne compte pas comme un score du cours",
+          len(store.attempts(cid)) == before)
+    ko = [qid for qid, h in history.items() if not h["ok"]]
+    check("questions ratees identifiables", ko == [qs[1]["id"]], str(ko))
+    store.reset_question_history(cid)
+
+    # requalification des faux exercices
+    batch = [
+        {"kind": "exercice", "difficulty": 2, "question": "<p>Calculez.</p>"},
+        {"kind": "exercice", "difficulty": 4, "question": "<p>" + "x" * 260 + "</p>"},
+        {"kind": "direct", "difficulty": 5, "question": "<p>court</p>"},
+    ]
+    moved = pipeline.retag_exercises(batch)
+    check("faux exercices requalifies",
+          moved == 1 and [q["kind"] for q in batch] == ["direct", "exercice", "direct"],
+          str([q["kind"] for q in batch]))
+
+
 def test_sheet() -> None:
     """Fiche de revision : extraction, assemblage, export PDF."""
     import re
@@ -669,6 +713,8 @@ def main() -> int:
     test_pages()
     print("\n--- contexte entre sections ---")
     test_section_context()
+    print("\n--- series de QCM ---")
+    test_quiz_sets()
     print("\n--- equilibre des QCM ---")
     test_qcm_balance()
     print("\n--- fiche de revision ---")

@@ -20,6 +20,7 @@ KIND_LABEL = {
     "regenerate": "Régénération complète",
     "exercises": "Exercices seuls",
     "sheet": "Fiche de révision",
+    "quiz": "Série de QCM",
 }
 
 
@@ -115,6 +116,10 @@ class _Task(QRunnable):
             elif job.kind == "exercises":
                 pipeline.regenerate_exercises(job.course_id, on_progress, cancel, syl)
                 msg = "Exercices régénérés"
+            elif job.kind == "quiz":
+                set_id, cost = pipeline.generate_quiz_set(
+                    job.course_id, None, on_progress, cancel, syl)
+                msg = "Série %s produite (%.2f $)" % (set_id, cost)
             elif job.kind == "sheet":
                 cost = pipeline.generate_sheet(job.course_id, None, on_progress, cancel, syl)
                 msg = "Fiche produite (%.2f $)" % cost

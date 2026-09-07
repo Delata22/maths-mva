@@ -241,6 +241,7 @@ class MainWindow(QMainWindow):
         self.course_page.regenerate_requested.connect(self.regenerate)
         self.course_page.exercises_requested.connect(self.enqueue_exercises)
         self.course_page.sheet_requested.connect(self.enqueue_sheet)
+        self.course_page.quiz_set_requested.connect(self.enqueue_quiz_set)
         self.course_page.sheet_export_requested.connect(self.export_sheet_pdf)
         self.course_page.cancel_requested.connect(self.queue.cancel)
         self.course_page.ask_requested.connect(self.ask_about)
@@ -378,6 +379,15 @@ class MainWindow(QMainWindow):
     def enqueue_exercises(self, course_id: str) -> None:
         self.queue.enqueue(course_id, self.syl.title(course_id), "exercises")
         self.queue_dock.setVisible(True)
+
+    def enqueue_quiz_set(self, course_id: str) -> None:
+        if self.queue.enqueue(course_id, self.syl.title(course_id), "quiz") is None:
+            self.statusBar().showMessage("Série déjà en production", 5000)
+            return
+        self.queue_dock.setVisible(True)
+        self.statusBar().showMessage(
+            "Nouvelle série de questions pour « %s » — environ deux minutes"
+            % self.syl.title(course_id), 8000)
 
     def enqueue_sheet(self, course_id: str) -> None:
         if self.queue.enqueue(course_id, self.syl.title(course_id), "sheet") is None:
@@ -524,7 +534,10 @@ class MainWindow(QMainWindow):
         elif self.stack.currentIndex() == PAGE_GRAPH:
             self.graph.rebuild()
         if self.course_page.course and self.course_page.course.id == course_id and ok:
-            self.course_page.reload_content()
+            if _kind == "quiz":
+                self.course_page.reload_quiz()
+            else:
+                self.course_page.reload_content()
 
     # -------------------------------------------------------------------- chat
     def ask_about(self, course_id: str, excerpt: str, heading: str) -> None:

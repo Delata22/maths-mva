@@ -66,6 +66,10 @@ def main() -> int:
         page = (tpl.replace("__THEME__", args.theme)
                    .replace("__ASSETS__", content.assets_url())
                    .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+                   .replace("__SETS__", json.dumps(content.quiz_sets(args.course_id),
+                                                   ensure_ascii=False))
+                   .replace("__HISTORY__", json.dumps(store.question_history(args.course_id),
+                                                      ensure_ascii=False))
                    .replace("__STATUS__", json.dumps(store.proof_statuses(args.course_id)))
                    .replace("__DRAFTS__", json.dumps(store.proof_drafts(args.course_id),
                                                      ensure_ascii=False)))

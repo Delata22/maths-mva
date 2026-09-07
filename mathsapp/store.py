@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS proof_state (
     PRIMARY KEY (course_id, proof_id)
 );
 
+CREATE TABLE IF NOT EXISTS question_result (
+    course_id   TEXT NOT NULL,
+    set_id      TEXT NOT NULL DEFAULT '1',
+    question_id TEXT NOT NULL,
+    last_ok     INTEGER NOT NULL DEFAULT 0,
+    tries       INTEGER NOT NULL DEFAULT 0,
+    ok_count    INTEGER NOT NULL DEFAULT 0,
+    updated_at  REAL NOT NULL,
+    PRIMARY KEY (course_id, set_id, question_id)
+);
+
 CREATE TABLE IF NOT EXISTS proof_draft (
     course_id   TEXT NOT NULL,
     proof_id    TEXT NOT NULL,
@@ -130,14 +141,61 @@ def get_notes(course_id: str) -> str:
 
 
 # ---------------------------------------------------------------------- QCM
-def record_attempt(course_id: str, total: int, correct: int, detail: dict) -> int:
+def record_attempt(course_id: str, total: int, correct: int, detail: dict,
+                   set_id: str = "1", partial: bool = False) -> int:
+    """Enregistre une tentative, et le resultat de chaque question.
+
+    `partial` signale une session portant sur une selection de questions : elle
+    met a jour le suivi par question, mais ne compte pas comme un score du
+    cours, sans quoi refaire trois questions ratees ferait chuter la moyenne.
+    """
     c = conn()
-    cur = c.execute(
-        "INSERT INTO quiz_attempt (course_id, finished_at, total, correct, detail) VALUES (?,?,?,?,?)",
-        (course_id, time.time(), total, correct, json.dumps(detail, ensure_ascii=False)),
-    )
+    now = time.time()
+    for answer in detail.get("answers") or []:
+        if not isinstance(answer, dict) or not answer.get("id"):
+            continue
+        ok = 1 if answer.get("ok") else 0
+        c.execute(
+            """INSERT INTO question_result
+                 (course_id, set_id, question_id, last_ok, tries, ok_count, updated_at)
+               VALUES (?,?,?,?,1,?,?)
+               ON CONFLICT(course_id, set_id, question_id) DO UPDATE SET
+                 last_ok=excluded.last_ok,
+                 tries=question_result.tries+1,
+                 ok_count=question_result.ok_count+excluded.ok_count,
+                 updated_at=excluded.updated_at""",
+            (course_id, str(set_id), str(answer["id"]), ok, ok, now),
+        )
+    cur = None
+    if not partial:
+        cur = c.execute(
+            "INSERT INTO quiz_attempt (course_id, finished_at, total, correct, detail) "
+            "VALUES (?,?,?,?,?)",
+            (course_id, now, total, correct, json.dumps(detail, ensure_ascii=False)),
+        )
     c.commit()
-    return int(cur.lastrowid)
+    return int(cur.lastrowid) if cur is not None else 0
+
+
+def question_history(course_id: str) -> Dict[str, Dict[str, dict]]:
+    """{set_id: {question_id: {ok, tries, ok_count}}}"""
+    out: Dict[str, Dict[str, dict]] = {}
+    for r in conn().execute(
+            "SELECT set_id, question_id, last_ok, tries, ok_count "
+            "FROM question_result WHERE course_id=?", (course_id,)):
+        out.setdefault(r["set_id"], {})[r["question_id"]] = {
+            "ok": bool(r["last_ok"]), "tries": r["tries"], "okCount": r["ok_count"]}
+    return out
+
+
+def reset_question_history(course_id: str, set_id: Optional[str] = None) -> None:
+    c = conn()
+    if set_id is None:
+        c.execute("DELETE FROM question_result WHERE course_id=?", (course_id,))
+    else:
+        c.execute("DELETE FROM question_result WHERE course_id=? AND set_id=?",
+                  (course_id, str(set_id)))
+    c.commit()
 
 
 def attempts(course_id: str) -> List[sqlite3.Row]:
