@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="__ASSETS__/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="__ASSETS__/sheet.css">
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="__ASSETS__/vendor/katex/katex.min.js"></script>
+<script src="__ASSETS__/vendor/katex/contrib/auto-render.min.js"></script>
+<script src="__ASSETS__/mviz.js"></script>
+</head>
+<body class="__CLASS__">
+<div class="sheet">
+__BODY__
+</div>
+<script>
+var MACROS = {
+  '\\R': '\\mathbb{R}', '\\N': '\\mathbb{N}', '\\Z': '\\mathbb{Z}',
+  '\\Q': '\\mathbb{Q}', '\\C': '\\mathbb{C}', '\\E': '\\mathbb{E}',
+  '\\P': '\\mathbb{P}', '\\1': '\\mathbf{1}',
+  '\\norm': '\\left\\lVert #1 \\right\\rVert', '\\abs': '\\left| #1 \\right|',
+  '\\scal': '\\left\\langle #1 , #2 \\right\\rangle',
+  '\\argmin': '\\operatorname{arg\\,min}', '\\argmax': '\\operatorname{arg\\,max}',
+  '\\Var': '\\operatorname{Var}', '\\Cov': '\\operatorname{Cov}',
+  '\\rank': '\\operatorname{rang}', '\\tr': '\\operatorname{tr}',
+  '\\diag': '\\operatorname{diag}', '\\Id': '\\mathrm{Id}',
+  '\\dd': '\\mathrm{d}', '\\eps': '\\varepsilon'
+};
+if (typeof renderMathInElement !== 'undefined') {
+  renderMathInElement(document.body, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '\\[', right: '\\]', display: true},
+      {left: '$', right: '$', display: false},
+      {left: '\\(', right: '\\)', display: false}
+    ],
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+    throwOnError: false, strict: false, macros: MACROS
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll('.qa .a'), function (el) {
+  el.addEventListener('click', function () { el.classList.add('revealed'); });
+});
+window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
+window.revealAll = function () {
+  Array.prototype.forEach.call(document.querySelectorAll('.qa .a'), function (el) {
+    el.classList.add('revealed');
+  });
+};
+window.sheetReady = true;
+</script>
+</body>
+</html>

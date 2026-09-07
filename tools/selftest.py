@@ -167,6 +167,70 @@ def test_pages() -> None:
     check("nettoyage des reponses du modele", cleaned == "<h2>A</h2>", repr(cleaned))
 
 
+def test_sheet() -> None:
+    """Fiche de revision : extraction, assemblage, export PDF."""
+    import re
+    from mathsapp import content
+    from mathsapp.syllabus import load
+
+    syl = load()
+    with_sheet = [c.id for c in syl.all() if content.has_sheet(c.id)]
+    with_course = [c.id for c in syl.all() if content.has_course(c.id)]
+    if not with_course:
+        check("fiche : aucun cours genere, test ignore", True)
+        return
+
+    cid = with_course[0]
+    substance = content.substance(cid)
+    check("substance extraite du cours", len(substance) > 2000,
+          "%d caracteres" % len(substance))
+    check("substance : enonces conserves",
+          "[DEFINITION]" in substance or "[THEOREME]" in substance,
+          substance[:60])
+
+    if not with_sheet:
+        check("fiche : aucune fiche generee, rendu non teste", True)
+        return
+
+    cid = with_sheet[0]
+    page = content.render_sheet_page(cid, syl.title(cid), "light")
+    text = page.read_text(encoding="utf-8")
+    check("page de fiche assemblee",
+          "katex.min.css" in text and "sheet.css" in text
+          and "__BODY__" not in text and "__ASSETS__" not in text)
+    printed = content.render_sheet_page(cid, syl.title(cid), "light", for_print=True)
+    check("variante impression", 'class="print"' in printed.read_text(encoding="utf-8"))
+
+    body = content.read_sheet(cid)
+    blocks = re.findall(r"<h2>(.*?)</h2>", body)
+    check("fiche structuree", len(blocks) >= 4, ", ".join(blocks[:4]))
+    check("fiche : rappel actif present", 'class="qa"' in body)
+    check("fiche : classes attendues seulement",
+          not re.search(r'class="(?!sheet-head|meta|oneline|block|def|thm|method|'
+                        r'trap|note|tag|formulas|check|qa|q|a|cols|mviz)', body),
+          str(set(re.findall(r'class="([a-z-]+)"', body)) - {
+              "sheet-head", "meta", "oneline", "block", "def", "thm", "method",
+              "trap", "note", "tag", "formulas", "check", "qa", "q", "a", "cols",
+              "mviz"}))
+
+    # export PDF reel
+    from mathsapp.paths import library_dir
+    from mathsapp.ui.pdf_export import PdfExporter
+    target = library_dir() / "_views" / "selftest.pdf"
+    result = {}
+    exporter = PdfExporter()
+    exporter.finished.connect(lambda ok, msg: result.update(ok=ok, msg=msg))
+    exporter.export(cid, syl.title(cid), target, settle_ms=400)
+    ok = wait_until(lambda: "ok" in result, 45000)
+    check("export PDF", ok and result.get("ok") and target.exists(),
+          result.get("msg", "délai dépassé"))
+    if target.exists():
+        data = target.read_bytes()
+        check("PDF valide", data[:5] == b"%PDF-" and len(data) > 20000,
+              "%d ko" % (len(data) // 1024))
+        target.unlink()
+
+
 def test_bridge() -> None:
     """Le JavaScript des pages doit pouvoir rappeler l'application."""
     from mathsapp import content
@@ -515,6 +579,8 @@ def main() -> int:
     test_store()
     print("\n--- assemblage des pages ---")
     test_pages()
+    print("\n--- fiche de revision ---")
+    test_sheet()
     print("\n--- pont javascript ---")
     test_bridge()
     print("\n--- editeur de demonstration ---")

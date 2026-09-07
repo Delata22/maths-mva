@@ -30,7 +30,8 @@ def main() -> int:
     parser.add_argument("course_id")
     parser.add_argument("--out", default=None)
     parser.add_argument("--theme", default="light", choices=["light", "dark"])
-    parser.add_argument("--view", default="course", choices=["course", "quiz", "proofs"])
+    parser.add_argument("--view", default="course",
+                        choices=["course", "quiz", "proofs", "sheet"])
     parser.add_argument("--scroll", type=float, default=0.0,
                         help="nombre d'ecrans a faire defiler avant la capture")
     parser.add_argument("--anchor", default=None,
@@ -54,6 +55,8 @@ def main() -> int:
     out = pathlib.Path(args.out or ("/tmp/%s.png" % args.course_id))
     if args.view == "course":
         path = content.render_course_page(args.course_id, course.title, args.theme)
+    elif args.view == "sheet":
+        path = content.render_sheet_page(args.course_id, course.title, args.theme)
     else:
         import json
         from mathsapp import store

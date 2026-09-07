@@ -37,6 +37,8 @@ def main() -> int:
     parser.add_argument("--list", action="store_true", help="lister les cours")
     parser.add_argument("--resume", action="store_true",
                         help="reprendre toutes les generations interrompues")
+    parser.add_argument("--sheets", action="store_true",
+                        help="produire les fiches de revision manquantes")
     parser.add_argument("--force", action="store_true", help="regenerer meme si deja present")
     parser.add_argument("--model",
                         help="modele pour les cours, pour cette execution seulement "
@@ -53,6 +55,27 @@ def main() -> int:
             print("[%s] %-30s niv.%d  %s%s"
                   % (mark, course.id, course.level, course.title, extra))
         print("\n  x terminé   ~ interrompu   (vide) pas commencé")
+        return 0
+
+    if args.sheets:
+        todo = [c.id for c in syl.all()
+                if content.has_course(c.id) and not content.has_sheet(c.id)]
+        if args.ids:
+            todo = [c for c in todo if c in set(args.ids)]
+        if not todo:
+            print("Aucune fiche manquante.")
+            return 0
+        print("%d fiche(s) à produire\n" % len(todo))
+        total = 0.0
+        for i, cid in enumerate(todo, 1):
+            print("(%d/%d) %s" % (i, len(todo), syl.title(cid)))
+            try:
+                total += pipeline.generate_sheet(cid, on_progress=show, syl=syl)
+            except Exception as exc:  # noqa: BLE001
+                print("\n  ECHEC : %s\n" % exc)
+                continue
+            print("\r  fiche produite%s\n" % (" " * 46))
+        print("Total : %.2f $" % total)
         return 0
 
     ids = list(args.ids)

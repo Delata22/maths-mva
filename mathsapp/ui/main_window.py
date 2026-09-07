@@ -1,10 +1,12 @@
 """Fenetre principale."""
 from __future__ import annotations
 
+import pathlib
 from typing import List, Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDockWidget, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
@@ -87,6 +89,7 @@ class MainWindow(QMainWindow):
         self.syl: Syllabus = load_syllabus()
         self.queue = GenerationQueue(self)
         self._proof_windows: List[ProofHelperWindow] = []
+        self._exporters: List[object] = []
 
         self.setWindowTitle("Maths MVA")
         self.resize(1500, 950)
@@ -229,6 +232,7 @@ class MainWindow(QMainWindow):
         self.library.generate_requested.connect(self.enqueue)
         self.library.regenerate_requested.connect(self.regenerate)
         self.library.exercises_requested.connect(self.enqueue_exercises)
+        self.library.sheets_requested.connect(self.enqueue_sheets)
         self.library.cancel_requested.connect(self.queue.cancel)
         self.library.delete_requested.connect(self.delete_content)
 
@@ -236,6 +240,8 @@ class MainWindow(QMainWindow):
         self.course_page.generate_requested.connect(self.enqueue)
         self.course_page.regenerate_requested.connect(self.regenerate)
         self.course_page.exercises_requested.connect(self.enqueue_exercises)
+        self.course_page.sheet_requested.connect(self.enqueue_sheet)
+        self.course_page.sheet_export_requested.connect(self.export_sheet_pdf)
         self.course_page.cancel_requested.connect(self.queue.cancel)
         self.course_page.ask_requested.connect(self.ask_about)
         self.course_page.proof_help_requested.connect(self.open_proof_helper)
@@ -372,6 +378,62 @@ class MainWindow(QMainWindow):
     def enqueue_exercises(self, course_id: str) -> None:
         self.queue.enqueue(course_id, self.syl.title(course_id), "exercises")
         self.queue_dock.setVisible(True)
+
+    def enqueue_sheet(self, course_id: str) -> None:
+        if self.queue.enqueue(course_id, self.syl.title(course_id), "sheet") is None:
+            self.statusBar().showMessage("Fiche déjà en cours de production", 5000)
+            return
+        self.queue_dock.setVisible(True)
+        self.statusBar().showMessage(
+            "Fiche de « %s » en production" % self.syl.title(course_id), 6000)
+
+    def enqueue_sheets(self, course_ids: List[str]) -> None:
+        todo = [c for c in course_ids if content.has_course(c) and not content.has_sheet(c)]
+        if not todo:
+            self.statusBar().showMessage("Toutes les fiches sont déjà là", 5000)
+            return
+        if len(todo) > 4:
+            answer = QMessageBox.question(
+                self, "Générer les fiches",
+                "Produire %d fiches de révision ?\n\n"
+                "Environ une minute et 0,20 $ par fiche, soit à peu près "
+                "%d min et %.0f $." % (len(todo), len(todo) * 100 // 60, len(todo) * 0.2),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        for cid in todo:
+            self.queue.enqueue(cid, self.syl.title(cid), "sheet")
+        self.queue_dock.setVisible(True)
+
+    def export_sheet_pdf(self, course_id: str) -> None:
+        """Enregistre la fiche en PDF a l'endroit choisi par l'utilisateur."""
+        from PySide6.QtWidgets import QFileDialog
+        from .pdf_export import PdfExporter
+        if not content.has_sheet(course_id):
+            return
+        title = self.syl.title(course_id)
+        default = str(pathlib.Path.home() / ("Fiche - %s.pdf" % title.replace("/", "-")))
+        path, _filter = QFileDialog.getSaveFileName(
+            self, "Enregistrer la fiche", default, "PDF (*.pdf)")
+        if not path:
+            return
+        self.statusBar().showMessage("Export en cours…")
+        exporter = PdfExporter(self)
+        self._exporters.append(exporter)
+
+        def done(ok: bool, message: str) -> None:
+            self._exporters.remove(exporter) if exporter in self._exporters else None
+            if ok:
+                self.statusBar().showMessage("Fiche enregistrée : %s" % message, 12000)
+                self.notice.show_message(
+                    "Fiche enregistrée dans %s" % message, "Ouvrir le dossier",
+                    lambda p=message: QDesktopServices.openUrl(
+                        QUrl.fromLocalFile(str(pathlib.Path(p).parent))))
+            else:
+                self.statusBar().showMessage("Export impossible : %s" % message, 12000)
+
+        exporter.finished.connect(done)
+        exporter.export(course_id, title, pathlib.Path(path))
 
     def delete_content(self, course_id: str) -> None:
         answer = QMessageBox.question(

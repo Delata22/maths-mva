@@ -662,3 +662,112 @@ Regles :
   ce que vous avez laisse de cote.
 
 Repondez uniquement par l'objet JSON."""
+
+
+# --------------------------------------------------------- fiche de revision
+SHEET_CONVENTIONS = r"""
+FORMAT : fragment HTML, sans ``` autour, sans <html>, <head>, <body>.
+N'utilisez que les classes ci-dessous. N'en inventez aucune.
+
+En-tête, une seule fois, en premier :
+
+  <div class="sheet-head">
+    <div class="meta">Domaine &middot; niveau n/5</div>
+    <h1>Titre du cours</h1>
+    <p class="oneline">Une phrase : à quoi sert ce cours, ce qu'il permet de
+    faire. Pas de définition ici.</p>
+  </div>
+
+Ensuite des blocs, dans cet ordre :
+
+  <section class="block"><h2>Définitions</h2>
+    <div class="def"><b>Terme</b> &mdash; énoncé exact et complet.</div>
+  </section>
+
+  <section class="block"><h2>Résultats à connaître</h2>
+    <div class="thm"><span class="tag">Théorème</span> <b>Nom.</b> Énoncé
+    complet, hypothèses comprises. <span class="tag">idée</span> la stratégie
+    de preuve en une demi-ligne.</div>
+  </section>
+  (valeurs possibles du premier tag : Théorème, Proposition, Lemme, Corollaire)
+
+  <section class="block"><h2>Formules</h2>
+    <table class="formulas">
+      <tr><td>ce que ça calcule</td><td>$formule$</td></tr>
+    </table>
+  </section>
+
+  <section class="block"><h2>Méthodes</h2>
+    <div class="method"><span class="tag">Pour montrer que…</span> la marche à
+    suivre, en une à trois phrases opératoires.</div>
+  </section>
+
+  <section class="block"><h2>Pièges</h2>
+    <div class="trap"><span class="tag">Piège</span> l'erreur exacte, et ce
+    qu'il faut faire à la place.</div>
+  </section>
+
+  <section class="block"><h2>À savoir refaire</h2>
+    <ul class="check"><li>Compétence vérifiable, formulée à l'infinitif.</li></ul>
+  </section>
+
+  <section class="block"><h2>Rappel actif</h2>
+    <div class="qa"><span class="q">Question courte ?</span>
+    <span class="a">Réponse courte.</span></div>
+  </section>
+
+Balises libres à l'intérieur : p, ul, ol, li, b, strong, em, code, span.
+Ajoutez class="cols" à une <section> pour la mettre sur deux colonnes : utile
+seulement si ses éléments sont courts et sans formule centrée.
+
+Mathématiques : LaTeX entre $ … $ ; les formules centrées $$ … $$ sont à éviter
+dans une fiche, sauf pour un résultat vraiment central. Macros disponibles :
+\R \N \Z \Q \C \E \P \eps \dd \Var \Cov \rank \tr \diag \Id
+\argmin \argmax \norm{…} \abs{…} \scal{…}{…}.
+"""
+
+
+def sheet_prompt(syl: Syllabus, course: Course, plan: Optional[dict],
+                 substance: str) -> str:
+    sections = ""
+    if plan and plan.get("sections"):
+        sections = "\n".join("  - %s" % sec["title"] for sec in plan["sections"])
+    return f"""Vous rédigez une FICHE DE RÉVISION à partir d'un cours déjà écrit.
+
+Ce n'est pas un résumé du cours : c'est l'outil qu'on relit trois mois plus
+tard, quand on a compris une fois et qu'on veut tout retrouver en dix minutes.
+Le cours long existe déjà pour la première lecture.
+
+CE QUI EST ATTENDU
+
+1. Densité. Aucune phrase de liaison, aucune introduction, aucune transition.
+   Chaque ligne porte une information qu'on peut avoir oubliée.
+2. Exactitude absolue. Un énoncé incomplet sur une fiche est pire que rien :
+   il installe une erreur. Toutes les hypothèses figurent. Si un théorème a une
+   hypothèse qu'on oublie souvent, c'est précisément celle qu'il faut écrire.
+3. Rien qui ne soit dans le cours. Vous condensez, vous n'ajoutez pas. Vous
+   pouvez reformuler plus court, jamais inventer un résultat.
+4. Opérationnel. La section Méthodes doit répondre à « je bloque, je fais
+   quoi ». Formulez « Pour montrer que… : … », pas « on peut noter que ».
+5. Les pièges sont ce qui a le plus de valeur à la relecture : reprenez ceux du
+   cours, formulés comme des avertissements courts.
+6. Le rappel actif sert à se tester : 6 à 10 questions dont la réponse tient en
+   une ligne. Des questions qui vérifient la compréhension, pas la mémoire d'un
+   mot.
+7. Longueur visée : deux à quatre pages A4 une fois imprimée. Un cours dense
+   peut aller à cinq. Ne descendez pas sous deux pages : ce serait un survol.
+8. Français avec tous les accents, y compris dans les titres de blocs.
+
+{SHEET_CONVENTIONS}
+
+COURS À CONDENSER : {course.title}
+Domaine : {syl.domain_name(course.domain)} &middot; niveau {course.level}/5
+Objectifs annoncés :
+{chr(10).join("  - " + o for o in course.objectives)}
+Plan du cours :
+{sections}
+
+MATIÈRE DU COURS (titres de sections, encadrés, résultats démontrés) :
+{substance}
+
+Produisez la fiche. Sortie : HTML brut, rien d'autre."""

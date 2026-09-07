@@ -159,6 +159,34 @@ les demonstrations decoupees en etapes qui disent *pourquoi* avant *comment*,
 et les pieges classiques nommes explicitement. Le niveau de depart suppose est
 celui d'une terminale maths expertes.
 
+### La fiche de revision
+
+Chaque cours a deux formes : le cours long pour la premiere lecture, et une
+**fiche condensee** pour y revenir. La fiche est produite a partir du cours
+redige, dans l'onglet *Fiche* de la page de cours.
+
+![Fiche de revision](docs/images/fiche-revision.png)
+
+Elle contient les definitions et les enonces exacts avec leurs hypotheses, un
+tableau de formules, les methodes formulees comme « pour montrer que..., faire
+... », les pieges du cours, une liste de ce qu'il faut savoir refaire, et un
+**rappel actif** : des questions dont la reponse est masquee a l'ecran et se
+devoile au clic.
+
+Elle est mise en page pour l'impression : deux a quatre pages A4, exportables
+en PDF depuis l'onglet, ou en lot :
+
+```bash
+python tools/sheet_pdf.py --all --out ~/fiches
+```
+
+Les fiches des nouveaux cours sont produites automatiquement a la fin de leur
+generation. Pour les cours deja rediges :
+
+```bash
+python tools/generate.py --sheets
+```
+
 ### Les figures
 
 Les cours utilisent `mviz`, une petite bibliotheque maison (aucune dependance) :
@@ -173,7 +201,7 @@ chaleur, curseurs et animations. Les couleurs suivent le theme clair/sombre.
 |---|---|
 | **Accueil** | Avancement global, les six parcours MVA, ce qu'on peut attaquer maintenant, ce qu'il faut reviser |
 | **Bibliotheque** | Les 142 cours, filtrables par domaine, niveau, statut et parcours, avec le score de QCM |
-| **Cours** | Lecture, QCM, demonstrations, notes personnelles |
+| **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles |
 | **Graphe** | Le cursus comme graphe : ce qui est maitrise, ce qui est accessible, ce qui est verrouille |
 
 Un cours passe **maitrise** quand le meilleur score de QCM atteint le seuil
@@ -293,6 +321,7 @@ python tools/install-desktop.sh                # entree dans le lanceur Ubuntu
 library/
   <id-du-cours>/
     body.html        cours genere
+    sheet.html       fiche de revision
     plan.json        plan et resultats laisses en exercice
     sections/        une section par fichier (reprise de generation)
     exercises.json   QCM et demonstrations

@@ -238,6 +238,34 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
     return data, res.cost_usd
 
 
+def generate_sheet(course_id: str, model: Optional[str] = None,
+                   on_progress: ProgressCb = _noop,
+                   cancel: CancelCb = _never,
+                   syl: Optional[Syllabus] = None) -> float:
+    """Produit la fiche de revision d'un cours deja redige. Retourne le cout."""
+    syl = syl or load_syllabus()
+    course = syl.get(course_id)
+    if course is None:
+        raise ValueError("cours inconnu : %s" % course_id)
+    if not content.has_course(course_id):
+        raise ValueError("Le cours doit etre redige avant sa fiche.")
+    model = model or str(settings.get("model/sheet") or settings.get("model/exercises"))
+    on_progress("Fiche de révision", 0.05)
+    res = cc.run(
+        prompts.sheet_prompt(syl, course, content.read_plan(course_id),
+                             content.substance(course_id)),
+        model=model,
+        system=("Vous condensez des cours de mathematiques en fiches de revision. "
+                "Vous ne produisez que le fragment HTML demande, sans commentaire."),
+        cancel=cancel,
+        on_progress=lambda n: on_progress("Fiche de révision", min(0.95, 0.05 + n / 9000.0)),
+        on_notice=lambda msg: on_progress("Fiche de révision — %s" % msg, 0.05),
+    )
+    content.write_sheet(course_id, content.clean_html(res.text))
+    on_progress("Terminé", 1.0)
+    return res.cost_usd
+
+
 def generate_course(course_id: str,
                     on_progress: ProgressCb = _noop,
                     cancel: CancelCb = _never,
@@ -269,6 +297,13 @@ def generate_course(course_id: str,
     if with_exercises and not content.has_exercises(course_id):
         _exos, c = generate_exercises(syl, course_id, plan, model_exos, on_progress, cancel)
         cost += c
+
+    if settings.get("gen/auto_sheet") and not content.has_sheet(course_id):
+        try:
+            cost += generate_sheet(course_id, None, on_progress, cancel, syl)
+        except cc.ClaudeError as exc:
+            # la fiche est un supplement : son echec ne doit pas perdre le cours
+            on_progress("Fiche non produite : %s" % exc, 0.98)
 
     duration = time.time() - started
     meta = {

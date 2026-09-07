@@ -17,7 +17,7 @@ from ..syllabus import Course, Syllabus
 from . import theme
 from .webview import WebView
 
-TAB_COURSE, TAB_QUIZ, TAB_PROOFS, TAB_NOTES = range(4)
+TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES = range(5)
 
 
 def _page_path(name: str):
@@ -136,6 +136,26 @@ class EmptyState(QWidget):
             self.note.setText("Généré par le Claude local. Comptez quelques minutes : "
                               "plan, puis chaque section, puis les exercices.")
 
+    def set_sheet_placeholder(self, course: Course) -> None:
+        self.title.setText("Fiche de révision")
+        self.summary.setText(
+            "Une version condensée de « %s » : définitions, résultats, formules, "
+            "méthodes, pièges, et un rappel actif pour se tester. Deux à quatre "
+            "pages, exportables en PDF." % course.title)
+        self.obj_title.setText("Ce que contient une fiche")
+        self.objectives.setText(
+            "<ul style='margin-left:-18px'>"
+            "<li style='margin-bottom:5px'>les définitions et les énoncés exacts, "
+            "hypothèses comprises</li>"
+            "<li style='margin-bottom:5px'>un tableau de formules</li>"
+            "<li style='margin-bottom:5px'>les méthodes, formulées comme « pour "
+            "montrer que…, faire… »</li>"
+            "<li style='margin-bottom:5px'>les pièges du cours</li>"
+            "<li style='margin-bottom:5px'>des questions de rappel avec réponses "
+            "masquées</li></ul>")
+        self.btn.setText("Générer la fiche")
+        self.note.setText("Produite à partir du cours déjà rédigé. Une minute environ.")
+
     def set_progress(self, running: bool, frac: float = 0.0, label: str = "") -> None:
         self.btn.setVisible(not running)
         self.progress.setVisible(running)
@@ -154,6 +174,8 @@ class CoursePage(QWidget):
     generate_requested = Signal(list)
     regenerate_requested = Signal(str)
     exercises_requested = Signal(str)
+    sheet_requested = Signal(str)
+    sheet_export_requested = Signal(str)
     cancel_requested = Signal(str)
 
     def __init__(self, syllabus: Syllabus, parent=None):
@@ -252,7 +274,51 @@ class CoursePage(QWidget):
         self._notes_timer.timeout.connect(self._save_notes)
         self.notes.textChanged.connect(lambda: self._notes_timer.start())
 
+        # --------------------------------------------------------- fiche
+        self.sheet_view = WebView(with_bridge=True)
+        self.sheet_view.bridge.ask_requested.connect(self._forward_ask)
+
+        self.sheet_holder = QWidget()
+        sh = QVBoxLayout(self.sheet_holder)
+        sh.setContentsMargins(0, 0, 0, 0)
+        sh.setSpacing(0)
+
+        sheet_bar = QWidget()
+        sheet_bar.setObjectName("TopBar")
+        sb = QHBoxLayout(sheet_bar)
+        sb.setContentsMargins(14, 7, 14, 7)
+        sb.setSpacing(8)
+        hint = QLabel("Version condensée, pour revenir sur le cours. "
+                      "Les réponses du rappel actif se dévoilent au clic.")
+        hint.setObjectName("Muted")
+        sb.addWidget(hint)
+        sb.addStretch(1)
+        self.btn_reveal = QPushButton("Tout dévoiler")
+        self.btn_reveal.setProperty("flat", True)
+        self.btn_reveal.clicked.connect(
+            lambda: self.sheet_view.run_js("window.revealAll && window.revealAll();"))
+        sb.addWidget(self.btn_reveal)
+        self.btn_sheet_again = QPushButton("Régénérer")
+        self.btn_sheet_again.setProperty("flat", True)
+        self.btn_sheet_again.clicked.connect(
+            lambda: self.sheet_requested.emit(self.course.id) if self.course else None)
+        sb.addWidget(self.btn_sheet_again)
+        self.btn_pdf = QPushButton("Exporter en PDF")
+        self.btn_pdf.setProperty("primary", True)
+        self.btn_pdf.clicked.connect(
+            lambda: self.sheet_export_requested.emit(self.course.id) if self.course else None)
+        sb.addWidget(self.btn_pdf)
+        sh.addWidget(sheet_bar)
+
+        self.sheet_empty = EmptyState()
+        self.sheet_empty.generate.connect(
+            lambda: self.sheet_requested.emit(self.course.id) if self.course else None)
+        sh.addWidget(self.sheet_empty)
+        sh.addWidget(self.sheet_view)
+        self.sheet_bar = sheet_bar
+
         self.tabs.addTab(self.course_holder, "Cours")
+        self.tabs.addTab(self.sheet_holder, "Fiche")
         self.tabs.addTab(self.quiz_view, "QCM")
         self.tabs.addTab(self.proofs_view, "Démonstrations")
         self.tabs.addTab(notes_host, "Notes")
@@ -293,6 +359,13 @@ class CoursePage(QWidget):
         readable = self.status.complete
         self.empty.setVisible(not readable)
         self.course_view.setVisible(readable)
+        has_sheet = content.has_sheet(cid)
+        self.tabs.setTabEnabled(TAB_SHEET, self.status.generated)
+        self.sheet_bar.setVisible(has_sheet)
+        self.sheet_view.setVisible(has_sheet)
+        self.sheet_empty.setVisible(not has_sheet)
+        if not has_sheet:
+            self.sheet_empty.set_sheet_placeholder(self.course)
         self.tabs.setTabEnabled(TAB_QUIZ, self.status.has_exercises)
         self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
         if not readable:
@@ -346,6 +419,10 @@ class CoursePage(QWidget):
         if index == TAB_COURSE and self.status and self.status.generated:
             path = content.render_course_page(cid, self.course.title, theme.name())
             self.course_view.load_file(path)
+            self._loaded_tabs.add(index)
+        elif index == TAB_SHEET and content.has_sheet(cid):
+            path = content.render_sheet_page(cid, self.course.title, theme.name())
+            self.sheet_view.load_file(path)
             self._loaded_tabs.add(index)
         elif index == TAB_QUIZ and self.status and self.status.has_exercises:
             self._load_quiz()
@@ -412,6 +489,11 @@ class CoursePage(QWidget):
             return
         cid = self.course.id
         menu = QMenu(self)
+        if self.status and self.status.generated:
+            act = QAction("Régénérer la fiche de révision" if content.has_sheet(cid)
+                          else "Générer la fiche de révision", self)
+            act.triggered.connect(lambda: self.sheet_requested.emit(cid))
+            menu.addAction(act)
         if self.status and self.status.complete:
             act = QAction("Régénérer seulement les exercices", self)
             act.triggered.connect(lambda: self.exercises_requested.emit(cid))
@@ -450,7 +532,7 @@ class CoursePage(QWidget):
             self._sync_generate_button()
 
     def apply_theme(self) -> None:
-        for view in (self.course_view, self.quiz_view, self.proofs_view):
+        for view in (self.course_view, self.sheet_view, self.quiz_view, self.proofs_view):
             view.set_theme(theme.name())
         if self.course:
             self._build_chips()

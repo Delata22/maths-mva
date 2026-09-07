@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from .. import status as st_mod
+from .. import content, status as st_mod
 from ..status import AVAILABLE, LOCKED, MASTERED, PARTIAL, READY, STARTED, Status
 from ..syllabus import Syllabus
 from . import theme
@@ -65,6 +65,7 @@ class LibraryPage(QWidget):
     generate_requested = Signal(list)       # liste d'identifiants
     regenerate_requested = Signal(str)
     exercises_requested = Signal(str)
+    sheets_requested = Signal(list)
     cancel_requested = Signal(str)
     delete_requested = Signal(str)
 
@@ -381,6 +382,10 @@ class LibraryPage(QWidget):
                     act = QAction("Régénérer le cours entier", self)
                     act.triggered.connect(lambda: self.regenerate_requested.emit(cid))
                     menu.addAction(act)
+                    act = QAction("Régénérer la fiche" if content.has_sheet(cid)
+                                  else "Générer la fiche de révision", self)
+                    act.triggered.connect(lambda: self.sheets_requested.emit([cid]))
+                    menu.addAction(act)
 
             missing_path = [c for c in self.syl.path_to(cid)
                             if not self.statuses[c].complete]
@@ -400,6 +405,14 @@ class LibraryPage(QWidget):
             if todo:
                 act = QAction("Générer les %d cours manquants de ce domaine" % len(todo), self)
                 act.triggered.connect(lambda: self.generate_requested.emit(todo))
+                menu.addAction(act)
+            missing_sheets = [c for c in ids
+                              if content.has_course(c) and not content.has_sheet(c)]
+            if missing_sheets:
+                act = QAction("Générer les %d fiches manquantes de ce domaine"
+                              % len(missing_sheets), self)
+                act.triggered.connect(
+                    lambda _=False, batch=missing_sheets: self.sheets_requested.emit(batch))
                 menu.addAction(act)
             act = QAction("Tout déplier", self)
             act.triggered.connect(lambda: item.setExpanded(True))

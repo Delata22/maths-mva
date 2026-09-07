@@ -10,6 +10,7 @@ from typing import Optional
 from .paths import ASSETS_DIR, course_dir
 
 BODY = "body.html"
+SHEET = "sheet.html"
 SECTIONS = "sections"
 PLAN = "plan.json"
 EXOS = "exercises.json"
@@ -60,6 +61,19 @@ def generation_state(course_id: str) -> dict:
 def has_exercises(course_id: str) -> bool:
     p = _p(course_id, EXOS)
     return p.exists() and p.stat().st_size > 50
+
+
+def has_sheet(course_id: str) -> bool:
+    p = _p(course_id, SHEET)
+    return p.exists() and p.stat().st_size > 200
+
+
+def read_sheet(course_id: str) -> str:
+    return _p(course_id, SHEET).read_text(encoding="utf-8")
+
+
+def write_sheet(course_id: str, body: str) -> None:
+    _p(course_id, SHEET).write_text(body, encoding="utf-8")
 
 
 def read_body(course_id: str) -> str:
@@ -232,3 +246,92 @@ def generation_estimate() -> tuple[float, float]:
     if not durations:
         return 1200.0, 5.0
     return sum(durations) / len(durations), sum(costs) / len(costs)
+
+
+# ------------------------------------------------------------------ substance
+_BOX_RE = re.compile(
+    r'<div class="box (definition|theorem|proposition|lemma|corollary|recap|warning|pitfall|intuition)"[^>]*>(.*?)</div>\s*(?=<(?:h[1-4]|p|div|details|ul|ol|table|hr|figure|script)\b|$)',
+    re.S | re.I)
+_HEAD_RE = re.compile(r"<(h2|h3)[^>]*>(.*?)</\1>", re.S | re.I)
+_PROOF_OF_RE = re.compile(r'<details class="proof"[^>]*data-of="([^"]*)"', re.I)
+_DISPLAY_MATH_RE = re.compile(r"\$\$(.+?)\$\$", re.S)
+
+# Ce qu'on garde en priorite quand il faut couper : les enonces avant le reste.
+_BOX_PRIORITY = {
+    "definition": 0, "theorem": 1, "proposition": 1, "lemma": 2, "corollary": 2,
+    "recap": 3, "warning": 4, "pitfall": 4, "intuition": 5,
+}
+_BOX_LABEL = {
+    "definition": "DEFINITION", "theorem": "THEOREME", "proposition": "PROPOSITION",
+    "lemma": "LEMME", "corollary": "COROLLAIRE", "recap": "A RETENIR",
+    "warning": "PIEGE", "pitfall": "PIEGE", "intuition": "INTUITION",
+}
+
+
+def _plain(html_text: str, keep_math: bool = True) -> str:
+    text = re.sub(r"<script\b.*?</script>", " ", html_text, flags=re.S | re.I)
+    text = re.sub(r"<br\s*/?>", " ", text, flags=re.I)
+    text = re.sub(r"</(p|li|div|h[1-4])>", "\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html.unescape(text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n+", "\n", text)
+    return text.strip()
+
+
+def substance(course_id: str, limit: int = 34000) -> str:
+    """La matiere du cours : enonces, resultats, pieges, formules centrees.
+
+    Sert a produire la fiche de revision. Contrairement a `digest`, qui donne un
+    apercu, on veut ici le texte complet des encadres : c'est la substance a
+    condenser, et la tronquer produirait une fiche qui invente.
+    """
+    body = read_body(course_id)
+    body = re.sub(r"<script\b.*?</script>", " ", body, flags=re.S | re.I)
+
+    pieces = []          # (priorite, position, texte)
+    for match in _HEAD_RE.finditer(body):
+        title = _plain(match.group(2))
+        if title:
+            level = "##" if match.group(1).lower() == "h2" else "###"
+            pieces.append((-1, match.start(), "\n%s %s" % (level, title)))
+    for match in _BOX_RE.finditer(body):
+        kind = match.group(1).lower()
+        text = _plain(match.group(2))
+        if not text:
+            continue
+        text = re.sub(r"^(Définition|Théorème|Proposition|Lemme|Corollaire|"
+                      r"À retenir|Piège classique|L'idée)\s*", "", text)
+        pieces.append((_BOX_PRIORITY.get(kind, 6), match.start(),
+                       "[%s] %s" % (_BOX_LABEL.get(kind, kind.upper()), text)))
+
+    proved = _PROOF_OF_RE.findall(body)
+    if proved:
+        pieces.append((3, len(body), "[DEMONTRE DANS LE COURS] "
+                       + " ; ".join(dict.fromkeys(proved))))
+
+    # on coupe par ordre d'importance, puis on restitue l'ordre de lecture
+    pieces.sort(key=lambda t: (t[0], t[1]))
+    kept, total = [], 0
+    for priority, position, text in pieces:
+        if total + len(text) > limit:
+            continue
+        kept.append((position, text))
+        total += len(text)
+    kept.sort()
+    return "\n".join(text for _pos, text in kept)
+
+
+def render_sheet_page(course_id: str, title: str, theme: str = "light",
+                      for_print: bool = False) -> pathlib.Path:
+    """Assemble la fiche de revision et retourne le chemin de la page."""
+    template = (ASSETS_DIR / "sheet_template.html").read_text(encoding="utf-8")
+    page = (template
+            .replace("__THEME__", "light" if for_print else theme)
+            .replace("__TITLE__", html.escape(title))
+            .replace("__ASSETS__", assets_url())
+            .replace("__CLASS__", "print" if for_print else "screen")
+            .replace("__BODY__", read_sheet(course_id)))
+    out = course_dir(course_id) / ("_sheet_print.html" if for_print else "_sheet.html")
+    out.write_text(page, encoding="utf-8")
+    return out

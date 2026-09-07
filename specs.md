@@ -28,7 +28,7 @@ Période de choix des cours 1er semestre
 9:30am
 Cours de remise à niveau - Analyse de Fourier
 
-En gros je veux avoir toutes les notions nécessaires pour aborder les notions sereinement. Mais de manière générale je voudrais utiliser cette app pour mettre toutes les notions de maths a fur et a mesure que je les travaille. Mon idée est la suivante :
+En gros je veux avoir toutes les notions nécessaires pour aborder les notions sereinement. Mais de manière générale je voudraaussi,is utiliser cette app pour mettre toutes les notions de maths a fur et a mesure que je les travaille. Mon idée est la suivante :
 
 Faire un syllabus complet, repartant de 0 des maths, cad en commençant par la logique, les propositions etc, puis théorie des ensembles, analyse, etc... dans un premier temps surtout ce dont j'ai besoin pour les cours d'IA (pour opti convexe je dois etre au point en analyse, algèbre linéaire et tout), tout ce qui est algèbre peut etre reporté, mais c est bien d'avoir la catégorie directement.
 

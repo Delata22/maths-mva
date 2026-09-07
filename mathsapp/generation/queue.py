@@ -19,6 +19,7 @@ KIND_LABEL = {
     "course": "Cours + exercices",
     "regenerate": "Régénération complète",
     "exercises": "Exercices seuls",
+    "sheet": "Fiche de révision",
 }
 
 
@@ -114,6 +115,9 @@ class _Task(QRunnable):
             elif job.kind == "exercises":
                 pipeline.regenerate_exercises(job.course_id, on_progress, cancel, syl)
                 msg = "Exercices régénérés"
+            elif job.kind == "sheet":
+                cost = pipeline.generate_sheet(job.course_id, None, on_progress, cancel, syl)
+                msg = "Fiche produite (%.2f $)" % cost
             else:
                 meta = pipeline.generate_course(job.course_id, on_progress, cancel, True, syl)
                 msg = "Généré en %s (%.2f $)" % (
