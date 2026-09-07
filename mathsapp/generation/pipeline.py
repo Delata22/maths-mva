@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -144,6 +146,33 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
         flush()
     report()
 
+    def context_for(index: int) -> tuple[str, str]:
+        """Ce qui precede la section, et ce qui est traite ailleurs.
+
+        Les sections sont redigees en parallele : sans ce contexte, chacune
+        reintroduit les memes definitions, puisqu'elle ne connait que les
+        titres des autres. Quand une section anterieure est deja ecrite, on
+        donne ce qu'elle a reellement introduit ; sinon on se rabat sur ce que
+        le plan lui assigne.
+        """
+        before, after = [], []
+        for j, section in enumerate(sections):
+            if j == index:
+                continue
+            written = parts[j]
+            if j < index:
+                if written:
+                    items = content.section_items(written)
+                    detail = ("\n".join("       - %s" % it for it in items)
+                              if items else "       %s" % section.get("content", ""))
+                else:
+                    detail = "       %s" % section.get("content", "")
+                before.append("  %d. %s\n%s" % (j + 1, section["title"], detail))
+            else:
+                after.append("  %d. %s — %s" % (j + 1, section["title"],
+                                                section.get("content", "")))
+        return "\n".join(before), "\n".join(after)
+
     def work(index: int) -> None:
         nonlocal done_count
         _check(cancel)
@@ -161,8 +190,10 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
             on_progress("Section %d/%d — %s" % (_i + 1, n, msg),
                         0.10 + 0.72 * done_count / max(1, n))
 
+        covered, upcoming = context_for(index)
         res = cc.run(
-            prompts.section_prompt(syl, course, plan, index, titles[:index]),
+            prompts.section_prompt(syl, course, plan, index, titles[:index],
+                                   covered, upcoming),
             model=model,
             system=("Vous redigez des cours de mathematiques en HTML. Vous ne "
                     "produisez que le fragment HTML demande, sans commentaire."),
@@ -196,6 +227,106 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
                              % ", ".join(titles[i] for i in missing))
     flush()
     return "\n\n".join(parts), sum(costs)
+
+
+# Une proposition qui renvoie aux autres interdit de melanger l'ordre.
+_POSITIONAL_RE = re.compile(
+    r"ci-dessus|ci-dessous|aucune de ces|toutes les (?:réponses|propositions)|"
+    r"\b(?:réponses?|propositions?)\s+[ABCD]\b", re.I)
+
+
+def _plain(html_text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html_text)).strip()
+
+
+def _shufflable(question: dict) -> bool:
+    return not any(_POSITIONAL_RE.search(_plain(c)) for c in question.get("choices", []))
+
+
+def rebalance_positions(qcm: List[dict], seed: int = 0) -> int:
+    """Repartit la bonne reponse sur les quatre positions.
+
+    Le modele place presque toujours la bonne reponse en A ou en B : sur les
+    premiers cours produits, elle n'etait en D qu'une fois sur cent cinquante.
+    On permute donc les propositions pour viser une repartition uniforme.
+    """
+    rng = random.Random(seed)
+    moved = 0
+    targets: List[int] = []
+    for i in range(len(qcm)):
+        if i % 4 == 0:
+            block = [0, 1, 2, 3]
+            rng.shuffle(block)
+            targets.extend(block)
+    for question, target in zip(qcm, targets):
+        choices = question.get("choices") or []
+        answer = question.get("answer", 0)
+        if len(choices) < 2 or not (0 <= answer < len(choices)):
+            continue
+        if not _shufflable(question):
+            continue
+        target = min(target, len(choices) - 1)
+        if target == answer:
+            continue
+        choices[answer], choices[target] = choices[target], choices[answer]
+        question["answer"] = target
+        moved += 1
+    return moved
+
+
+def length_offenders(qcm: List[dict], ratio: float = 1.35) -> List[dict]:
+    """Questions ou la bonne reponse se reconnait a sa longueur."""
+    out = []
+    for question in qcm:
+        choices = question.get("choices") or []
+        answer = question.get("answer", 0)
+        if len(choices) < 3 or not (0 <= answer < len(choices)):
+            continue
+        lengths = [len(_plain(c)) for c in choices]
+        others = sorted(lengths[:answer] + lengths[answer + 1:])
+        median = others[len(others) // 2] or 1
+        if lengths[answer] == max(lengths) and lengths[answer] > ratio * median:
+            out.append(question)
+    return out
+
+
+def repair_qcm_balance(syl: Syllabus, course_id: str, qcm: List[dict], model: str,
+                       on_progress: ProgressCb = _noop,
+                       cancel: CancelCb = _never) -> tuple[int, float]:
+    """Reecrit les propositions desequilibrees. Retourne (corrigees, cout)."""
+    course = syl.get(course_id)
+    offenders = length_offenders(qcm)
+    if len(offenders) < 2:
+        return 0, 0.0
+    on_progress("Équilibrage des propositions (%d questions)" % len(offenders), 0.93)
+    try:
+        data, res = cc.run_json(
+            prompts.qcm_repair_prompt(course, offenders),
+            model=model,
+            system=("Vous corrigez des QCM de mathematiques. Vous repondez "
+                    "uniquement en JSON valide."),
+            schema=prompts.QCM_REPAIR_SCHEMA,
+            cancel=cancel,
+        )
+    except cc.ClaudeError:
+        return 0, 0.0
+    by_id = {q["id"]: q for q in qcm}
+    fixed = 0
+    for item in data.get("questions", []):
+        target = by_id.get(item.get("id"))
+        choices = item.get("choices") or []
+        if target is None or len(choices) != len(target["choices"]):
+            continue
+        try:
+            answer = int(item.get("answer", 0))
+        except (TypeError, ValueError):
+            continue
+        if not (0 <= answer < len(choices)):
+            continue
+        target["choices"] = choices
+        target["answer"] = answer
+        fixed += 1
+    return fixed, res.cost_usd
 
 
 def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
@@ -233,9 +364,16 @@ def generate_exercises(syl: Syllabus, course_id: str, plan: dict, model: str,
         d.setdefault("steps", [])
     qcm.sort(key=lambda q: q["difficulty"])
     proofs.sort(key=lambda d: d["difficulty"])
+
+    cost = res.cost_usd
+    _fixed, repair_cost = repair_qcm_balance(syl, course_id, qcm, model,
+                                             on_progress, cancel)
+    cost += repair_cost
+    rebalance_positions(qcm, seed=abs(hash(course_id)) % 10000)
+
     data = {"qcm": qcm, "proofs": proofs}
     content.write_json(course_id, content.EXOS, data)
-    return data, res.cost_usd
+    return data, cost
 
 
 def generate_sheet(course_id: str, model: Optional[str] = None,

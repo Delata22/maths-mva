@@ -151,6 +151,26 @@ Deux mecanismes rendent cela supportable :
   fichier, marque par une empreinte du plan. Une generation interrompue reprend
   ou elle s'etait arretee. Si le plan change, le cache est invalide.
 
+### L'equilibre des QCM
+
+Un QCM ou la bonne reponse est plus longue et plus argumentee que les trois
+autres se resout sans connaitre le cours. Sur les premiers cours produits, la
+bonne reponse etait la plus longue 57 % du temps, et elle tombait en D une fois
+sur cent cinquante.
+
+Les consignes de generation imposent donc des propositions de longueur et de
+registre comparables, et interdisent qu'une seule porte un raisonnement. Apres
+generation, les questions ou la bonne reponse depasse encore les autres d'un
+tiers sont renvoyees au modele pour reecriture, puis la position de la bonne
+reponse est repartie sur les quatre lettres.
+
+Pour reequilibrer des QCM deja produits :
+
+```bash
+python tools/fix_qcm.py --dry-run    # mesurer
+python tools/fix_qcm.py              # corriger
+```
+
 ### Ce qu'on attend d'un cours
 
 Les prompts imposent une ligne editoriale precise : l'intuition avant le

@@ -167,6 +167,94 @@ def test_pages() -> None:
     check("nettoyage des reponses du modele", cleaned == "<h2>A</h2>", repr(cleaned))
 
 
+def test_qcm_balance() -> None:
+    """La bonne reponse ne doit pas se reconnaitre a sa forme."""
+    import collections
+    import statistics
+    from mathsapp import content
+    from mathsapp.generation import pipeline
+    from mathsapp.syllabus import load
+
+    qcm = [{"id": "q%d" % i, "choices": ["a", "b", "c", "d"], "answer": 0}
+           for i in range(16)]
+    pipeline.rebalance_positions(qcm, seed=3)
+    spread = collections.Counter(q["answer"] for q in qcm)
+    check("positions reparties sur les quatre reponses",
+          len(spread) == 4 and max(spread.values()) <= 6, dict(sorted(spread.items())))
+
+    positional = {"id": "p", "answer": 0,
+                  "choices": ["aucune de ces réponses", "b", "c", "d"]}
+    pipeline.rebalance_positions([positional], seed=1)
+    check("propositions renvoyant aux autres non permutees",
+          positional["answer"] == 0 and positional["choices"][0].startswith("aucune"))
+
+    biased = {"id": "b", "answer": 2, "choices": [
+        "Faux.", "Non.",
+        "Vrai, car la suite est croissante et majorée donc convergente vers sa "
+        "borne supérieure, ce qui conclut immédiatement.", "Peut-être."]}
+    balanced = {"id": "e", "answer": 1, "choices": [
+        "La suite diverge.", "La suite converge.", "La suite est bornée.",
+        "La suite est constante."]}
+    offenders = [q["id"] for q in pipeline.length_offenders([biased, balanced])]
+    check("desequilibre de longueur detecte", offenders == ["b"], str(offenders))
+
+    # sur les exercices reellement produits
+    syl = load()
+    allq = []
+    for course in syl.all():
+        data = content.read_exercises(course.id)
+        if data:
+            allq.extend(data.get("qcm") or [])
+    if not allq:
+        return
+    spread = collections.Counter(q["answer"] for q in allq)
+    worst = max(spread.values()) / len(allq)
+    check("QCM produits : aucune position dominante", worst < 0.40,
+          "%s, position la plus frequente %.0f %%" % (dict(sorted(spread.items())), 100 * worst))
+    longest = 0
+    for q in allq:
+        lengths = [len(pipeline._plain(c)) for c in q["choices"]]
+        if lengths[q["answer"]] == max(lengths):
+            longest += 1
+    check("QCM produits : la bonne reponse n'est pas la plus longue",
+          longest / len(allq) < 0.45,
+          "%d / %d (%.0f %%)" % (longest, len(allq), 100 * longest / len(allq)))
+
+
+def test_section_context() -> None:
+    """Chaque section doit savoir ce que les autres traitent deja."""
+    from mathsapp import content
+    from mathsapp.generation import prompts
+    from mathsapp.syllabus import load
+
+    syl = load()
+    cid = next((c.id for c in syl.all() if content.has_course(c.id)), None)
+    if cid is None:
+        return
+    plan = content.read_plan(cid)
+    if not plan:
+        return
+    section_dir = content.sections_dir(cid)
+    written = sorted(section_dir.glob("*.html"))
+    if len(written) < 3:
+        return
+    body = written[1].read_text(encoding="utf-8")
+    items = content.section_items(body)
+    check("notions d'une section extraites", len(items) >= 3, "%d notions" % len(items))
+
+    covered = "\n".join("  - %s" % it for it in items)
+    upcoming = "  5. Suite — contenu prevu"
+    prompt = prompts.section_prompt(syl, syl.get(cid), plan, 3,
+                                    [s["title"] for s in plan["sections"][:3]],
+                                    covered, upcoming)
+    check("prompt : notions deja vues transmises",
+          "DEJA INTRODUIT" in prompt and items[0][:30] in prompt)
+    check("prompt : contenus a venir signales",
+          "TRAITE AILLEURS" in prompt and "contenu prevu" in prompt)
+    check("prompt : le plan donne le contenu, pas seulement les titres",
+          plan["sections"][0].get("content", "zzz")[:40] in prompt)
+
+
 def test_sheet() -> None:
     """Fiche de revision : extraction, assemblage, export PDF."""
     import re
@@ -579,6 +667,10 @@ def main() -> int:
     test_store()
     print("\n--- assemblage des pages ---")
     test_pages()
+    print("\n--- contexte entre sections ---")
+    test_section_context()
+    print("\n--- equilibre des QCM ---")
+    test_qcm_balance()
     print("\n--- fiche de revision ---")
     test_sheet()
     print("\n--- pont javascript ---")

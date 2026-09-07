@@ -5,7 +5,7 @@ import html
 import json
 import pathlib
 import re
-from typing import Optional
+from typing import List, Optional
 
 from .paths import ASSETS_DIR, course_dir
 
@@ -335,3 +335,41 @@ def render_sheet_page(course_id: str, title: str, theme: str = "light",
     out = course_dir(course_id) / ("_sheet_print.html" if for_print else "_sheet.html")
     out.write_text(page, encoding="utf-8")
     return out
+
+
+_TITLED_BOX_RE = re.compile(
+    r'<div class="box (definition|theorem|proposition|lemma|corollary)"[^>]*>\s*'
+    r'<span class="box-title">(.*?)</span>(.*?)(?=<div class="box|<h[23]|<details|$)',
+    re.S | re.I)
+_FIRST_BOLD_RE = re.compile(r"<(?:b|strong)[^>]*>(.*?)</(?:b|strong)>", re.S | re.I)
+
+
+def section_items(html_text: str, limit: int = 14) -> List[str]:
+    """Les notions qu'une section a effectivement introduites.
+
+    Sert a dire aux sections suivantes ce qui est deja acquis : sans cela,
+    chacune reintroduit les memes definitions, puisqu'elles sont redigees en
+    parallele et ne voient que les titres des autres.
+    """
+    items: List[str] = []
+    for kind, box_title, body in _TITLED_BOX_RE.findall(html_text):
+        label = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", box_title)).strip()
+        name = ""
+        bold = _FIRST_BOLD_RE.search(body)
+        if bold:
+            name = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", bold.group(1))).strip(" .:")
+        if not name:
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body)).strip()
+            name = text[:70].rsplit(" ", 1)[0] if len(text) > 70 else text
+        if not name:
+            continue
+        items.append("%s : %s" % (label, name) if label.lower() not in name.lower() else name)
+    for proved in _PROOF_OF_RE.findall(html_text):
+        items.append("démontré : %s" % proved.strip())
+    seen, out = set(), []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out[:limit]

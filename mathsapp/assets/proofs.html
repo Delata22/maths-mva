@@ -118,8 +118,10 @@
   #previewbox {
     margin-top: 12px; padding: 14px 16px; border-radius: 10px;
     border: 1px dashed var(--line-strong); background: var(--bg-soft);
+    white-space: pre-wrap;
   }
   #previewbox:empty { display: none; }
+  #previewbox .katex-display { white-space: normal; margin: .5em 0; }
   .keyhelp {
     margin-top: 8px; color: var(--muted);
     font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; line-height: 1.6;
@@ -289,12 +291,22 @@ function buildPalette(host) {
 }
 
 function previewHtml(text) {
-  var esc = text.replace(/[&<>]/g, function (c) {
+  // Le texte reste dans un seul noeud, mis en forme par white-space: pre-wrap.
+  // Decouper en <p> et <br> cassait les formules centrees ecrites sur
+  // plusieurs lignes : KaTeX n'apparie pas deux $$ separes par un element.
+  return text.replace(/[&<>]/g, function (c) {
     return {'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c];
   });
-  return esc.split(/\n{2,}/).map(function (block) {
-    return '<p>' + block.replace(/\n/g, '<br>') + '</p>';
-  }).join('');
+}
+
+function renderPreview() {
+  var box = document.getElementById('previewbox');
+  var ta = document.getElementById('draft');
+  if (!box || !ta || !box.classList.contains('open')) return;
+  var text = ta.value.trim();
+  box.innerHTML = text ? previewHtml(ta.value)
+                       : '<span style="color:var(--muted)">Rien à afficher.</span>';
+  if (text) typeset(box);
 }
 
 function renderList() {
@@ -467,12 +479,22 @@ function open(i) {
     }
   });
 
+  var previewTimer = null;
   document.getElementById('prev').addEventListener('click', function () {
     var box = document.getElementById('previewbox');
-    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Aperçu'; return; }
-    box.innerHTML = previewHtml(ta.value) || '<p style="color:var(--muted)">Rien à afficher.</p>';
-    typeset(box);
+    if (box.classList.contains('open')) {
+      box.classList.remove('open');
+      box.innerHTML = '';
+      this.textContent = 'Aperçu';
+      return;
+    }
+    box.classList.add('open');
+    renderPreview();
     this.textContent = 'Masquer l\'aperçu';
+  });
+  ta.addEventListener('input', function () {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(renderPreview, 300);
   });
 
   document.getElementById('review').addEventListener('click', function () {

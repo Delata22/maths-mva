@@ -243,11 +243,14 @@ Repondez uniquement par l'objet JSON."""
 
 # ------------------------------------------------------------------ section
 def section_prompt(syl: Syllabus, course: Course, plan: dict, index: int,
-                   written_titles: List[str]) -> str:
+                   written_titles: List[str], covered: str = "",
+                   upcoming: str = "") -> str:
     section = plan["sections"][index]
     total = len(plan["sections"])
     others = "\n".join(
-        "  %d. %s%s" % (i + 1, s["title"], "  <- section a ecrire" if i == index else "")
+        "  %d. %s%s\n     %s" % (i + 1, s["title"],
+                                 "   <- SECTION A ECRIRE" if i == index else "",
+                                 s.get("content", ""))
         for i, s in enumerate(plan["sections"])
     )
     left = plan.get("left_as_exercise", [])
@@ -281,8 +284,15 @@ def section_prompt(syl: Syllabus, course: Course, plan: dict, index: int,
 PLAN COMPLET DU COURS :
 {others}
 
-Sections deja redigees : {", ".join(written_titles) if written_titles else "aucune"}
-(ne les reecrivez pas, ne les resumez pas, enchainez simplement)
+DEJA INTRODUIT AVANT VOTRE SECTION. Ces notions sont acquises : utilisez-les
+directement, sans les redefinir, sans les reexpliquer, sans « rappelons que ».
+Si vous en avez besoin, renvoyez-y d'une incise (« la table de verite de
+l'implication, vue plus haut »).
+{covered if covered else "  (rien : votre section est la premiere)"}
+
+TRAITE AILLEURS, PAS PAR VOUS. N'anticipez pas ces contenus : au plus une
+phrase d'annonce si la transition l'exige.
+{upcoming if upcoming else "  (rien)"}
 
 Resultats volontairement laisses en exercice pour TOUT le cours :
 {left_txt}
@@ -386,6 +396,23 @@ TACHE : produire un JSON avec deux tableaux, `qcm` et `proofs`.
   - Les mauvaises reponses doivent correspondre a des erreurs REELLES et
     plausibles (confusion classique, quantificateur inverse, hypothese
     oubliee), jamais a du remplissage absurde.
+  - EQUILIBRE DES PROPOSITIONS. C'est la regle la plus souvent violee, et elle
+    suffit a rendre un QCM inutile : si la bonne reponse est plus longue ou
+    plus argumentee que les autres, on la reconnait sans rien savoir du cours.
+      * les quatre propositions ont une longueur et un registre comparables,
+        a 20 % pres ;
+      * si la bonne reponse porte un raisonnement, les trois autres en portent
+        un aussi : un raisonnement faux mais plausible, celui que ferait
+        vraiment quelqu'un qui se trompe ;
+      * sinon, aucune des quatre n'en porte, et l'explication seule justifie.
+        C'est le choix a preferer : une proposition est une affirmation, pas
+        une demonstration ;
+      * ecrivez les trois distracteurs d'abord, puis la bonne reponse dans le
+        meme moule.
+  - Repartissez la bonne reponse sur les quatre positions : elle ne doit pas
+    tomber presque toujours en A ou en B.
+  - Aucune proposition ne fait reference aux autres (« aucune des reponses
+    ci-dessus », « les deux premieres ») : l'ordre des propositions change.
   - `explanation` : pourquoi la bonne reponse est bonne ET pourquoi le piege
     principal est un piege. 2 a 5 phrases.
   - `section` : le titre de la section du cours concernee.
@@ -771,3 +798,58 @@ MATIÈRE DU COURS (titres de sections, encadrés, résultats démontrés) :
 {substance}
 
 Produisez la fiche. Sortie : HTML brut, rien d'autre."""
+
+
+QCM_REPAIR_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "choices": {"type": "array", "items": {"type": "string"}},
+                    "answer": {"type": "integer"},
+                },
+                "required": ["id", "choices", "answer"],
+            },
+        },
+    },
+    "required": ["questions"],
+}
+
+
+def qcm_repair_prompt(course: Course, questions: List[dict]) -> str:
+    """Demande de reecrire les propositions desequilibrees d'un QCM."""
+    payload = json.dumps(
+        [{"id": q["id"], "question": q["question"], "choices": q["choices"],
+          "answer": q["answer"], "explanation": q.get("explanation", "")}
+         for q in questions], ensure_ascii=False, indent=1)
+    return f"""Dans ce QCM du cours « {course.title} », la bonne réponse se
+reconnaît à sa forme : elle est nettement plus longue ou plus argumentée que
+les trois autres. On peut donc y répondre sans rien savoir du cours, ce qui
+rend l'exercice inutile.
+
+Réécrivez les PROPOSITIONS de chaque question. Ne touchez ni à l'énoncé, ni à
+l'explication, ni à la difficulté.
+
+Règles :
+- Les quatre propositions ont une longueur et un registre comparables, à 20 %
+  près. Comptez les caractères.
+- Une proposition est une affirmation, pas une démonstration. Retirez le
+  raisonnement de la bonne réponse plutôt que d'en ajouter partout — sauf si
+  la question porte précisément sur le choix d'un raisonnement, auquel cas les
+  quatre en portent un, dont trois faux mais plausibles.
+- Chaque distracteur reste l'erreur réelle qu'il incarnait : ne le remplacez
+  pas par du remplissage. Vous le reformulez, vous ne le changez pas de nature.
+- La bonne réponse reste la même affirmation ; `answer` doit pointer vers elle
+  dans le nouvel ordre.
+- Aucune proposition ne fait référence aux autres.
+- Français avec tous les accents. Du LaTeX entre $ … $ si nécessaire.
+
+QUESTIONS À CORRIGER :
+{payload}
+
+Répondez uniquement par l'objet JSON, avec pour chaque question son `id`, ses
+quatre `choices` et l'index `answer`."""
