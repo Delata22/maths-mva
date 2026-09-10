@@ -396,8 +396,10 @@ class CoursePage(QWidget):
 
         state_tone = {"mastered": "ok", "started": "warn", "locked": "chip"}.get(st.state, "accent")
         state_text = st.label
-        if st.best_pct is not None:
-            state_text += "  ·  %d %%" % st.best_pct
+        if st.score_pct is not None:
+            state_text += "  ·  %d %%" % st.score_pct
+            if not st.enough_answered:
+                state_text += "  (%d/%d tentées)" % (st.answered, st.questions_needed)
         state = Chip(state_text, state_tone)
         state.setEnabled(False)
         self.chips_row.addWidget(state)
@@ -569,6 +571,11 @@ class CoursePage(QWidget):
                              set_id=str(data.get("setId") or "1"),
                              partial=bool(data.get("partial")))
         self.refresh()
+        st = self.status
+        if st is not None and st.score_pct is not None:
+            self.quiz_view.run_js(
+                "window.showCourseScore && window.showCourseScore(%d, %d, %d, %d);"
+                % (st.score_pct, st.correct, st.answered, st.questions_total))
 
     def _on_proof_status(self, proof_id: str, value: str) -> None:
         if self.course:

@@ -285,12 +285,17 @@ class LibraryPage(QWidget):
                     item.setText(COL_PREREQ, "aucun")
                     item.setForeground(COL_PREREQ, QColor(pal["muted"]))
 
-                if s.best_pct is not None:
-                    item.setData(COL_SCORE, ROLE_SCORE, s.best_pct)
-                    item.setToolTip(COL_SCORE, "Meilleur : %d %%\nDernier : %s\n%d tentative(s)"
-                                    % (s.best_pct,
-                                       "%d %%" % s.last_pct if s.last_pct is not None else "-",
-                                       s.attempts))
+                if s.score_pct is not None:
+                    item.setData(COL_SCORE, ROLE_SCORE, s.score_pct)
+                    tip = ("%d questions justes sur %d tentées\n"
+                           "%d question(s) au total dans les séries"
+                           % (s.correct, s.answered, s.questions_total))
+                    if not s.enough_answered:
+                        tip += ("\nIl en faut %d tentées pour juger de la maîtrise."
+                                % s.questions_needed)
+                    if s.best_pct is not None:
+                        tip += "\nMeilleure séance complète : %d %%" % s.best_pct
+                    item.setToolTip(COL_SCORE, tip)
                 else:
                     item.setText(COL_SCORE, "-")
                     item.setForeground(COL_SCORE, QColor(pal["muted"]))

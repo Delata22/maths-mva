@@ -288,8 +288,9 @@ class Dashboard(QWidget):
         meta.setObjectName("Muted")
         row.addWidget(meta)
 
-        if s.best_pct is not None:
-            score = QLabel("%d %%" % s.best_pct)
+        if s.score_pct is not None:
+            score = QLabel("%d %%" % s.score_pct)
+            score.setToolTip("%d justes sur %d tentées" % (s.correct, s.answered))
             score.setStyleSheet("color:%s;font-weight:600"
                                 % (pal["ok"] if s.mastered else pal["warn"]))
             row.addWidget(score)
@@ -325,10 +326,10 @@ class Dashboard(QWidget):
 
     def _review(self, statuses: Dict[str, Status], pal: dict) -> None:
         ids = [cid for cid in self.syl.order
-               if statuses[cid].attempts and not statuses[cid].mastered]
+               if statuses[cid].answered and not statuses[cid].mastered]
         if not ids:
             return
-        ids.sort(key=lambda c: statuses[c].best_pct or 0)
+        ids.sort(key=lambda c: statuses[c].score_pct or 0)
         self._section_title("À réviser", "QCM sous le seuil de maîtrise")
         card = Card()
         for cid in ids[:8]:

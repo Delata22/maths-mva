@@ -248,8 +248,20 @@ chaleur, curseurs et animations. Les couleurs suivent le theme clair/sombre.
 | **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles |
 | **Graphe** | Le cursus comme graphe : ce qui est maitrise, ce qui est accessible, ce qui est verrouille |
 
-Un cours passe **maitrise** quand le meilleur score de QCM atteint le seuil
-(80 % par defaut), ce qui debloque les cours qui en dependent.
+### Le score d'un cours
+
+Le score n'est pas celui de votre meilleure seance : c'est **la part des
+questions actuellement justes parmi celles que vous avez tentees**. Refaire une
+question ratee et la reussir fait donc monter le score, et la rater de nouveau
+le fait redescendre. C'est ce qui rend utile de ne refaire que ses erreurs.
+
+Un cours passe **maitrise** quand ce score atteint le seuil (80 % par defaut)
+*et* qu'assez de questions ont ete tentees — les deux tiers de la serie la plus
+fournie. Repondre juste a deux questions faciles ne suffit donc pas a debloquer
+la suite du cursus.
+
+Les seances completes restent enregistrees comme historique, et servent a
+reconstruire le suivi par question si la base est restauree.
 
 ### Raccourcis
 

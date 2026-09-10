@@ -177,6 +177,46 @@ def record_attempt(course_id: str, total: int, correct: int, detail: dict,
     return int(cur.lastrowid) if cur is not None else 0
 
 
+def backfill_question_results() -> int:
+    """Reconstruit le suivi par question a partir des tentatives passees.
+
+    Le suivi par question n'existe que depuis peu : sans ce rattrapage, les
+    cours deja evalues repartiraient d'un score vide.
+    """
+    c = conn()
+    done = c.execute("SELECT COUNT(*) n FROM question_result").fetchone()["n"]
+    already = {r["course_id"] for r in c.execute(
+        "SELECT DISTINCT course_id FROM question_result")} if done else set()
+    added = 0
+    for row in c.execute("SELECT course_id, finished_at, detail FROM quiz_attempt "
+                         "ORDER BY finished_at"):
+        if row["course_id"] in already:
+            continue
+        try:
+            detail = json.loads(row["detail"] or "{}")
+        except json.JSONDecodeError:
+            continue
+        for answer in detail.get("answers") or []:
+            if not isinstance(answer, dict) or not answer.get("id"):
+                continue
+            ok = 1 if answer.get("ok") else 0
+            c.execute(
+                """INSERT INTO question_result
+                     (course_id, set_id, question_id, last_ok, tries, ok_count, updated_at)
+                   VALUES (?,'1',?,?,1,?,?)
+                   ON CONFLICT(course_id, set_id, question_id) DO UPDATE SET
+                     last_ok=excluded.last_ok,
+                     tries=question_result.tries+1,
+                     ok_count=question_result.ok_count+excluded.ok_count,
+                     updated_at=excluded.updated_at""",
+                (row["course_id"], str(answer["id"]), ok, ok, row["finished_at"]),
+            )
+            added += 1
+    if added:
+        c.commit()
+    return added
+
+
 def question_history(course_id: str) -> Dict[str, Dict[str, dict]]:
     """{set_id: {question_id: {ok, tries, ok_count}}}"""
     out: Dict[str, Dict[str, dict]] = {}
@@ -265,12 +305,19 @@ class Progress:
     attempts: int = 0
     best_pct: Optional[int] = None
     last_pct: Optional[int] = None
+    answered: int = 0
+    correct: int = 0
+    answered_ids: frozenset = frozenset()
+    correct_ids: frozenset = frozenset()
     proofs_done: int = 0
     proofs_total: int = 0
 
     @property
-    def validated_by_quiz(self) -> bool:
-        return self.best_pct is not None and self.best_pct >= 80
+    def current_pct(self) -> Optional[int]:
+        """Part des questions actuellement justes parmi celles deja tentees."""
+        if not self.answered:
+            return None
+        return int(round(100.0 * self.correct / self.answered))
 
 
 def progress_map() -> Dict[str, Progress]:
@@ -296,6 +343,24 @@ def progress_map() -> Dict[str, Progress]:
         p = out.setdefault(r["course_id"], Progress(r["course_id"]))
         if r["total"]:
             p.last_pct = int(round(100.0 * r["correct"] / r["total"]))
+    # Etat courant de chaque question : c'est lui qui donne le score du cours.
+    # Le meilleur `quiz_attempt` ne bougeait pas quand on refaisait uniquement
+    # les questions ratees, alors que c'est precisement la qu'on progresse.
+    answered: Dict[str, set] = {}
+    correct: Dict[str, set] = {}
+    for r in c.execute(
+        "SELECT course_id, question_id, last_ok FROM question_result"
+    ):
+        answered.setdefault(r["course_id"], set()).add(r["question_id"])
+        if r["last_ok"]:
+            correct.setdefault(r["course_id"], set()).add(r["question_id"])
+    for course_id, ids in answered.items():
+        p = out.setdefault(course_id, Progress(course_id))
+        p.answered_ids = frozenset(ids)
+        p.correct_ids = frozenset(correct.get(course_id, set()))
+        p.answered = len(ids)
+        p.correct = len(p.correct_ids)
+
     for r in c.execute(
         """SELECT course_id, SUM(status='done') done, COUNT(*) total
            FROM proof_state GROUP BY course_id"""

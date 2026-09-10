@@ -87,6 +87,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.syl: Syllabus = load_syllabus()
+        # Le suivi par question est recent : on reconstruit celui des cours
+        # evalues avant son introduction, sinon leur score repartirait a zero.
+        store.backfill_question_results()
         self.queue = GenerationQueue(self)
         self._proof_windows: List[ProofHelperWindow] = []
         self._exporters: List[object] = []

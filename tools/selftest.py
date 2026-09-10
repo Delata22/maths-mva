@@ -273,19 +273,34 @@ def test_quiz_sets() -> None:
           len({q["id"] for q in content.all_questions(cid)})
           == len(content.all_questions(cid)))
 
-    # suivi par question, sans polluer les scores du cours
+    # suivi par question, sans polluer les scores du cours ni l'historique reel
+    saved = store.question_history(cid)
     before = len(store.attempts(cid))
     qs = sets[0]["qcm"][:3]
-    detail = {"answers": [{"id": q["id"], "ok": i != 1} for i, q in enumerate(qs)]}
-    store.record_attempt(cid, 3, 2, detail, set_id="1", partial=True)
-    history = store.question_history(cid).get("1", {})
-    check("resultat par question enregistre",
-          all(q["id"] in history for q in qs), "%d suivis" % len(history))
-    check("session partielle ne compte pas comme un score du cours",
-          len(store.attempts(cid)) == before)
-    ko = [qid for qid, h in history.items() if not h["ok"]]
-    check("questions ratees identifiables", ko == [qs[1]["id"]], str(ko))
-    store.reset_question_history(cid)
+    try:
+        store.reset_question_history(cid)
+        detail = {"answers": [{"id": q["id"], "ok": i != 1} for i, q in enumerate(qs)]}
+        store.record_attempt(cid, 3, 2, detail, set_id="1", partial=True)
+        history = store.question_history(cid).get("1", {})
+        check("resultat par question enregistre",
+              all(q["id"] in history for q in qs), "%d suivis" % len(history))
+        check("session partielle ne compte pas comme un score du cours",
+              len(store.attempts(cid)) == before)
+        mine = {q["id"] for q in qs}
+        ko = sorted(qid for qid, h in history.items()
+                    if qid in mine and not h["ok"])
+        check("questions ratees identifiables", ko == [qs[1]["id"]], str(ko))
+    finally:
+        store.reset_question_history(cid)
+        now = __import__("time").time()
+        for set_id, items in saved.items():
+            for qid, h in items.items():
+                store.conn().execute(
+                    "INSERT OR REPLACE INTO question_result "
+                    "(course_id, set_id, question_id, last_ok, tries, ok_count, updated_at) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (cid, set_id, qid, 1 if h["ok"] else 0, h["tries"], h["okCount"], now))
+        store.conn().commit()
 
     # requalification des faux exercices
     batch = [
@@ -297,6 +312,83 @@ def test_quiz_sets() -> None:
     check("faux exercices requalifies",
           moved == 1 and [q["kind"] for q in batch] == ["direct", "exercice", "direct"],
           str([q["kind"] for q in batch]))
+
+
+def test_score_updates() -> None:
+    """Refaire une question ratee et la reussir doit faire monter le score."""
+    from mathsapp import content, status as st_mod, store
+    from mathsapp.syllabus import load
+
+    syl = load()
+    cid = next((c.id for c in syl.all() if content.has_exercises(c.id)), None)
+    if cid is None:
+        return
+    questions = content.quiz_sets(cid)[0]["qcm"]
+    if len(questions) < 6:
+        return
+
+    saved = store.question_history(cid)
+    saved_attempts = list(store.attempts(cid))
+    try:
+        store.reset_question_history(cid)
+        store.conn().execute("DELETE FROM quiz_attempt WHERE course_id=?", (cid,))
+        store.conn().commit()
+
+        # seance complete : une seule erreur
+        wrong = questions[2]
+        detail = {"answers": [{"id": q["id"], "ok": q["id"] != wrong["id"]}
+                              for q in questions]}
+        store.record_attempt(cid, len(questions), len(questions) - 1, detail, "1")
+        first = st_mod.compute(syl)[cid]
+        expected = int(round(100.0 * (len(questions) - 1) / len(questions)))
+        check("score apres une seance complete", first.score_pct == expected,
+              "%s %% (attendu %d %%)" % (first.score_pct, expected))
+
+        # on refait uniquement la question ratee, et on la reussit
+        store.record_attempt(cid, 1, 1, {"answers": [{"id": wrong["id"], "ok": True}]},
+                             "1", partial=True)
+        after = st_mod.compute(syl)[cid]
+        check("le score monte apres correction de l'erreur",
+              after.score_pct == 100 and after.answered == len(questions),
+              "%s %% sur %d tentees" % (after.score_pct, after.answered))
+        check("la seance partielle ne cree pas de tentative",
+              len(store.attempts(cid)) == 1, "%d tentative(s)" % len(store.attempts(cid)))
+
+        # et il redescend si on la rate de nouveau
+        store.record_attempt(cid, 1, 0, {"answers": [{"id": wrong["id"], "ok": False}]},
+                             "1", partial=True)
+        again = st_mod.compute(syl)[cid]
+        check("le score redescend si on la rate de nouveau",
+              again.score_pct == expected, "%s %%" % again.score_pct)
+
+        # couverture insuffisante : pas de maitrise sur deux bonnes reponses
+        store.reset_question_history(cid)
+        store.record_attempt(cid, 2, 2, {"answers": [{"id": questions[0]["id"], "ok": True},
+                                                     {"id": questions[1]["id"], "ok": True}]},
+                             "1", partial=True)
+        thin = st_mod.compute(syl)[cid]
+        check("100 % sur deux questions ne vaut pas maitrise",
+              thin.score_pct == 100 and not thin.mastered and not thin.enough_answered,
+              "%s %%, %d tentees, seuil %d" % (thin.score_pct, thin.answered,
+                                               thin.questions_needed))
+    finally:
+        store.reset_question_history(cid)
+        store.conn().execute("DELETE FROM quiz_attempt WHERE course_id=?", (cid,))
+        for row in saved_attempts:
+            store.conn().execute(
+                "INSERT INTO quiz_attempt (course_id, finished_at, total, correct, detail) "
+                "VALUES (?,?,?,?,?)",
+                (cid, row["finished_at"], row["total"], row["correct"], row["detail"]))
+        store.conn().commit()
+        now = __import__("time").time()
+        for set_id, items in saved.items():
+            for qid, h in items.items():
+                store.conn().execute(
+                    "INSERT OR REPLACE INTO question_result "
+                    "(course_id, set_id, question_id, last_ok, tries, ok_count, updated_at) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (cid, set_id, qid, 1 if h["ok"] else 0, h["tries"], h["okCount"], now))
+        store.conn().commit()
 
 
 def test_sheet() -> None:
@@ -713,6 +805,8 @@ def main() -> int:
     test_pages()
     print("\n--- contexte entre sections ---")
     test_section_context()
+    print("\n--- score du cours ---")
+    test_score_updates()
     print("\n--- series de QCM ---")
     test_quiz_sets()
     print("\n--- equilibre des QCM ---")

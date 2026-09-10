@@ -184,6 +184,16 @@ def delete_quiz_set(course_id: str, set_id: str) -> bool:
     return len(extra["sets"]) < before
 
 
+def question_ids(course_id: str) -> set:
+    """Identifiants des questions actuellement proposees, toutes series."""
+    return {q["id"] for q in all_questions(course_id) if q.get("id")}
+
+
+def largest_set_size(course_id: str) -> int:
+    sizes = [len(item["qcm"]) for item in quiz_sets(course_id)]
+    return max(sizes) if sizes else 0
+
+
 def all_questions(course_id: str) -> List[dict]:
     out: List[dict] = []
     for item in quiz_sets(course_id):
