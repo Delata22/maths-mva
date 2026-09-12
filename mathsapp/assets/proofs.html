@@ -465,7 +465,8 @@ function open(i) {
     + '<div class="palette" id="palette"></div>'
     + '<textarea id="draft" spellcheck="false" placeholder="Rédigez ici. Les maths s\'écrivent en LaTeX entre $ ... $ — la palette ci-dessus insère les symboles, et Alt+lettre va plus vite."></textarea>'
     + '<div class="row edrow">'
-    + '<button class="btn primary" id="review">Faire corriger par Claude</button>'
+    + '<button class="btn" id="ontrack" title="Pour un travail en cours : Claude dit si la direction est bonne, sans reprocher ce qui reste à faire">Suis-je sur la bonne voie ?</button>'
+    + '<button class="btn primary" id="review">Corriger ma démonstration</button>'
     + '<button class="btn" id="prev">Aperçu</button>'
     + '<label class="autolbl"><input type="checkbox" id="auto" checked> remplacements automatiques</label>'
     + '<span class="hintlbl" id="saved"></span>'
@@ -604,7 +605,7 @@ function open(i) {
     previewTimer = setTimeout(renderPreview, 300);
   });
 
-  document.getElementById('review').addEventListener('click', function () {
+  function askReview(mode) {
     if (!bridge) return;
     var text = ta.value.trim();
     if (!text) { ta.focus(); return; }
@@ -619,8 +620,15 @@ function open(i) {
       title: p.title,
       statement: tmp.innerText.trim(),
       solution: sol.innerText.trim().slice(0, 6000),
-      attempt: text
+      attempt: text,
+      mode: mode
     }));
+  }
+  document.getElementById('review').addEventListener('click', function () {
+    askReview('complete');
+  });
+  document.getElementById('ontrack').addEventListener('click', function () {
+    askReview('etape');
   });
 
   if (ta.value.trim()) {

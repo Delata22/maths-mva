@@ -583,6 +583,7 @@ class MainWindow(QMainWindow):
         attempt = (data.get("attempt") or "").strip()
         if not attempt:
             return
+        mode = "etape" if data.get("mode") == "etape" else "complete"
         course = self.syl.get(course_id)
         title = data.get("title") or "Démonstration"
         attempt_no = store.count_review(course_id, proof_id)
@@ -594,19 +595,28 @@ class MainWindow(QMainWindow):
             window.finished.connect(
                 lambda _=0, w=window: self._proof_windows.remove(w)
                 if w in self._proof_windows else None)
-        window.setWindowTitle("Correction : %s" % title)
-        window.chat.set_context(course, "review:%s" % proof_id, mode="review",
-                                title="Correction — %s" % title)
+        window.setWindowTitle(
+            ("Sur la bonne voie ? — %s" if mode == "etape" else "Correction : %s") % title)
+        # Le fil est le meme dans les deux modes : Claude voit les versions
+        # precedentes. Seules les consignes changent d'un envoi a l'autre.
+        window.chat.set_context(
+            course, "review:%s" % proof_id,
+            mode="review-etape" if mode == "etape" else "review",
+            title=("Sur la bonne voie — %s" if mode == "etape" else "Correction — %s") % title)
         window.show()
         window.raise_()
         window.activateWindow()
         if window.chat.busy:
             return
-        shown = ("Ma démonstration :\n\n%s" % attempt if attempt_no == 1
-                 else "Version %d de ma démonstration :\n\n%s" % (attempt_no, attempt))
+        if mode == "etape":
+            shown = "Voilà où j'en suis — est-ce que je suis sur la bonne voie ?\n\n%s" % attempt
+        elif attempt_no == 1:
+            shown = "Ma démonstration :\n\n%s" % attempt
+        else:
+            shown = "Version %d de ma démonstration :\n\n%s" % (attempt_no, attempt)
         window.chat.send_hidden(
             proof_review_prompt(title, data.get("statement", ""),
-                                data.get("solution", ""), attempt, attempt_no),
+                                data.get("solution", ""), attempt, attempt_no, mode),
             shown=shown)
 
     def _proof_window(self, context_key: str):

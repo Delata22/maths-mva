@@ -144,6 +144,7 @@ class ChatPanel(QWidget):
     def set_context(self, course: Optional[Course], context_key: str = "general",
                     mode: str = "general", title: Optional[str] = None) -> None:
         if (self.session and self.session.context_key == context_key
+                and self.session.mode == mode
                 and (self.session.course.id if self.session.course else None)
                 == (course.id if course else None)):
             return

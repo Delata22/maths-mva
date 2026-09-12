@@ -304,13 +304,22 @@ et trois choses evitent d'avoir a le taper a la main :
 - des **abreviations** developpees a l'espace : `=>`, `<=>`, `ssi`, `!=`, `>=`,
   `<=`, `->`, `|->`, `inf`, `qqs`, `ex`.
 
-Un bouton *Apercu* rend le texte par KaTeX. **Faire corriger par Claude**
-(ou `Ctrl+Entree`) ouvre une fenetre de correction : verdict, ce qui tient,
-**le premier** point qui bloque avec une piste pour repartir, et les remarques
-de redaction. La correction ne deroule pas la solution — sauf si vous la
-demandez — et une preuve correcte differente de la solution de reference est
-reconnue comme correcte. Vous corrigez, vous resoumettez : le fil garde les
-versions precedentes et Claude dit si le point signale est regle.
+Un bouton *Apercu* rend le texte par KaTeX. Deux facons de faire relire :
+
+- **Suis-je sur la bonne voie ?** pour un travail en cours. Claude ne releve
+  jamais que la demonstration est incomplete — c'est le point de depart, pas un
+  defaut. Il dit ce qui est deja etabli, si la direction mene au but, et donne
+  la prochaine etape, une seule.
+- **Corriger ma demonstration** (ou `Ctrl+Entree`) pour une copie terminee.
+  Ouvre sur ce qui est acquis, puis dit ou en est la demonstration, puis LE
+  premier point a reprendre avec une piste, puis au plus deux remarques de
+  redaction.
+
+Dans les deux cas : la solution n'est pas deroulee (sauf demande explicite),
+une preuve correcte differente de la reference est reconnue correcte, et une
+affirmation fausse est dite fausse — encourageant ne veut pas dire complaisant.
+Vous corrigez, vous resoumettez : le fil garde les versions precedentes et
+Claude commence par dire ce qui a progresse.
 
 ---
 

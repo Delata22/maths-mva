@@ -314,6 +314,36 @@ def test_quiz_sets() -> None:
           str([q["kind"] for q in batch]))
 
 
+def test_review_modes() -> None:
+    """Deux registres de relecture : travail en cours et copie terminee."""
+    from mathsapp.chat import ChatSession
+    from mathsapp.generation import prompts
+
+    etape = prompts.proof_review_system(None, None, "etape")
+    complete = prompts.proof_review_system(None, None, "complete")
+    check("mode etape : pas de verdict",
+          "Pas de verdict" in etape and "Ne relevez donc jamais" in etape)
+    check("mode etape : ne reproche pas l'inachevement",
+          "ne prétend pas avoir fini" in etape)
+    check("mode complet : ouvre sur l'acquis",
+          complete.index("Ce qui est acquis") < complete.index("Le point à reprendre"))
+    for text, label in ((etape, "etape"), (complete, "complete")):
+        check("  %s : tournures decourageantes bannies" % label,
+              "il suffit de" in text and "vous auriez dû" in text)
+        check("  %s : exactitude preservee" % label,
+              "Une affirmation fausse est dite" in text)
+    check("un seul point a la fois",
+          "Une seule chose à reprendre à la fois" in etape)
+
+    session = ChatSession(None, None, "selftest-review", "review-etape")
+    check("session en mode etape", "SUIS-JE SUR LA BONNE VOIE" in session.system)
+    session2 = ChatSession(None, None, "selftest-review2", "review")
+    check("session en mode complet", "CORRECTION COMPLÈTE" in session2.system)
+    prompt = prompts.proof_review_prompt("T", "E", "S", "debut", 2, "etape")
+    check("relance : progression mentionnee d'abord",
+          "ce qui a progressé" in prompt and "bonne voie" in prompt)
+
+
 def test_score_updates() -> None:
     """Refaire une question ratee et la reussir doit faire monter le score."""
     from mathsapp import content, status as st_mod, store
@@ -805,6 +835,8 @@ def main() -> int:
     test_pages()
     print("\n--- contexte entre sections ---")
     test_section_context()
+    print("\n--- registres de relecture ---")
+    test_review_modes()
     print("\n--- score du cours ---")
     test_score_updates()
     print("\n--- series de QCM ---")

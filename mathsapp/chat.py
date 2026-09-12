@@ -78,7 +78,9 @@ class ChatSession:
         if self.mode == "proof":
             return proof_helper_system(self.course, self.syl)
         if self.mode == "review":
-            return proof_review_system(self.course, self.syl)
+            return proof_review_system(self.course, self.syl, "complete")
+        if self.mode == "review-etape":
+            return proof_review_system(self.course, self.syl, "etape")
         return chat_system(self.course, self.syl)
 
     @property
