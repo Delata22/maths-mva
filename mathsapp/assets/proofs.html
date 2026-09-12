@@ -243,7 +243,8 @@ var SHORTCUTS = {
   a: '\\forall #', e: '\\exists #', i: ' \\in ', r: ' \\Rightarrow ', q: ' \\iff ',
   u: ' \\cup ', n: ' \\cap ', o: '\\emptyset', d: '\\delta ', p: '\\partial ',
   g: '\\nabla ', l: '\\lim_{# \\to +\\infty} ', s: '\\sum_{#}^{} ',
-  t: '\\int_{#}^{} ', f: '\\frac{#}{}', w: '\\norm{#}', m: '$#$'
+  t: '\\int_{#}^{} ', f: '\\frac{#}{}', w: '\\norm{#}', m: '$#$',
+  arrowup: '^{#}', arrowdown: '_{#}'
 };
 
 var AUTO = {
@@ -478,6 +479,7 @@ function open(i) {
     + 'Alt+U <code>\\cup</code>, Alt+N <code>\\cap</code>, Alt+G <code>\\nabla</code>, '
     + 'Alt+F <code>\\frac</code>, Alt+S <code>\\sum</code>, Alt+T <code>\\int</code>, '
     + 'Alt+L <code>\\lim</code>, Alt+W <code>\\norm</code>, Alt+M entoure de <code>$…$</code>, '
+    + 'Alt+↑ puissance <code>^{}</code>, Alt+↓ indice <code>_{}</code>, '
     + 'Ctrl+Entrée envoie à la correction.<br>'
     + '<strong>Abréviations</strong> (suivies d\'une espace) — <code>=></code>, <code>&lt;=></code>, '
     + '<code>ssi</code>, <code>!=</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>-></code>, '

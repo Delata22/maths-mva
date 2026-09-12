@@ -690,3 +690,73 @@ aboutir) :
 --- ce qu'il a écrit ---
 {attempt}
 --- fin ---"""
+
+
+DAILY_SCHEMA = {
+    "type": "object",
+    "properties": {"qcm": EXERCISES_SCHEMA["properties"]["qcm"]},
+    "required": ["qcm"],
+}
+
+
+def daily_quiz_prompt(syl: Syllabus, items: List[dict], count: int = 20) -> str:
+    """Questions du jour, reparties sur plusieurs cours deja etudies.
+
+    `items` : [{course, digest, seen}] ou `seen` liste les enonces deja poses.
+    """
+    blocks = []
+    for item in items:
+        course = item["course"]
+        seen = "\n".join("      - %s" % q[:110] for q in item.get("seen", [])[:18])
+        blocks.append(
+            "### %s  [%s]  niveau %d/5\n"
+            "Objectifs : %s\n"
+            "Extraits du cours :\n%s\n"
+            "Questions deja posees sur ce cours (a ne pas reprendre) :\n%s"
+            % (course.title, course.id, course.level,
+               " ; ".join(course.objectives),
+               item["digest"], seen or "      (aucune)"))
+    corpus = "\n\n".join(blocks)
+    titles = ", ".join(item["course"].title for item in items)
+
+    return f"""{STYLE}
+
+Vous composez le QUIZ DU JOUR : une serie courte qui fait reviser plusieurs
+chapitres a la fois, pour entretenir ce qui a deja ete travaille.
+
+Ce n'est pas le QCM d'un cours. Son interet est precisement de melanger : on
+passe de la logique aux probabilites sans transition, comme dans un examen, et
+on verifie que les notions anciennes tiennent encore.
+
+COURS AU PROGRAMME DU JOUR : {titles}
+
+{corpus}
+
+TACHE : produire exactement {count} questions a choix unique, NOUVELLES.
+
+Regles :
+- Repartissez les questions entre les cours ci-dessus, a peu pres
+  equitablement. Chaque cours doit apparaitre.
+- Aucune question deja posee, meme reformulee ou avec d'autres valeurs. Les
+  enonces existants vous sont donnes pour cela.
+- Difficultes melangees, de 1 a 4 : le quiz du jour doit pouvoir se faire en
+  dix minutes. Pas plus de trois questions de difficulte 4, et au plus deux de
+  type `exercice`.
+- Privilegiez ce qui se verifie vite et ce qui s'oublie : definitions exactes,
+  hypotheses d'un theoreme, contre-exemples, signes et facteurs, ordre des
+  quantificateurs.
+- Deux ou trois questions peuvent croiser deux cours du programme, si le lien
+  est reel et pas artificiel.
+- `section` : indiquez le TITRE du cours d'ou vient la question, pas la section.
+- Toutes les regles du QCM s'appliquent : quatre propositions de longueur et de
+  registre comparables, une seule correcte, distracteurs correspondant a des
+  erreurs reelles, position de la bonne reponse repartie, aucune proposition ne
+  renvoyant aux autres. Une proposition est une affirmation, pas une
+  demonstration.
+- L'explication dit pourquoi la bonne reponse est bonne et pourquoi le piege
+  principal est un piege.
+- Francais avec tous les accents ; ces consignes sont sans accents pour des
+  raisons techniques, n'imitez pas ce style.
+
+Repondez uniquement par {{"qcm": [...]}}, chaque question portant id, kind,
+difficulty, question, choices, answer, explanation, section."""

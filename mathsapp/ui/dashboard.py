@@ -9,10 +9,11 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
-from .. import content, status as st_mod
+from .. import content, gamify, review as review_mod, status as st_mod
 from ..status import MASTERED, PARTIAL, Status
 from ..syllabus import Syllabus
 from . import theme
+from .widgets import Heatmap, Ring
 
 
 def _bar(value: int, total: int, color: str) -> QProgressBar:
@@ -41,6 +42,7 @@ class Dashboard(QWidget):
     course_opened = Signal(str)
     generate_requested = Signal(list)
     show_graph = Signal(str)
+    session_requested = Signal(str)      # review / daily / challenge
 
     def __init__(self, syllabus: Syllabus, parent=None):
         super().__init__(parent)
@@ -93,11 +95,15 @@ class Dashboard(QWidget):
         self.root.addWidget(_bar(mastered, total, pal["ok"]))
         self.root.addSpacing(6)
 
+        self._today(statuses, pal)
+        self._progression(statuses, pal)
+        self._milestones(statuses, pal)
         self._interrupted(statuses, pal)
         self._tracks(statuses, pal)
         self._tracks_compact(statuses, pal)
         self._next(statuses, pal)
         self._review(statuses, pal)
+        self._week(statuses, pal)
         self._domains(statuses, pal)
         self.root.addStretch(1)
         # on garde la position de lecture : la page se rafraichit pendant les
@@ -119,6 +125,193 @@ class Dashboard(QWidget):
         host.setLayout(row)
         self.root.addSpacing(10)
         self.root.addWidget(host)
+
+    # ------------------------------------------------------------ aujourd'hui
+    def _today(self, statuses: Dict[str, Status], pal: dict) -> None:
+        goal = gamify.goal_state()
+        streak = gamify.refresh_streak()
+        due = review_mod.due_resolved()
+        day = gamify.today()
+        has_daily = content.has_daily(day)
+
+        self._section_title(
+            "Aujourd'hui",
+            "objectif atteint" if goal.met else "une brique suffit pour tenir la série")
+        card = Card()
+        top = QHBoxLayout()
+        top.setSpacing(20)
+
+        ring = Ring(96)
+        ring.set_value(goal.fraction,
+                       "%d/%d" % (goal.done, goal.target),
+                       "brique" if goal.target == 1 else "briques",
+                       "ok" if goal.met else "accent")
+        ring.setToolTip("Une brique = une séance de QCM, une révision terminée, "
+                        "une démonstration soumise ou réussie.")
+        top.addWidget(ring)
+
+        info = QVBoxLayout()
+        info.setSpacing(3)
+        flame = QLabel(
+            "<span style='font-size:19px;font-weight:700'>%d</span> "
+            "<span style='color:%s'>jour%s d'affilée</span>"
+            % (streak.current, pal["muted"], "s" if streak.current > 1 else ""))
+        flame.setTextFormat(Qt.TextFormat.RichText)
+        info.addWidget(flame)
+        detail = QLabel("record %d  ·  %d gel%s disponible%s ce mois"
+                        % (streak.best, streak.freezes_left,
+                           "s" if streak.freezes_left > 1 else "",
+                           "s" if streak.freezes_left > 1 else ""))
+        detail.setObjectName("Muted")
+        detail.setToolTip("Un gel couvre un jour manqué des deux derniers jours, "
+                          "pour qu'un oubli ne casse pas la série.")
+        info.addWidget(detail)
+        if goal.questions or goal.reviews or goal.proofs:
+            done = QLabel("aujourd'hui : %d question%s · %d révision%s · %d démo%s · %d XP"
+                          % (goal.questions, "s" if goal.questions > 1 else "",
+                             goal.reviews, "s" if goal.reviews > 1 else "",
+                             goal.proofs, "s" if goal.proofs > 1 else "", goal.xp))
+            done.setObjectName("Muted")
+            info.addWidget(done)
+        info.addStretch(1)
+        host = QWidget()
+        host.setLayout(info)
+        top.addWidget(host, 1)
+
+        heat = Heatmap()
+        heat.set_days(streak.days)
+        heat.setToolTip("Les jours travaillés des trois derniers mois.")
+        top.addWidget(heat, 1)
+        holder = QWidget()
+        holder.setLayout(top)
+        card.lay.addWidget(holder)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        btn_review = QPushButton("Réviser  (%d)" % len(due) if due else "Rien à revoir")
+        btn_review.setProperty("primary", bool(due))
+        btn_review.setEnabled(bool(due))
+        if due:
+            btn_review.setToolTip("%d question%s à revoir, environ %d min"
+                                  % (len(due), "s" if len(due) > 1 else "",
+                                     review_mod.estimate_minutes(len(due))))
+        else:
+            btn_review.setToolTip("Rien n'est dû aujourd'hui. "
+                                  "Le prochain rappel viendra tout seul.")
+        btn_review.clicked.connect(lambda: self.session_requested.emit("review"))
+        actions.addWidget(btn_review)
+
+        btn_daily = QPushButton("Quiz du jour" if has_daily else "Préparer le quiz du jour")
+        btn_daily.setProperty("primary", has_daily and not due)
+        btn_daily.clicked.connect(lambda: self.session_requested.emit("daily"))
+        actions.addWidget(btn_daily)
+
+        btn_challenge = QPushButton("Défi éclair")
+        btn_challenge.setToolTip("Cinq questions déjà vues, chronométrées.")
+        btn_challenge.clicked.connect(lambda: self.session_requested.emit("challenge"))
+        actions.addWidget(btn_challenge)
+
+        upcoming = review_mod.upcoming(8)
+        if sum(upcoming[1:]):
+            nxt = next((i for i, n in enumerate(upcoming) if n and i > 0), None)
+            if nxt:
+                label = QLabel("prochaine échéance : %d question%s dans %d jour%s"
+                               % (upcoming[nxt], "s" if upcoming[nxt] > 1 else "",
+                                  nxt, "s" if nxt > 1 else ""))
+                label.setObjectName("Muted")
+                actions.addWidget(label)
+        actions.addStretch(1)
+        holder = QWidget()
+        holder.setLayout(actions)
+        card.lay.addWidget(holder)
+        self.root.addWidget(card)
+
+    # ------------------------------------------------------------ progression
+    def _progression(self, statuses: Dict[str, Status], pal: dict) -> None:
+        total = gamify.xp_total()
+        level, into, need = gamify.level_of(total)
+        week = gamify.xp_last_days(7)
+        self._section_title("Niveau %d" % level,
+                            "%d XP au total  ·  %d cette semaine" % (total, week))
+        card = Card()
+        row = QHBoxLayout()
+        row.setSpacing(14)
+        bar = _bar(into, need, pal["accent"])
+        bar.setMinimumWidth(220)
+        row.addWidget(bar, 1)
+        row.addWidget(QLabel("%d / %d XP" % (into, need)))
+        holder = QWidget()
+        holder.setLayout(row)
+        card.lay.addWidget(holder)
+
+        by_domain = gamify.xp_by_domain()
+        if by_domain:
+            grid = QGridLayout()
+            grid.setHorizontalSpacing(14)
+            grid.setVerticalSpacing(7)
+            ordered = sorted(by_domain.items(), key=lambda kv: -kv[1])[:10]
+            for i, (did, xp) in enumerate(ordered):
+                dlevel, dinto, dneed = gamify.level_of(xp)
+                name = QLabel(self.syl.domain_name(did))
+                name.setStyleSheet("color:%s;font-weight:600" % self.syl.domain_color(did))
+                grid.addWidget(name, i, 0)
+                dbar = _bar(dinto, dneed, self.syl.domain_color(did))
+                dbar.setMinimumWidth(140)
+                grid.addWidget(dbar, i, 1)
+                tag = QLabel("niveau %d" % dlevel)
+                tag.setObjectName("Muted")
+                grid.addWidget(tag, i, 2)
+            holder = QWidget()
+            holder.setLayout(grid)
+            card.lay.addWidget(holder)
+        self.root.addWidget(card)
+
+    # ---------------------------------------------------------------- jalons
+    def _milestones(self, statuses: Dict[str, Status], pal: dict) -> None:
+        ctx = gamify.build_context(self.syl, statuses)
+        gamify.check_milestones(ctx)
+        reached = gamify.reached_ids()
+        done = [m for m in gamify.MILESTONES if m.id in reached]
+        todo = [m for m in gamify.MILESTONES if m.id not in reached]
+
+        def distance(milestone):
+            if milestone.progress is None:
+                return 1.0
+            try:
+                value, target = milestone.progress(ctx)
+            except Exception:  # noqa: BLE001
+                return 1.0
+            return 1.0 - min(1.0, value / max(1, target))
+
+        todo.sort(key=distance)
+        self._section_title("Jalons", "%d sur %d" % (len(done), len(gamify.MILESTONES)))
+        card = Card()
+        for milestone in done[-3:] + todo[:5]:
+            got = milestone.id in reached
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 2, 0, 2)
+            row.setSpacing(10)
+            mark = QLabel("✓" if got else "○")
+            mark.setStyleSheet("color:%s;font-weight:700"
+                               % (pal["ok"] if got else pal["muted"]))
+            row.addWidget(mark)
+            label = QLabel(milestone.label)
+            if not got:
+                label.setObjectName("Muted")
+            label.setToolTip(milestone.detail or milestone.label)
+            row.addWidget(label, 1)
+            if not got and milestone.progress is not None:
+                try:
+                    value, target = milestone.progress(ctx)
+                    count = QLabel("%d / %d" % (value, target))
+                    count.setObjectName("Muted")
+                    row.addWidget(count)
+                except Exception:  # noqa: BLE001
+                    pass
+            holder = QWidget()
+            holder.setLayout(row)
+            card.lay.addWidget(holder)
+        self.root.addWidget(card)
 
     def _interrupted(self, statuses: Dict[str, Status], pal: dict) -> None:
         ids = st_mod.incomplete(self.syl, statuses)
@@ -334,6 +527,73 @@ class Dashboard(QWidget):
         card = Card()
         for cid in ids[:8]:
             card.lay.addWidget(self._course_row(cid, statuses, pal))
+        self.root.addWidget(card)
+
+    def _week(self, statuses: Dict[str, Status], pal: dict) -> None:
+        now = gamify.week_totals(0)
+        before = gamify.week_totals(1)
+        if not now["questions"] and not before["questions"]:
+            return
+
+        def delta(key: str, suffix: str = "") -> str:
+            diff = (now[key] or 0) - (before[key] or 0)
+            if not diff:
+                return "<span style='color:%s'>inchangé</span>" % pal["muted"]
+            colour = pal["ok"] if diff > 0 else pal["warn"]
+            return ("<span style='color:%s'>%+d%s</span>" % (colour, diff, suffix))
+
+        self._section_title("Cette semaine",
+                            "du %s au %s" % (now["first"][8:10] + "/" + now["first"][5:7],
+                                             now["last"][8:10] + "/" + now["last"][5:7]))
+        card = Card()
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(6)
+        rows = [
+            ("Questions", "%d" % now["questions"], delta("questions")),
+            ("Score moyen", "%s" % ("%d %%" % now["score"] if now["score"] is not None else "—"),
+             ("<span style='color:%s'>%+d pts</span>"
+              % (pal["ok"] if (now["score"] or 0) >= (before["score"] or 0) else pal["warn"],
+                 (now["score"] or 0) - (before["score"] or 0))
+              if now["score"] is not None and before["score"] is not None
+              else "<span style='color:%s'>—</span>" % pal["muted"])),
+            ("Révisions", "%d" % now["reviews"], delta("reviews")),
+            ("Démonstrations", "%d" % now["proofs"], delta("proofs")),
+            ("Jours travaillés", "%d / 7" % now["days"], delta("days")),
+            ("XP", "%d" % now["xp"], delta("xp")),
+        ]
+        for i, (label, value, change) in enumerate(rows):
+            name = QLabel(label)
+            name.setObjectName("Muted")
+            grid.addWidget(name, i, 0)
+            val = QLabel(value)
+            val.setStyleSheet("font-weight:600")
+            grid.addWidget(val, i, 1)
+            chg = QLabel(change)
+            chg.setTextFormat(Qt.TextFormat.RichText)
+            grid.addWidget(chg, i, 2)
+        grid.setColumnStretch(3, 1)
+        holder = QWidget()
+        holder.setLayout(grid)
+        card.lay.addWidget(holder)
+
+        gains = gamify.week_domains(0)
+        if gains:
+            best = max(gains.items(), key=lambda kv: kv[1])
+            line = QLabel("Le domaine qui a le plus avancé : "
+                          "<span style='color:%s;font-weight:600'>%s</span> (+%d XP)"
+                          % (self.syl.domain_color(best[0]),
+                             self.syl.domain_name(best[0]), best[1]))
+            line.setTextFormat(Qt.TextFormat.RichText)
+            card.lay.addWidget(line)
+        stale = [did for did in self.syl.domain_order
+                 if did not in gains and gamify.xp_by_domain().get(did)]
+        if stale:
+            line = QLabel("Sans activité cette semaine : %s"
+                          % ", ".join(self.syl.domain_name(d) for d in stale[:4]))
+            line.setObjectName("Muted")
+            line.setWordWrap(True)
+            card.lay.addWidget(line)
         self.root.addWidget(card)
 
     def _domains(self, statuses: Dict[str, Status], pal: dict) -> None:

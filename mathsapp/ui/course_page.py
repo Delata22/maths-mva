@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from .. import content, status as st_mod, store
+from .. import content, gamify, status as st_mod, store
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
 from . import theme
@@ -177,6 +177,7 @@ class CoursePage(QWidget):
     sheet_requested = Signal(str)
     quiz_set_requested = Signal(str)
     sheet_export_requested = Signal(str)
+    progress_made = Signal()
     cancel_requested = Signal(str)
 
     def __init__(self, syllabus: Syllabus, parent=None):
@@ -578,8 +579,14 @@ class CoursePage(QWidget):
                 % (st.score_pct, st.correct, st.answered, st.questions_total))
 
     def _on_proof_status(self, proof_id: str, value: str) -> None:
-        if self.course:
-            store.set_proof_status(self.course.id, proof_id, value)
+        if not self.course:
+            return
+        before = store.proof_statuses(self.course.id).get(proof_id)
+        store.set_proof_status(self.course.id, proof_id, value)
+        if value == "done" and before != "done":
+            gamify.log("proof_solved", proofs=1, brick=True,
+                       xp=gamify.XP["proof_solved"], domain=self.course.domain)
+            self.progress_made.emit()
 
     def _on_proof_draft(self, proof_id: str, text: str) -> None:
         if self.course:

@@ -457,6 +457,95 @@ def generate_quiz_set(course_id: str, model: Optional[str] = None,
     return set_id, cost
 
 
+def pick_daily_courses(syl: Syllabus, statuses, count: int = 6) -> List[str]:
+    """Choisit les cours du quiz du jour : les plus fragiles et les plus anciens."""
+    from .. import store
+    eligible = [c.id for c in syl.all()
+                if statuses[c.id].has_exercises and statuses[c.id].answered > 0]
+    if not eligible:
+        eligible = [c.id for c in syl.all() if statuses[c.id].has_exercises]
+    if not eligible:
+        return []
+
+    seen_at = {r["course_id"]: r["last"] for r in store.conn().execute(
+        "SELECT course_id, MAX(updated_at) last FROM question_result GROUP BY course_id")}
+    weak = sorted(eligible, key=lambda cid: statuses[cid].score_pct or 0)
+    old = sorted(eligible, key=lambda cid: seen_at.get(cid, 0.0))
+
+    picked: List[str] = []
+    for source in (weak[:2], old[:2], weak[2:], old[2:]):
+        for cid in source:
+            if cid not in picked:
+                picked.append(cid)
+            if len(picked) >= count:
+                return picked
+    return picked[:count]
+
+
+def generate_daily_quiz(day: Optional[str] = None, model: Optional[str] = None,
+                        on_progress: ProgressCb = _noop,
+                        cancel: CancelCb = _never,
+                        syl: Optional[Syllabus] = None,
+                        count: int = 20) -> tuple[str, float]:
+    """Produit le quiz du jour. Retourne (jour, cout)."""
+    from .. import gamify, status as st_mod
+    syl = syl or load_syllabus()
+    day = day or gamify.today()
+    statuses = st_mod.compute(syl)
+    course_ids = pick_daily_courses(syl, statuses)
+    if not course_ids:
+        raise ValueError("Aucun cours evalue : le quiz du jour a besoin de "
+                         "chapitres deja travailles.")
+    model = model or str(settings.get("model/exercises"))
+    on_progress("Quiz du jour", 0.1)
+
+    items = []
+    for cid in course_ids:
+        seen = [re.sub(r"<[^>]+>", " ", q.get("question", ""))
+                for q in content.all_questions(cid)]
+        items.append({"course": syl.get(cid),
+                      "digest": content.digest(cid, limit=2600),
+                      "seen": seen})
+
+    data, res = cc.run_json(
+        prompts.daily_quiz_prompt(syl, items, count),
+        model=model,
+        system=("Vous composez des quiz de revision en mathematiques. Vous "
+                "repondez uniquement en JSON valide."),
+        schema=prompts.DAILY_SCHEMA,
+        cancel=cancel,
+        on_progress=lambda n: on_progress("Quiz du jour", min(0.9, 0.1 + n / 20000.0)),
+        on_notice=lambda msg: on_progress("Quiz du jour — %s" % msg, 0.1),
+    )
+    qcm = data.get("qcm") or []
+    if not qcm:
+        raise cc.ClaudeError("Aucune question renvoyee.")
+
+    titles = {syl.get(cid).title: cid for cid in course_ids}
+    for i, q in enumerate(qcm):
+        q["id"] = "d%s-%d" % (day.replace("-", ""), i + 1)
+        q["kind"] = "exercice" if str(q.get("kind", "")).lower().startswith("ex") else "direct"
+        q["difficulty"] = max(1, min(5, int(q.get("difficulty") or 1)))
+        choices = q.get("choices") or []
+        try:
+            q["answer"] = int(q.get("answer", 0))
+        except (TypeError, ValueError):
+            q["answer"] = 0
+        if not (0 <= q["answer"] < len(choices)):
+            q["answer"] = 0
+        # on rattache la question a son cours, pour le suivi et l'XP
+        q["course_id"] = titles.get((q.get("section") or "").strip(), course_ids[i % len(course_ids)])
+        q["section"] = syl.title(q["course_id"])
+
+    retag_exercises(qcm)
+    cost = res.cost_usd
+    rebalance_positions(qcm, seed=abs(hash(day)) % 10000)
+    content.write_daily(day, {"day": day, "courses": course_ids, "qcm": qcm,
+                              "created_at": time.time()})
+    on_progress("Termine", 1.0)
+    return day, cost
+
+
 def generate_sheet(course_id: str, model: Optional[str] = None,
                    on_progress: ProgressCb = _noop,
                    cancel: CancelCb = _never,

@@ -314,6 +314,134 @@ def test_quiz_sets() -> None:
           str([q["kind"] for q in batch]))
 
 
+def test_gamify() -> None:
+    """Revisions espacees, objectif, serie, XP, niveaux, jalons."""
+    from mathsapp import content, gamify, review as review_mod, status as st_mod, store
+    from mathsapp.syllabus import load
+
+    # --- planification
+    interval, ease, due = review_mod.schedule(True, None, None, now=0.0)
+    check("premiere reussite : revision a un jour",
+          interval == 1.0 and due == review_mod.DAY, "%.1f j" % interval)
+    steps = []
+    i, e = interval, ease
+    for _ in range(4):
+        i, e, _d = review_mod.schedule(True, i, e)
+        steps.append(round(i, 1))
+    check("les intervalles s'allongent", steps == sorted(steps) and steps[-1] > 20,
+          str(steps))
+    i2, e2, due2 = review_mod.schedule(False, i, e, now=1000.0)
+    check("un echec ramene la question tout de suite",
+          i2 == 0.0 and due2 == 1000.0 and e2 < e, "%.1f j, facilite %.2f" % (i2, e2))
+
+    # --- journal, objectif, serie : sur des jours factices
+    fake = ["1999-12-29", "1999-12-30", "1999-12-31", "2000-01-01"]
+    c = store.conn()
+    try:
+        for day in fake:
+            c.execute("DELETE FROM day_log WHERE day=?", (day,))
+        c.execute("DELETE FROM xp_event WHERE day IN ('%s')" % "','".join(fake))
+        c.commit()
+
+        gamify.log("test", questions=10, correct=8, brick=True, xp=42,
+                   domain="logique", day=fake[0])
+        row = gamify.day_row(fake[0])
+        check("journal du jour", row["questions"] == 10 and row["bricks"] == 1
+              and row["xp"] == 42, str({k: row[k] for k in ("questions", "bricks", "xp")}))
+
+        before = gamify.xp_total()
+        gamify.log("test", xp=8, domain="logique", day=fake[1])
+        check("XP cumulee", gamify.xp_total() == before + 8)
+        check("XP par domaine", gamify.xp_by_domain().get("logique", 0) >= 50)
+
+        for day in fake:
+            c.execute("DELETE FROM day_log WHERE day=?", (day,))
+        c.execute("DELETE FROM xp_event WHERE day IN ('%s')" % "','".join(fake))
+        c.commit()
+    finally:
+        pass
+
+    # --- niveaux
+    check("niveau 1 au depart", gamify.level_of(0)[0] == 1)
+    levels = [gamify.level_of(x)[0] for x in (0, 100, 270, 510, 5000)]
+    check("les niveaux montent", levels == sorted(levels) and levels[-1] > 5, str(levels))
+
+    # --- XP d'une question selon la difficulte et le type
+    easy = gamify.question_xp(1, True)
+    hard = gamify.question_xp(5, True)
+    exo = gamify.question_xp(5, True, "exercice")
+    wrong = gamify.question_xp(5, False)
+    check("une question difficile rapporte plus", hard > easy and exo > hard,
+          "%d < %d < %d" % (easy, hard, exo))
+    check("se tromper rapporte quand meme un peu", 0 < wrong < easy, str(wrong))
+
+    # --- serie : un gel couvre un oubli recent, pas un trou ancien
+    import datetime as _dt
+    today_d = _dt.date.today()
+    days = {(today_d - _dt.timedelta(days=n)).isoformat(): n for n in range(6)}
+    saved = {d: gamify.day_row(d) for d in days}
+    try:
+        for d in days:
+            c.execute("DELETE FROM day_log WHERE day=?", (d,))
+        c.commit()
+        # travaille aujourd'hui, avant-hier, et il y a 5 jours
+        for n in (0, 2, 5):
+            gamify.log("test", brick=True, day=(today_d - _dt.timedelta(days=n)).isoformat())
+        streak = gamify.refresh_streak()
+        check("la serie couvre l'oubli d'hier", streak.current == 3,
+              "%d jours" % streak.current)
+        check("un gel a ete consomme", streak.freezes_left < gamify.FREEZES_PER_MONTH,
+              "%d gels restants" % streak.freezes_left)
+        check("le trou de 3-4 jours n'est pas couvert", streak.current < 6)
+    finally:
+        for d in days:
+            c.execute("DELETE FROM day_log WHERE day=?", (d,))
+        for d, row in saved.items():
+            if row["bricks"] or row["questions"] or row["xp"]:
+                c.execute(
+                    "INSERT OR REPLACE INTO day_log "
+                    "(day, bricks, questions, correct, proofs, reviews, seconds, xp, frozen) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (d, row["bricks"], row["questions"], row["correct"], row["proofs"],
+                     row["reviews"], row["seconds"], row["xp"], row["frozen"]))
+        c.commit()
+
+    # --- jalons
+    syl = load()
+    statuses = st_mod.compute(syl)
+    ctx = gamify.build_context(syl, statuses)
+    check("contexte des jalons complet",
+          all(k in ctx for k in ("correct_total", "proofs_done", "streak", "level")))
+    ids = [m.id for m in gamify.MILESTONES]
+    check("jalons sans doublon d'identifiant", len(ids) == len(set(ids)))
+    broken = []
+    for milestone in gamify.MILESTONES:
+        try:
+            milestone.reach(ctx)
+            if milestone.progress:
+                milestone.progress(ctx)
+        except Exception as exc:  # noqa: BLE001
+            broken.append("%s: %s" % (milestone.id, exc))
+    check("tous les jalons s'evaluent", not broken, str(broken[:2]))
+
+    # --- quiz du jour et resolution des questions
+    index = content.question_index()
+    check("index des questions construit", len(index) > 50, "%d questions" % len(index))
+    days_available = content.daily_days()
+    if days_available:
+        data = content.read_daily(days_available[-1])
+        qcm = data.get("qcm", [])
+        check("quiz du jour : questions rattachees a un cours",
+              all(q.get("course_id") in syl.courses for q in qcm),
+              str({q.get("course_id") for q in qcm} - set(syl.courses)))
+        check("quiz du jour : plusieurs cours",
+              len({q["course_id"] for q in qcm}) >= 3,
+              "%d cours" % len({q["course_id"] for q in qcm}))
+        check("quiz du jour : questions retrouvables",
+              all(("", "daily", q["id"]) in index or (q["course_id"], "daily", q["id"]) in index
+                  for q in qcm[:5]))
+
+
 def test_review_modes() -> None:
     """Deux registres de relecture : travail en cours et copie terminee."""
     from mathsapp.chat import ChatSession
@@ -835,6 +963,8 @@ def main() -> int:
     test_pages()
     print("\n--- contexte entre sections ---")
     test_section_context()
+    print("\n--- habitude et progression ---")
+    test_gamify()
     print("\n--- registres de relecture ---")
     test_review_modes()
     print("\n--- score du cours ---")

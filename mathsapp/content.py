@@ -439,3 +439,55 @@ def section_items(html_text: str, limit: int = 14) -> List[str]:
             seen.add(key)
             out.append(item)
     return out[:limit]
+
+
+# --------------------------------------------------------- quiz du jour
+def daily_path(day: str) -> pathlib.Path:
+    from .paths import daily_dir
+    return daily_dir() / ("%s.json" % day)
+
+
+def read_daily(day: str) -> Optional[dict]:
+    path = daily_path(day)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def write_daily(day: str, data: dict) -> None:
+    daily_path(day).write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                               encoding="utf-8")
+
+
+def has_daily(day: str) -> bool:
+    data = read_daily(day)
+    return bool(data and data.get("qcm"))
+
+
+def daily_days() -> List[str]:
+    from .paths import daily_dir
+    return sorted(p.stem for p in daily_dir().glob("*.json"))
+
+
+def question_index() -> dict:
+    """{(course_id, set_id, question_id): question} sur tout le contenu.
+
+    Inclut les quiz du jour : leurs questions entrent aussi dans le cycle de
+    revision, et il faut pouvoir les retrouver plus tard.
+    """
+    from .paths import library_dir
+    index = {}
+    for d in library_dir().iterdir():
+        if not d.is_dir() or d.name.startswith("_"):
+            continue
+        for item in quiz_sets(d.name):
+            for q in item["qcm"]:
+                index[(d.name, item["id"], q["id"])] = q
+    for day in daily_days():
+        data = read_daily(day) or {}
+        for q in data.get("qcm", []):
+            index[(q.get("course_id", ""), "daily", q["id"])] = q
+    return index

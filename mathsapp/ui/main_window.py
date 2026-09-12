@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import content, settings, status as st_mod, store
+from .. import content, gamify, review as review_mod, settings, status as st_mod, store
 from ..generation.claude_cli import ClaudeError, check_available
 from ..generation.queue import GenerationQueue
 from ..syllabus import Syllabus, load as load_syllabus, reload as reload_syllabus
@@ -24,9 +24,10 @@ from .graph_page import GraphPage
 from .library import LibraryPage
 from .prefs import PrefsDialog
 from .queue_panel import QueuePanel
+from .session_page import SessionPage
 from .syllabus_dialog import SyllabusDialog
 
-PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH = range(4)
+PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH, PAGE_SESSION = range(5)
 
 
 class NoticeBar(QWidget):
@@ -90,6 +91,7 @@ class MainWindow(QMainWindow):
         # Le suivi par question est recent : on reconstruit celui des cours
         # evalues avant son introduction, sinon leur score repartirait a zero.
         store.backfill_question_results()
+        gamify.backfill(self.syl)
         self.queue = GenerationQueue(self)
         self._proof_windows: List[ProofHelperWindow] = []
         self._exporters: List[object] = []
@@ -191,7 +193,9 @@ class MainWindow(QMainWindow):
         self.library = LibraryPage(self.syl)
         self.course_page = CoursePage(self.syl)
         self.graph = GraphPage(self.syl)
-        for page in (self.dashboard, self.library, self.course_page, self.graph):
+        self.session = SessionPage(self.syl)
+        for page in (self.dashboard, self.library, self.course_page, self.graph,
+                     self.session):
             self.stack.addWidget(page)
 
         central = QWidget()
@@ -246,6 +250,7 @@ class MainWindow(QMainWindow):
         self.course_page.sheet_requested.connect(self.enqueue_sheet)
         self.course_page.quiz_set_requested.connect(self.enqueue_quiz_set)
         self.course_page.sheet_export_requested.connect(self.export_sheet_pdf)
+        self.course_page.progress_made.connect(self._refresh_current)
         self.course_page.cancel_requested.connect(self.queue.cancel)
         self.course_page.ask_requested.connect(self.ask_about)
         self.course_page.proof_help_requested.connect(self.open_proof_helper)
@@ -257,6 +262,9 @@ class MainWindow(QMainWindow):
         self.dashboard.course_opened.connect(self.open_course)
         self.dashboard.generate_requested.connect(self.enqueue)
         self.dashboard.show_graph.connect(self.show_track)
+        self.dashboard.session_requested.connect(self.start_session)
+        self.session.finished.connect(self._on_session_finished)
+        self.session.leave.connect(self.go_home)
 
         self.queue_panel.course_opened.connect(self.open_course)
         self.queue_panel.retried.connect(lambda: self.statusBar().showMessage(
@@ -302,6 +310,120 @@ class MainWindow(QMainWindow):
         job = self.queue.job_for(course_id)
         self.course_page.set_generation_progress(
             job is not None, job.progress if job else 0.0, job.label if job else "")
+
+    # ------------------------------------------------------------- seances
+    def start_session(self, kind: str) -> None:
+        statuses = st_mod.compute(self.syl)
+        if kind == "daily":
+            day = gamify.today()
+            data = content.read_daily(day)
+            if not data or not data.get("qcm"):
+                if self.queue.enqueue(day, "Quiz du %s" % day, "daily") is None:
+                    self.statusBar().showMessage("Quiz du jour déjà en préparation", 6000)
+                else:
+                    self.queue_dock.setVisible(True)
+                    self.statusBar().showMessage(
+                        "Quiz du jour en préparation — deux minutes environ", 10000)
+                return
+            questions = [dict(q, day=day) for q in data["qcm"]]
+            self.session.start("daily", questions)
+        elif kind == "review":
+            batch = int(settings.get("goal/review_batch") or 20)
+            questions = [
+                dict(q, course_id=q.get("course_id") or item.course_id,
+                     set_id=item.set_id)
+                for item, q in review_mod.due_resolved(limit=batch)]
+            if not questions:
+                self.statusBar().showMessage("Rien à revoir pour le moment", 6000)
+                return
+            self.session.start("review", questions)
+        else:
+            index = content.question_index()
+            pool = [(key, q) for key, q in index.items() if key[1] != "daily"]
+            history = {}
+            for cid in {key[0] for key, _q in pool}:
+                for set_id, marks in store.question_history(cid).items():
+                    for qid, mark in marks.items():
+                        history[(cid, set_id, qid)] = mark
+            seen = [(key, q) for key, q in pool if key in history]
+            if len(seen) < 5:
+                self.statusBar().showMessage(
+                    "Il faut avoir déjà répondu à cinq questions pour un défi", 7000)
+                return
+            import random
+            weak = [pair for pair in seen if not history[pair[0]].get("ok")]
+            random.shuffle(weak)
+            rest = [pair for pair in seen if pair not in weak]
+            random.shuffle(rest)
+            chosen = (weak + rest)[:5]
+            questions = [dict(q, course_id=key[0], set_id=key[1])
+                         for key, q in chosen]
+            self.session.start("challenge", questions, timed=True)
+        self.go(PAGE_SESSION)
+
+    def _on_session_finished(self, kind: str, payload: str) -> None:
+        import json as _json
+        try:
+            data = _json.loads(payload)
+        except _json.JSONDecodeError:
+            return
+        answers = [a for a in (data.get("answers") or []) if isinstance(a, dict)]
+        if not answers:
+            return
+
+        by_course: dict = {}
+        for answer in answers:
+            cid = answer.get("courseId") or ""
+            by_course.setdefault(cid, []).append(answer)
+
+        xp = 0
+        for cid, group in by_course.items():
+            if not cid or cid not in self.syl.courses:
+                continue
+            set_id = "daily" if kind == "daily" else str(group[0].get("setId") or "1")
+            detail = {"answers": group, "session": kind}
+            store.record_attempt(cid, len(group),
+                                 sum(1 for a in group if a.get("ok")),
+                                 detail, set_id=set_id, partial=True)
+            course = self.syl.get(cid)
+            gained = sum(gamify.question_xp(a.get("difficulty", 1), bool(a.get("ok")),
+                                            a.get("kind", "direct")) for a in group)
+            gamify.log("session:%s" % kind, questions=len(group),
+                       correct=sum(1 for a in group if a.get("ok")),
+                       reviews=len(group) if kind == "review" else 0,
+                       xp=gained, domain=course.domain)
+            xp += gained
+
+        bonus = 0
+        if kind == "review":
+            bonus = gamify.XP["review_done"]
+        elif kind == "daily":
+            bonus = gamify.XP["daily_quiz"]
+        elif kind == "challenge" and data.get("correct") == data.get("total"):
+            bonus = gamify.XP["challenge_perfect"]
+        gamify.log("session_done:%s" % kind, brick=True, xp=bonus,
+                   seconds=float(data.get("seconds") or 0))
+        xp += bonus
+
+        statuses = st_mod.compute(self.syl)
+        gamify.award_course_mastery(self.syl, statuses)
+        fresh = gamify.check_milestones(gamify.build_context(self.syl, statuses))
+        goal = gamify.goal_state()
+        message = "Séance terminée : %d/%d  ·  +%d XP" % (
+            data.get("correct", 0), data.get("total", 0), xp)
+        if fresh:
+            message += "  ·  jalon atteint : %s" % fresh[0].label
+        self.statusBar().showMessage(message, 15000)
+        if fresh:
+            self.notice.show_message(
+                "Jalon atteint : %s" % ", ".join(m.label for m in fresh),
+                "Voir", self.go_home)
+        elif goal.met and goal.done == goal.target:
+            self.notice.show_message(
+                "Objectif du jour atteint. Série : %d jour%s."
+                % (gamify.refresh_streak().current,
+                   "s" if gamify.refresh_streak().current > 1 else ""),
+                "Voir", self.go_home)
 
     def show_track(self, track_id: str) -> None:
         for i in range(self.graph.f_scope.count()):
@@ -618,6 +740,9 @@ class MainWindow(QMainWindow):
             proof_review_prompt(title, data.get("statement", ""),
                                 data.get("solution", ""), attempt, attempt_no, mode),
             shown=shown)
+        if attempt_no == 1:
+            gamify.log("proof_review", brick=True, xp=gamify.XP["proof_review"],
+                       domain=course.domain if course else None)
 
     def _proof_window(self, context_key: str):
         for w in self._proof_windows:
@@ -635,6 +760,7 @@ class MainWindow(QMainWindow):
         QApplication.instance().setStyleSheet(theme.stylesheet())
         self.chat.apply_theme()
         self.course_page.apply_theme()
+        self.session.apply_theme()
         for window in self._proof_windows:
             window.chat.apply_theme()
         index = self.stack.currentIndex()
@@ -661,6 +787,7 @@ class MainWindow(QMainWindow):
         self.syl = reload_syllabus()
         for page in (self.library, self.course_page, self.graph, self.dashboard):
             page.set_syllabus(self.syl)
+        self.session.syl = self.syl
         self.chat.syl = self.syl
         for window in self._proof_windows:
             window.chat.syl = self.syl

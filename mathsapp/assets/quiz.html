@@ -14,6 +14,11 @@
   .qhead .bar { flex: 1; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
   .qhead .bar > i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .diff { letter-spacing: 1.5px; color: var(--warn); font-size: 13px; }
+  .clock {
+    font-family: ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 2px 9px; border-radius: 999px;
+  }
   .qtext { font-size: 1.06em; margin-bottom: 20px; }
   .qtext p:first-child { margin-top: 0; }
   .choice {
@@ -184,6 +189,8 @@ if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTrans
 var shell = document.getElementById('shell');
 var idx = 0, answers = [], validated = false, chosen = -1;
 var LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+var SESSION = window.SESSION || null;   // seance transversale, le cas echeant
+var timerStart = 0, timerId = null;
 var setIndex = 0;          // serie courante
 var selection = [];        // indices des questions retenues
 var partial = false;       // session sur une selection seulement
@@ -315,6 +322,7 @@ function render() {
   var h = '';
   h += '<div class="qhead">';
   h += '<span>Question ' + (idx + 1) + ' / ' + DATA.qcm.length + '</span>';
+  if (SESSION && SESSION.timed) h += '<span id="clock" class="clock">0:00</span>';
   h += '<span class="bar"><i style="width:' + (100 * idx / DATA.qcm.length) + '%"></i></span>';
   h += '<span class="diff" title="difficulté">' + stars(q.difficulty) + '</span>';
   h += '<span>' + correct + ' bonne' + (correct > 1 ? 's' : '') + '</span>';
@@ -336,7 +344,7 @@ function render() {
   if (isExo) h += '<button class="btn" id="reveal">Afficher les propositions</button>';
   h += '<button class="btn primary" id="go"' + (isExo ? ' hidden' : '') + ' disabled>Valider</button>';
   h += '<button class="btn ghost" id="ask">Demander à Claude</button>';
-  h += '<button class="btn ghost" id="back">Retour à la liste</button>';
+  if (!SESSION) h += '<button class="btn ghost" id="back">Retour à la liste</button>';
   h += '</div>';
   shell.innerHTML = h;
   typeset(shell);
@@ -352,9 +360,23 @@ function render() {
     });
   });
   document.getElementById('go').addEventListener('click', onGo);
-  document.getElementById('back').addEventListener('click', function () {
+  var backBtn = document.getElementById('back');
+  if (backBtn) backBtn.addEventListener('click', function () {
     renderMenu(); window.scrollTo(0, 0);
   });
+  if (SESSION && SESSION.timed) {
+    var clock = document.getElementById('clock');
+    if (clock) {
+      if (!timerStart) timerStart = Date.now();
+      clearInterval(timerId);
+      timerId = setInterval(function () {
+        var el = document.getElementById('clock');
+        if (!el) { clearInterval(timerId); return; }
+        var t = Math.floor((Date.now() - timerStart) / 1000);
+        el.textContent = Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2);
+      }, 250);
+    }
+  }
   var revealBtn = document.getElementById('reveal');
   if (revealBtn) {
     revealBtn.addEventListener('click', function () {
@@ -380,7 +402,9 @@ function onGo() {
   if (!validated) {
     validated = true;
     var ok = chosen === q.answer;
-    answers[idx] = { id: q.id, chosen: chosen, ok: ok, difficulty: q.difficulty };
+    answers[idx] = { id: q.id, chosen: chosen, ok: ok,
+                     difficulty: q.difficulty, kind: q.kind || 'direct',
+                     courseId: q.course_id || null };
     Array.prototype.forEach.call(shell.querySelectorAll('.choice'), function (el) {
       var i = parseInt(el.getAttribute('data-i'), 10);
       el.classList.add('locked');
@@ -436,16 +460,19 @@ function renderResult() {
     h += '</div>';
   }
   h += '<div class="actions" style="justify-content:center">'
-    + '<button class="btn primary" id="menu">Retour à la liste</button>'
+    + (SESSION ? '' : '<button class="btn primary" id="menu">Retour à la liste</button>')
     + (missed.length ? '<button class="btn" id="redo">Refaire mes ' + missed.length + ' erreurs</button>' : '')
     + '<button class="btn" id="again">Recommencer</button>'
     + (missed.length ? '<button class="btn ghost" id="review">Revoir mes erreurs avec Claude</button>' : '')
     + '</div>';
   shell.innerHTML = h;
   typeset(shell);
+  clearInterval(timerId);
+  var seconds = timerStart ? Math.round((Date.now() - timerStart) / 1000) : 0;
   if (bridge) bridge.quizFinished(JSON.stringify({
     total: total, correct: correct, answers: answers,
-    setId: currentSet().id, partial: partial
+    setId: currentSet().id, partial: partial,
+    session: SESSION ? SESSION.kind : null, seconds: seconds
   }));
   answers.forEach(function (a) {
     if (!a) return;
@@ -457,7 +484,8 @@ function renderResult() {
   document.getElementById('again').addEventListener('click', function () {
     idx = 0; answers = []; render(); window.scrollTo(0, 0);
   });
-  document.getElementById('menu').addEventListener('click', function () {
+  var menuBtn = document.getElementById('menu');
+  if (menuBtn) menuBtn.addEventListener('click', function () {
     renderMenu(); window.scrollTo(0, 0);
   });
   var redo = document.getElementById('redo');
@@ -500,7 +528,12 @@ window.showCourseScore = function (pct, correct, answered, total) {
 window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
 window.restartQuiz = function () { renderMenu(); window.scrollTo(0, 0); };
 selection = currentSet().qcm.map(function (_q, i) { return i; });
-renderMenu();
+if (SESSION && SESSION.autostart) {
+  timerStart = SESSION.timed ? Date.now() : 0;
+  startQuiz();
+} else {
+  renderMenu();
+}
 </script>
 </body>
 </html>

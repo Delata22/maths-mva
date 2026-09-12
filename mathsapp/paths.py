@@ -30,6 +30,12 @@ def course_dir(course_id: str, create: bool = False) -> pathlib.Path:
     return d
 
 
+def daily_dir() -> pathlib.Path:
+    d = library_dir() / "_daily"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def db_file() -> pathlib.Path:
     return library_dir() / "progress.db"
 

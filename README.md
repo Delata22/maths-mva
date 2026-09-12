@@ -248,6 +248,69 @@ chaleur, curseurs et animations. Les couleurs suivent le theme clair/sombre.
 | **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles |
 | **Graphe** | Le cursus comme graphe : ce qui est maitrise, ce qui est accessible, ce qui est verrouille |
 
+## Tenir le rythme
+
+L'accueil s'ouvre sur une carte **Aujourd'hui** : ce qu'il y a a faire, en
+combien de temps, et ou en est la serie.
+
+### Revisions espacees
+
+C'est le moteur. Chaque question porte une date de prochaine revision : une
+reponse juste la repousse (1 jour, puis 3, puis 7, puis l'intervalle se
+multiplie par une facilite propre a la question), une erreur la ramene
+immediatement. L'accueil annonce donc ce qui est du aujourd'hui, et une seance
+de revision melange les matieres.
+
+C'est la seule raison non arbitraire d'ouvrir l'application chaque jour : il y
+a ce qu'il faut revoir, et rien de plus.
+
+### Objectif du jour et serie
+
+L'objectif se compte en **briques** : une seance de QCM, une revision terminee,
+une demonstration soumise ou reussie. Une seule suffit par defaut — c'est
+l'habitude qu'on cherche, pas la performance.
+
+La serie tolere **deux gels par mois** : un jour manque des deux derniers jours
+est couvert automatiquement. Une serie qui casse au premier oubli fait
+abandonner, alors qu'elle est censee soutenir. Un gel ne couvre pas un trou
+ancien : il protege une serie qu'on entretient, il ne fabrique pas un passe.
+
+### Quiz du jour
+
+Vingt questions **neuves**, reparties sur quatre a six chapitres deja
+travailles, choisis parmi les plus fragiles et les plus anciens. Le modele
+recoit les questions deja posees et ne doit en reprendre aucune. L'interet est
+precisement de melanger : on passe de la logique aux probabilites sans
+transition, comme dans un examen.
+
+### Defi eclair
+
+Cinq questions deja vues, chronometrees, tirees en priorite parmi celles qu'on
+a ratees. Trois minutes, pour les jours ou il n'y a pas le temps de travailler
+vraiment.
+
+### XP, niveaux et jalons
+
+L'XP est ponderee par la difficulte (une question de difficulte 5 vaut quatre
+fois une question de difficulte 1, et une question de type exercice compte une
+fois et demie), et se trompper rapporte quand meme un peu : chercher compte.
+Chaque domaine a son propre niveau, ce qui transforme les 26 domaines en 26
+barres de competence.
+
+Les jalons sont des etapes reelles, pas des points : premier cours maitrise, un
+domaine complet, dix demonstrations reussies, un parcours a moitie, une semaine
+d'affilee. Vingt-quatre au total.
+
+### Bilan hebdomadaire et carte allumee
+
+Le tableau de bord compare la semaine en cours a la precedente — questions,
+score moyen, revisions, demonstrations, jours travailles, XP — et nomme le
+domaine qui a le plus avance comme ceux restes sans activite.
+
+Dans la vue **Graphe**, un cours maitrise s'allume : halo de la couleur de son
+domaine, fond teinte. La carte du cursus devient une carte de progression, avec
+un compteur de cours allumes.
+
 ### Le score d'un cours
 
 Le score n'est pas celui de votre meilleure seance : c'est **la part des
@@ -271,6 +334,7 @@ reconstruire le suivi par question si la base est restauree.
 | `Ctrl+K` | Ouvrir le chat sur le cours courant |
 | `Ctrl+F` | Rechercher un cours |
 | `Ctrl+N` | Etendre le syllabus |
+| `Alt+↑` / `Alt+↓` | Puissance / indice, dans l'editeur de demonstrations |
 | `Ctrl+G` | Afficher la file de generation |
 
 ### Le chat

@@ -16,6 +16,8 @@ DEFAULTS = {
     "gen/auto_sheet": True,
     "gen/max_sections": 9,
     "ui/mastery_threshold": 80,
+    "goal/bricks": 1,
+    "goal/review_batch": 20,
     "ui/font_scale": 100,
     "claude/binary": "claude",
     "claude/timeout": 1800,

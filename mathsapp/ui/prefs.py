@@ -109,6 +109,24 @@ class PrefsDialog(QDialog):
                                   "et débloque ses suites.")
         uf.addRow("Seuil de maîtrise", self.threshold)
 
+        self.goal = QSpinBox()
+        self.goal.setRange(1, 6)
+        self.goal.setValue(int(settings.get("goal/bricks")))
+        self.goal.setToolTip(
+            "Nombre de briques à faire par jour pour tenir la série. Une brique = "
+            "une séance de QCM, une révision terminée, une démonstration soumise "
+            "ou réussie. Une seule suffit pour que l'habitude prenne.")
+        uf.addRow("Objectif quotidien", self.goal)
+
+        self.review_batch = QSpinBox()
+        self.review_batch.setRange(5, 60)
+        self.review_batch.setSingleStep(5)
+        self.review_batch.setValue(int(settings.get("goal/review_batch")))
+        self.review_batch.setToolTip(
+            "Nombre maximum de questions par séance de révision, même s'il y en "
+            "a davantage à revoir. Le reste attendra demain.")
+        uf.addRow("Révisions par séance", self.review_batch)
+
         self.theme = QComboBox()
         self.theme.addItem("Clair", "light")
         self.theme.addItem("Sombre", "dark")
@@ -143,4 +161,6 @@ class PrefsDialog(QDialog):
         settings.put("claude/retries", self.retries.value())
         settings.put("claude/binary", self.binary.text().strip() or "claude")
         settings.put("ui/mastery_threshold", self.threshold.value())
+        settings.put("goal/bricks", self.goal.value())
+        settings.put("goal/review_batch", self.review_batch.value())
         theme.set_name(self.theme.currentData())

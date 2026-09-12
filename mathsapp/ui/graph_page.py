@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import status as st_mod
-from ..status import AVAILABLE, LOCKED, MASTERED, READY, STARTED, Status
+from ..status import AVAILABLE, LOCKED, MASTERED, PARTIAL, READY, STARTED, Status
 from ..syllabus import Syllabus
 from . import theme
 
@@ -24,10 +24,12 @@ COL_GAP, ROW_GAP = 224.0, 20.0
 STATE_STYLE = {
     MASTERED: ("ok_soft", "ok", "fg"),
     STARTED: ("warn_soft", "warn", "fg"),
+    PARTIAL: ("err_soft", "err", "fg"),
     READY: ("bg2", "line2", "fg"),
     AVAILABLE: ("accent_soft", "accent", "accent"),
     LOCKED: ("bg2", "line", "locked"),
 }
+DEFAULT_STYLE = ("bg2", "line2", "fg")
 
 
 class Node(QGraphicsItem):
@@ -48,9 +50,21 @@ class Node(QGraphicsItem):
 
     def paint(self, painter: QPainter, _option, _widget=None) -> None:  # noqa: N802
         pal = theme.palette()
-        bg_key, border_key, fg_key = STATE_STYLE[self.state]
+        bg_key, border_key, fg_key = STATE_STYLE.get(self.state, DEFAULT_STYLE)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         alpha = 60 if self.dimmed else 255
+
+        # Un cours maitrise est « allume » : halo de la couleur du domaine, et
+        # fond teinte. La carte devient une carte de progression.
+        if self.state == MASTERED and not self.dimmed:
+            halo = QColor(self.domain_color)
+            for spread, opacity in ((7, 26), (4, 40), (2, 60)):
+                halo.setAlpha(opacity)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(halo))
+                painter.drawRoundedRect(
+                    QRectF(-spread, -spread, NODE_W + 2 * spread, NODE_H + 2 * spread),
+                    8 + spread, 8 + spread)
 
         bg = QColor(pal[bg_key])
         border = QColor(pal[border_key])
@@ -59,6 +73,11 @@ class Node(QGraphicsItem):
             col.setAlpha(alpha)
 
         rect = QRectF(0, 0, NODE_W, NODE_H)
+        if self.state == MASTERED:
+            bg = QColor(self.domain_color)
+            bg.setAlpha(int(alpha * 0.18))
+            border = QColor(self.domain_color)
+            border.setAlpha(alpha)
         painter.setBrush(QBrush(bg))
         pen = QPen(border, 2.4 if (self.highlighted or self.isSelected()) else 1.2)
         if self.isSelected():
@@ -189,6 +208,9 @@ class GraphPage(QWidget):
         bl.addWidget(self.btn_gen)
 
         bl.addStretch(1)
+        self.lit = QLabel()
+        self.lit.setObjectName("Muted")
+        bl.addWidget(self.lit)
         self.legend = QLabel()
         self.legend.setTextFormat(Qt.TextFormat.RichText)
         bl.addWidget(self.legend)
@@ -250,8 +272,8 @@ class GraphPage(QWidget):
         self.legend.setText(
             "  ".join(
                 "<span style='color:%s'>&#9679;</span> <span style='color:%s'>%s</span>"
-                % (pal[STATE_STYLE[s][1]], pal["muted"], st_mod.LABELS[s])
-                for s in (MASTERED, STARTED, READY, AVAILABLE, LOCKED)))
+                % (pal[STATE_STYLE.get(s, DEFAULT_STYLE)[1]], pal["muted"], st_mod.LABELS[s])
+                for s in (MASTERED, STARTED, PARTIAL, READY, AVAILABLE, LOCKED)))
 
         ids = self._visible_ids()
         keep = set(ids)
@@ -313,6 +335,9 @@ class GraphPage(QWidget):
                 item.setZValue(0)
                 self.scene.addItem(item)
                 self.scene.edges.append((item, pid, cid))
+
+        lit = sum(1 for cid in ids if self.statuses[cid].state == MASTERED)
+        self.lit.setText("%d cours allumé%s sur %d" % (lit, "s" if lit > 1 else "", len(ids)))
 
         rect = self.scene.itemsBoundingRect()
         self.scene.setSceneRect(rect.adjusted(-120, -120, 120, 120))

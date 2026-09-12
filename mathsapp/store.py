@@ -53,6 +53,34 @@ CREATE TABLE IF NOT EXISTS question_result (
     PRIMARY KEY (course_id, set_id, question_id)
 );
 
+-- Journal du jour : une ligne par journee travaillee.
+CREATE TABLE IF NOT EXISTS day_log (
+    day        TEXT PRIMARY KEY,
+    bricks     INTEGER NOT NULL DEFAULT 0,
+    questions  INTEGER NOT NULL DEFAULT 0,
+    correct    INTEGER NOT NULL DEFAULT 0,
+    proofs     INTEGER NOT NULL DEFAULT 0,
+    reviews    INTEGER NOT NULL DEFAULT 0,
+    seconds    REAL    NOT NULL DEFAULT 0,
+    xp         INTEGER NOT NULL DEFAULT 0,
+    frozen     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS milestone (
+    id         TEXT PRIMARY KEY,
+    reached_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS xp_event (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    day    TEXT NOT NULL,
+    domain TEXT,
+    kind   TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    at     REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_xp_domain ON xp_event(domain);
+
 CREATE TABLE IF NOT EXISTS proof_draft (
     course_id   TEXT NOT NULL,
     proof_id    TEXT NOT NULL,
@@ -92,9 +120,18 @@ def conn() -> sqlite3.Connection:
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA foreign_keys=ON")
         c.executescript(SCHEMA)
+        _migrate(c)
         c.commit()
         _local.conn = c
     return c
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    """Ajoute les colonnes apparues apres coup, sans toucher aux donnees."""
+    existing = {r["name"] for r in c.execute("PRAGMA table_info(question_result)")}
+    for name, decl in (("due_at", "REAL"), ("interval_days", "REAL"), ("ease", "REAL")):
+        if name not in existing:
+            c.execute("ALTER TABLE question_result ADD COLUMN %s %s" % (name, decl))
 
 
 # --------------------------------------------------------------------- cours
@@ -151,20 +188,35 @@ def record_attempt(course_id: str, total: int, correct: int, detail: dict,
     """
     c = conn()
     now = time.time()
+    from . import review as review_mod
     for answer in detail.get("answers") or []:
         if not isinstance(answer, dict) or not answer.get("id"):
             continue
         ok = 1 if answer.get("ok") else 0
+        qid = str(answer["id"])
+        previous = c.execute(
+            "SELECT interval_days, ease FROM question_result "
+            "WHERE course_id=? AND set_id=? AND question_id=?",
+            (course_id, str(set_id), qid)).fetchone()
+        interval, ease, due_at = review_mod.schedule(
+            bool(ok),
+            previous["interval_days"] if previous else None,
+            previous["ease"] if previous else None,
+            now)
         c.execute(
             """INSERT INTO question_result
-                 (course_id, set_id, question_id, last_ok, tries, ok_count, updated_at)
-               VALUES (?,?,?,?,1,?,?)
+                 (course_id, set_id, question_id, last_ok, tries, ok_count,
+                  updated_at, due_at, interval_days, ease)
+               VALUES (?,?,?,?,1,?,?,?,?,?)
                ON CONFLICT(course_id, set_id, question_id) DO UPDATE SET
                  last_ok=excluded.last_ok,
                  tries=question_result.tries+1,
                  ok_count=question_result.ok_count+excluded.ok_count,
-                 updated_at=excluded.updated_at""",
-            (course_id, str(set_id), str(answer["id"]), ok, ok, now),
+                 updated_at=excluded.updated_at,
+                 due_at=excluded.due_at,
+                 interval_days=excluded.interval_days,
+                 ease=excluded.ease""",
+            (course_id, str(set_id), qid, ok, ok, now, due_at, interval, ease),
         )
     cur = None
     if not partial:
@@ -212,7 +264,25 @@ def backfill_question_results() -> int:
                 (row["course_id"], str(answer["id"]), ok, ok, row["finished_at"]),
             )
             added += 1
-    if added:
+    # Les lignes reconstruites n'ont pas d'echeance : sans cela, rien ne serait
+    # jamais a revoir. On en deduit une a partir du nombre de reussites.
+    from . import review as review_mod
+    scheduled = 0
+    for row in c.execute(
+            "SELECT course_id, set_id, question_id, last_ok, ok_count, updated_at "
+            "FROM question_result WHERE due_at IS NULL"):
+        if row["last_ok"]:
+            successes = max(1, int(row["ok_count"]))
+            interval = {1: 1.0, 2: 3.0}.get(successes, 7.0)
+            ease = review_mod.EASE_START
+        else:
+            interval, ease = 0.0, review_mod.EASE_START - 0.25
+        c.execute("UPDATE question_result SET due_at=?, interval_days=?, ease=? "
+                  "WHERE course_id=? AND set_id=? AND question_id=?",
+                  (row["updated_at"] + interval * review_mod.DAY, interval, ease,
+                   row["course_id"], row["set_id"], row["question_id"]))
+        scheduled += 1
+    if added or scheduled:
         c.commit()
     return added
 
