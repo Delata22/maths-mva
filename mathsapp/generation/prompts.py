@@ -760,3 +760,334 @@ Regles :
 
 Repondez uniquement par {{"qcm": [...]}}, chaque question portant id, kind,
 difficulty, question, choices, answer, explanation, section."""
+
+# ---------------------------------------------------------------------------
+# Restaure : ce bloc avait ete supprime par erreur lors de la reecriture de
+# proof_review_system (commit c7f3618), qui avait tronque la fin du fichier.
+# ---------------------------------------------------------------------------
+SYLLABUS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "domains": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "color": {"type": "string"},
+                },
+                "required": ["id", "name", "description"],
+            },
+        },
+        "courses": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "domain": {"type": "string"},
+                    "level": {"type": "integer"},
+                    "prereqs": {"type": "array", "items": {"type": "string"}},
+                    "summary": {"type": "string"},
+                    "objectives": {"type": "array", "items": {"type": "string"}},
+                    "keywords": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["id", "title", "domain", "level", "prereqs",
+                             "summary", "objectives", "keywords"],
+            },
+        },
+        "tracks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "goal": {"type": "string"},
+                    "extra": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["id", "title", "goal"],
+            },
+        },
+        "notes": {"type": "string"},
+    },
+    "required": ["courses"],
+}
+
+
+def catalogue(syl: Syllabus, max_per_domain: int = 40) -> str:
+    """Catalogue compact des cours existants, pour cabler les prerequis."""
+    lines = []
+    for did in syl.domain_order:
+        courses = syl.by_domain(did)
+        if not courses:
+            continue
+        lines.append("# %s  [%s]" % (syl.domain_name(did), did))
+        for c in courses[:max_per_domain]:
+            lines.append("  %-34s niv.%d  %s" % (c.id, c.level, c.title))
+    return "\n".join(lines)
+
+
+def syllabus_prompt(syl: Syllabus, request: str, count: int,
+                    domain_hint: Optional[str] = None,
+                    level_hint: Optional[str] = None) -> str:
+    """Demande une extension du syllabus, cablee sur les cours existants."""
+    if domain_hint:
+        where = ("Rattachez les nouveaux cours au domaine existant « %s » (identifiant "
+                 "`%s`). Ne creez pas de nouveau domaine." % (syl.domain_name(domain_hint), domain_hint))
+    else:
+        where = ("Creez UN nouveau domaine pour accueillir ces cours, avec un "
+                 "identifiant court en ASCII, un nom en francais accentue, une "
+                 "description d'une phrase et une couleur hexadecimale lisible sur "
+                 "fond clair comme sur fond sombre. Si le sujet appartient "
+                 "manifestement a un domaine deja present, utilisez-le plutot que "
+                 "d'en creer un.")
+    level = ""
+    if level_hint:
+        level = "\nNiveau vise : %s. Ajustez la profondeur en consequence.\n" % level_hint
+
+    return f"""{STYLE}
+
+Vous n'ecrivez pas un cours ici : vous concevez une EXTENSION DE SYLLABUS.
+
+DEMANDE DE L'UTILISATEUR :
+{request}
+
+COURS DEJA PRESENTS DANS LE CURSUS (identifiant, niveau, titre). Vos prerequis
+doivent pointer vers ces identifiants, ou vers des cours de votre propre
+proposition :
+
+{catalogue(syl)}
+
+TACHE : proposer environ {count} cours qui couvrent la demande, dans l'esprit
+du syllabus existant.
+{where}{level}
+
+Regles :
+- Les identifiants sont en ASCII minuscule, sans accent, mots separes par des
+  tirets, prefixes par un trigramme de domaine (par exemple `ts-stationnarite`).
+  Ils servent de noms de dossiers : aucun accent, aucun espace.
+- Tout le reste est en francais avec les accents : titres, resumes, objectifs,
+  mots-cles. Ces consignes sont ecrites sans accents pour des raisons
+  techniques, n'imitez pas ce style.
+- Ordonnez les cours du plus fondamental au plus avance. Chaque cours doit
+  avoir des prerequis coherents : ce qui est necessaire pour le suivre, ni
+  plus, ni moins. Un cours d'entree dans le sujet s'appuie sur des cours
+  existants du cursus, pas sur du vide.
+- Ne redonnez JAMAIS un cours deja present dans le catalogue ci-dessus, meme
+  sous un autre titre. Verifiez avant de proposer.
+- Le graphe doit rester acyclique.
+- `level` va de 1 (post-bac) a 5 (M2). Soyez honnete sur la difficulte.
+- `summary` : une a deux phrases qui disent ce que le cours apporte, sur le ton
+  du syllabus existant : concret, sans emphase.
+- `objectives` : 3 a 4 competences verifiables, formulees a l'infinitif.
+- `keywords` : 4 a 6 termes techniques.
+- `tracks` : proposez au plus un parcours, dont `goal` est le cours le plus
+  avance de la serie et `extra` deux ou trois autres cours importants. Omettez
+  ce champ si un parcours n'a pas de sens ici.
+- `notes` : une ou deux phrases pour dire ce que vous avez choisi de couvrir et
+  ce que vous avez laisse de cote.
+
+Repondez uniquement par l'objet JSON."""
+
+
+# --------------------------------------------------------- fiche de revision
+SHEET_CONVENTIONS = r"""
+FORMAT : fragment HTML, sans ``` autour, sans <html>, <head>, <body>.
+N'utilisez que les classes ci-dessous. N'en inventez aucune.
+
+En-tête, une seule fois, en premier :
+
+  <div class="sheet-head">
+    <div class="meta">Domaine &middot; niveau n/5</div>
+    <h1>Titre du cours</h1>
+    <p class="oneline">Une phrase : à quoi sert ce cours, ce qu'il permet de
+    faire. Pas de définition ici.</p>
+  </div>
+
+Ensuite des blocs, dans cet ordre :
+
+  <section class="block"><h2>Définitions</h2>
+    <div class="def"><b>Terme</b> &mdash; énoncé exact et complet.</div>
+  </section>
+
+  <section class="block"><h2>Résultats à connaître</h2>
+    <div class="thm"><span class="tag">Théorème</span> <b>Nom.</b> Énoncé
+    complet, hypothèses comprises. <span class="tag">idée</span> la stratégie
+    de preuve en une demi-ligne.</div>
+  </section>
+  (valeurs possibles du premier tag : Théorème, Proposition, Lemme, Corollaire)
+
+  <section class="block"><h2>Formules</h2>
+    <table class="formulas">
+      <tr><td>ce que ça calcule</td><td>$formule$</td></tr>
+    </table>
+  </section>
+
+  <section class="block"><h2>Méthodes</h2>
+    <div class="method"><span class="tag">Pour montrer que…</span> la marche à
+    suivre, en une à trois phrases opératoires.</div>
+  </section>
+
+  <section class="block"><h2>Pièges</h2>
+    <div class="trap"><span class="tag">Piège</span> l'erreur exacte, et ce
+    qu'il faut faire à la place.</div>
+  </section>
+
+  <section class="block"><h2>À savoir refaire</h2>
+    <ul class="check"><li>Compétence vérifiable, formulée à l'infinitif.</li></ul>
+  </section>
+
+  <section class="block"><h2>Rappel actif</h2>
+    <div class="qa"><span class="q">Question courte ?</span>
+    <span class="a">Réponse courte.</span></div>
+  </section>
+
+Balises libres à l'intérieur : p, ul, ol, li, b, strong, em, code, span.
+Ajoutez class="cols" à une <section> pour la mettre sur deux colonnes : utile
+seulement si ses éléments sont courts et sans formule centrée.
+
+Mathématiques : LaTeX entre $ … $ ; les formules centrées $$ … $$ sont à éviter
+dans une fiche, sauf pour un résultat vraiment central. Macros disponibles :
+\R \N \Z \Q \C \E \P \eps \dd \Var \Cov \rank \tr \diag \Id
+\argmin \argmax \norm{…} \abs{…} \scal{…}{…}.
+"""
+
+
+def sheet_prompt(syl: Syllabus, course: Course, plan: Optional[dict],
+                 substance: str) -> str:
+    sections = ""
+    if plan and plan.get("sections"):
+        sections = "\n".join("  - %s" % sec["title"] for sec in plan["sections"])
+    return f"""Vous rédigez une FICHE DE RÉVISION à partir d'un cours déjà écrit.
+
+Ce n'est pas un résumé du cours : c'est l'outil qu'on relit trois mois plus
+tard, quand on a compris une fois et qu'on veut tout retrouver en dix minutes.
+Le cours long existe déjà pour la première lecture.
+
+CE QUI EST ATTENDU
+
+1. Densité. Aucune phrase de liaison, aucune introduction, aucune transition.
+   Chaque ligne porte une information qu'on peut avoir oubliée.
+2. Exactitude absolue. Un énoncé incomplet sur une fiche est pire que rien :
+   il installe une erreur. Toutes les hypothèses figurent. Si un théorème a une
+   hypothèse qu'on oublie souvent, c'est précisément celle qu'il faut écrire.
+3. Rien qui ne soit dans le cours. Vous condensez, vous n'ajoutez pas. Vous
+   pouvez reformuler plus court, jamais inventer un résultat.
+4. Opérationnel. La section Méthodes doit répondre à « je bloque, je fais
+   quoi ». Formulez « Pour montrer que… : … », pas « on peut noter que ».
+5. Les pièges sont ce qui a le plus de valeur à la relecture : reprenez ceux du
+   cours, formulés comme des avertissements courts.
+6. Le rappel actif sert à se tester : 6 à 10 questions dont la réponse tient en
+   une ligne. Des questions qui vérifient la compréhension, pas la mémoire d'un
+   mot.
+7. Longueur visée : deux à quatre pages A4 une fois imprimée. Un cours dense
+   peut aller à cinq. Ne descendez pas sous deux pages : ce serait un survol.
+8. Français avec tous les accents, y compris dans les titres de blocs.
+
+{SHEET_CONVENTIONS}
+
+COURS À CONDENSER : {course.title}
+Domaine : {syl.domain_name(course.domain)} &middot; niveau {course.level}/5
+Objectifs annoncés :
+{chr(10).join("  - " + o for o in course.objectives)}
+Plan du cours :
+{sections}
+
+MATIÈRE DU COURS (titres de sections, encadrés, résultats démontrés) :
+{substance}
+
+Produisez la fiche. Sortie : HTML brut, rien d'autre."""
+
+
+QCM_REPAIR_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "choices": {"type": "array", "items": {"type": "string"}},
+                    "answer": {"type": "integer"},
+                },
+                "required": ["id", "choices", "answer"],
+            },
+        },
+    },
+    "required": ["questions"],
+}
+
+
+def qcm_repair_prompt(course: Course, questions: List[dict]) -> str:
+    """Demande de reecrire les propositions desequilibrees d'un QCM."""
+    payload = json.dumps(
+        [{"id": q["id"], "question": q["question"], "choices": q["choices"],
+          "answer": q["answer"], "explanation": q.get("explanation", "")}
+         for q in questions], ensure_ascii=False, indent=1)
+    return f"""Dans ce QCM du cours « {course.title} », la bonne réponse se
+reconnaît à sa forme : elle est nettement plus longue ou plus argumentée que
+les trois autres. On peut donc y répondre sans rien savoir du cours, ce qui
+rend l'exercice inutile.
+
+Réécrivez les PROPOSITIONS de chaque question. Ne touchez ni à l'énoncé, ni à
+l'explication, ni à la difficulté.
+
+Règles :
+- Les quatre propositions ont une longueur et un registre comparables, à 20 %
+  près. Comptez les caractères.
+- Une proposition est une affirmation, pas une démonstration. Retirez le
+  raisonnement de la bonne réponse plutôt que d'en ajouter partout — sauf si
+  la question porte précisément sur le choix d'un raisonnement, auquel cas les
+  quatre en portent un, dont trois faux mais plausibles.
+- Chaque distracteur reste l'erreur réelle qu'il incarnait : ne le remplacez
+  pas par du remplissage. Vous le reformulez, vous ne le changez pas de nature.
+- La bonne réponse reste la même affirmation ; `answer` doit pointer vers elle
+  dans le nouvel ordre.
+- Aucune proposition ne fait référence aux autres.
+- Français avec tous les accents. Du LaTeX entre $ … $ si nécessaire.
+
+QUESTIONS À CORRIGER :
+{payload}
+
+Répondez uniquement par l'objet JSON, avec pour chaque question son `id`, ses
+quatre `choices` et l'index `answer`."""
+
+
+def extra_quiz_prompt(syl: Syllabus, course: Course, plan: dict, digest: str,
+                      existing: List[dict], count: int = 15) -> str:
+    """Une serie de QCM supplementaire, qui ne redit pas la precedente."""
+    seen = "\n".join(
+        "  - [%s] %s" % (q.get("kind", "direct"),
+                         re.sub(r"<[^>]+>", " ", q.get("question", ""))[:160])
+        for q in existing)
+    return f"""{STYLE}
+
+Vous produisez une SERIE SUPPLEMENTAIRE de questions pour un cours dont une
+serie existe deja. Elle doit permettre de se retester sans retomber sur les
+memes items.
+
+{_context(syl, course)}
+
+PLAN DU COURS :
+{json.dumps([{"titre": s["title"], "contenu": s["content"]} for s in plan["sections"]], ensure_ascii=False, indent=1)}
+
+EXTRAITS DU COURS :
+{digest}
+
+QUESTIONS DEJA POSEES — n'en reprenez aucune, ni sous une autre formulation,
+ni en changeant seulement les valeurs numeriques :
+{seen}
+
+TACHE : produire {count} nouvelles questions, avec la meme repartition de
+difficulte et les memes regles que la premiere serie, dont 5 de type
+`exercice`. Couvrez en priorite les points du cours que la serie precedente
+laisse de cote, et abordez sous un autre angle ceux qu'elle traite deja.
+
+Repondez uniquement par un objet JSON de la forme {{"qcm": [...]}}, avec les
+memes champs que la premiere serie : id, kind, difficulty, question, choices,
+answer, explanation, section."""

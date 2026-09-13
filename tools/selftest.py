@@ -143,6 +143,75 @@ def test_syllabus_extra() -> None:
         syllabus.reload()
 
 
+def test_prompts_integrity() -> None:
+    """Tout ce que le code appelle dans prompts doit exister et s'executer.
+
+    Un remplacement de texte trop large a deja supprime huit definitions de
+    prompts.py sans qu'aucun test ne le voie : la generation d'exercices, les
+    fiches, les series de QCM et l'extension du syllabus plantaient au premier
+    appel. Ce test couvre les deux angles : les references, et l'execution.
+    """
+    import re
+    from mathsapp import content
+    from mathsapp.generation import prompts
+    from mathsapp.syllabus import load
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    referenced = set()
+    for path in list((root / "mathsapp").rglob("*.py")) + list((root / "tools").rglob("*.py")):
+        if path.name == "selftest.py":
+            continue
+        referenced.update(re.findall(r"\bprompts\.([A-Za-z_][A-Za-z0-9_]*)",
+                                     path.read_text(encoding="utf-8")))
+    missing = sorted(name for name in referenced if not hasattr(prompts, name))
+    check("toute reference a prompts existe", not missing,
+          "%d references, manquantes : %s" % (len(referenced), missing))
+
+    syl = load()
+    cid = next((c.id for c in syl.all()
+                if content.has_exercises(c.id) and content.read_plan(c.id)), None)
+    if cid is None:
+        check("prompts : aucun cours genere, execution non testee", True)
+        return
+    course, plan = syl.get(cid), content.read_plan(cid)
+    questions = content.quiz_sets(cid)[0]["qcm"][:3]
+    builders = {
+        "plan_prompt": lambda: prompts.plan_prompt(syl, course),
+        "section_prompt": lambda: prompts.section_prompt(syl, course, plan, 1,
+                                                         [plan["sections"][0]["title"]]),
+        "exercises_prompt": lambda: prompts.exercises_prompt(syl, course, plan,
+                                                             content.digest(cid)),
+        "extra_quiz_prompt": lambda: prompts.extra_quiz_prompt(syl, course, plan,
+                                                               content.digest(cid), questions),
+        "qcm_repair_prompt": lambda: prompts.qcm_repair_prompt(course, questions),
+        "sheet_prompt": lambda: prompts.sheet_prompt(syl, course, plan,
+                                                     content.substance(cid)),
+        "syllabus_prompt": lambda: prompts.syllabus_prompt(syl, "series temporelles", 8),
+        "daily_quiz_prompt": lambda: prompts.daily_quiz_prompt(
+            syl, [{"course": course, "digest": content.digest(cid, limit=800), "seen": []}]),
+        "chat_system": lambda: prompts.chat_system(course, syl),
+        "proof_helper_system": lambda: prompts.proof_helper_system(course, syl),
+        "proof_walkthrough_prompt": lambda: prompts.proof_walkthrough_prompt("T", "texte"),
+        "proof_review_system (etape)": lambda: prompts.proof_review_system(course, syl, "etape"),
+        "proof_review_system (complete)": lambda: prompts.proof_review_system(course, syl,
+                                                                              "complete"),
+        "proof_review_prompt": lambda: prompts.proof_review_prompt("T", "E", "S", "copie"),
+    }
+    failed = []
+    for name, build in builders.items():
+        try:
+            out = build()
+            if not isinstance(out, str) or len(out) < 200:
+                failed.append("%s: sortie vide" % name)
+        except Exception as exc:  # noqa: BLE001
+            failed.append("%s: %s: %s" % (name, type(exc).__name__, exc))
+    check("chaque constructeur de prompt s'execute", not failed,
+          "%d constructeurs%s" % (len(builders), (" — " + "; ".join(failed[:3])) if failed else ""))
+    for schema in ("PLAN_SCHEMA", "EXERCISES_SCHEMA", "SYLLABUS_SCHEMA",
+                   "QCM_REPAIR_SCHEMA", "DAILY_SCHEMA"):
+        check("  schema %s present" % schema, isinstance(getattr(prompts, schema, None), dict))
+
+
 def test_store() -> None:
     from mathsapp import status as st_mod, store
     from mathsapp.syllabus import load
@@ -955,6 +1024,8 @@ def main() -> int:
 
     print("\n--- syllabus ---")
     test_syllabus()
+    print("\n--- integrite des prompts ---")
+    test_prompts_integrity()
     print("\n--- extension du syllabus ---")
     test_syllabus_extra()
     print("\n--- progression ---")
