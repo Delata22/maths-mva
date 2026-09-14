@@ -65,6 +65,9 @@ class TdPage(QWidget):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.list = QListWidget()
         self.list.setMinimumWidth(270)
+        self.list.setWordWrap(True)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list.setSpacing(2)
         self.list.currentRowChanged.connect(self._on_row)
         self.splitter.addWidget(self.list)
 
@@ -103,7 +106,7 @@ class TdPage(QWidget):
         rv.addWidget(self.view, 1)
         self.splitter.addWidget(right)
         self.splitter.setStretchFactor(1, 1)
-        self.splitter.setSizes([300, 900])
+        self.splitter.setSizes([360, 1040])
         root.addWidget(self.splitter, 1)
 
     # ------------------------------------------------------------- données
