@@ -22,12 +22,15 @@ KIND_TITLE = {
     "review": "Révisions du jour",
     "daily": "Quiz du jour",
     "challenge": "Défi éclair",
+    "refresher": "Rappel ciblé",
 }
 KIND_HINT = {
     "review": "Les questions dont c'est le moment, toutes matières confondues. "
               "Une réponse juste repousse la question ; une erreur la ramène.",
-    "daily": "Vingt questions neuves réparties sur plusieurs chapitres déjà "
+    "daily": "Dix questions neuves réparties sur plusieurs chapitres déjà "
              "travaillés, comme dans un examen.",
+    "refresher": "Cinq questions neuves sur ce qui a coincé récemment. Chaque "
+                 "correction rappelle le point de cours en jeu.",
     "challenge": "Cinq questions déjà vues, chronométrées. Il y a un record à battre.",
 }
 

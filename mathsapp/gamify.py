@@ -31,6 +31,7 @@ XP = {
     "goal_met": 25,
     "challenge_perfect": 30,
     "daily_quiz": 20,
+    "refresher": 12,
 }
 
 

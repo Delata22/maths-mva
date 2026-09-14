@@ -457,7 +457,7 @@ def generate_quiz_set(course_id: str, model: Optional[str] = None,
     return set_id, cost
 
 
-def pick_daily_courses(syl: Syllabus, statuses, count: int = 6) -> List[str]:
+def pick_daily_courses(syl: Syllabus, statuses, count: int = 4) -> List[str]:
     """Choisit les cours du quiz du jour : les plus fragiles et les plus anciens."""
     from .. import store
     eligible = [c.id for c in syl.all()
@@ -486,7 +486,7 @@ def generate_daily_quiz(day: Optional[str] = None, model: Optional[str] = None,
                         on_progress: ProgressCb = _noop,
                         cancel: CancelCb = _never,
                         syl: Optional[Syllabus] = None,
-                        count: int = 20) -> tuple[str, float]:
+                        count: int = 10) -> tuple[str, float]:
     """Produit le quiz du jour. Retourne (jour, cout)."""
     from .. import gamify, status as st_mod
     syl = syl or load_syllabus()
@@ -867,3 +867,79 @@ def run_td(td_id: str, on_progress: ProgressCb = _noop, cancel: CancelCb = _neve
     state = td_mod.state(td_id)
     return {"exercises": state["total"], "corrected": corrected,
             "cost": cost, "complete": state["complete"]}
+
+
+# ---------------------------------------------------------------------------
+# Rappel ciblé
+# ---------------------------------------------------------------------------
+def missed_questions(course_id: str, limit: int = 6) -> List[dict]:
+    """Questions du cours actuellement ratées, les plus tenaces d'abord."""
+    from .. import store
+    index = content.question_index()
+    out = []
+    for r in store.conn().execute(
+            "SELECT set_id, question_id, tries FROM question_result"
+            " WHERE course_id = ? AND last_ok = 0 ORDER BY tries DESC, updated_at DESC",
+            (course_id,)):
+        q = index.get((course_id, r["set_id"], r["question_id"]))
+        if q is not None:
+            out.append(dict(q, tries=r["tries"]))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def generate_refresher(course_id: str, day: Optional[str] = None,
+                       model: Optional[str] = None,
+                       on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+                       syl: Optional[Syllabus] = None, count: int = 5) -> tuple[str, float]:
+    """Cinq questions neuves sur ce qui coince dans un cours. Retourne (jour, coût)."""
+    from .. import gamify
+    syl = syl or load_syllabus()
+    course = syl.get(course_id)
+    if course is None:
+        raise ValueError("Cours inconnu : %s" % course_id)
+    day = day or gamify.today()
+    model = model or str(settings.get("model/exercises"))
+    on_progress("Rappel ciblé", 0.1)
+
+    missed = missed_questions(course_id)
+    seen = [re.sub(r"<[^>]+>", " ", q.get("question", ""))
+            for q in content.all_questions(course_id)]
+    data, res = cc.run_json(
+        prompts.refresher_prompt(syl, course, content.digest(course_id, limit=5000),
+                                 missed, seen, count),
+        model=model,
+        system=("Vous composez des rappels de cours ciblés en mathématiques. Vous "
+                "répondez uniquement en JSON valide."),
+        schema=prompts.DAILY_SCHEMA,
+        cancel=cancel,
+        on_progress=lambda n: on_progress("Rappel ciblé", min(0.9, 0.1 + n / 9000.0)),
+        on_notice=lambda msg: on_progress("Rappel ciblé — %s" % msg, 0.1),
+    )
+    qcm = (data.get("qcm") or [])[:count]
+    if not qcm:
+        raise cc.ClaudeError("Aucune question renvoyée.")
+    for i, q in enumerate(qcm):
+        q["id"] = "r%s-%d" % (day.replace("-", ""), i + 1)
+        q["kind"] = "exercice" if str(q.get("kind", "")).lower().startswith("ex") else "direct"
+        try:
+            q["difficulty"] = max(1, min(5, int(q.get("difficulty") or 1)))
+        except (TypeError, ValueError):
+            q["difficulty"] = 2
+        choices = q.get("choices") or []
+        try:
+            q["answer"] = int(q.get("answer", 0))
+        except (TypeError, ValueError):
+            q["answer"] = 0
+        if not (0 <= q["answer"] < len(choices)):
+            q["answer"] = 0
+        q["course_id"] = course_id
+    retag_exercises(qcm)
+    rebalance_positions(qcm, seed=abs(hash((day, course_id))) % 10000)
+    content.write_refresher(day, course_id, {
+        "day": day, "course_id": course_id, "qcm": qcm,
+        "missed": [q.get("id") for q in missed], "created_at": time.time(),
+        "cost_usd": round(res.cost_usd, 4)})
+    on_progress("Terminé", 1.0)
+    return day, res.cost_usd

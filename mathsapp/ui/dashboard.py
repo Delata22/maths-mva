@@ -206,6 +206,22 @@ class Dashboard(QWidget):
         btn_daily.clicked.connect(lambda: self.session_requested.emit("daily"))
         actions.addWidget(btn_daily)
 
+        pending = content.pending_refresher(day)
+        candidates = [] if pending else review_mod.refresher_candidates()
+        if pending or candidates:
+            cid = pending or candidates[0]["course_id"]
+            name = self.syl.title(cid)
+            short = name if len(name) <= 32 else name[:31] + "…"
+            btn_refresh = QPushButton(("Rappel : %s" if pending else "Rappel conseillé : %s")
+                                      % short)
+            btn_refresh.setToolTip(
+                "Cinq questions neuves sur « %s », prêtes." % name if pending else
+                "%s. Cinq questions neuves ciblées sur ce qui coince, avec le "
+                "rappel de cours dans chaque correction." % candidates[0]["reason"].capitalize())
+            btn_refresh.clicked.connect(
+                lambda _=False, c=cid: self.session_requested.emit("refresher:" + c))
+            actions.addWidget(btn_refresh)
+
         btn_challenge = QPushButton("Défi éclair")
         btn_challenge.setToolTip("Cinq questions déjà vues, chronométrées.")
         btn_challenge.clicked.connect(lambda: self.session_requested.emit("challenge"))

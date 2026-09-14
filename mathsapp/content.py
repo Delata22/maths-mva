@@ -490,4 +490,58 @@ def question_index() -> dict:
         data = read_daily(day) or {}
         for q in data.get("qcm", []):
             index[(q.get("course_id", ""), "daily", q["id"])] = q
+    for day, course_id in refreshers():
+        data = read_refresher(day, course_id) or {}
+        for q in data.get("qcm", []):
+            index[(course_id, "rappel", q["id"])] = q
     return index
+
+
+# --------------------------------------------------------- rappels ciblés
+def refresher_path(day: str, course_id: str) -> pathlib.Path:
+    from .paths import refresher_dir
+    return refresher_dir() / ("%s_%s.json" % (day, course_id))
+
+
+def read_refresher(day: str, course_id: str) -> Optional[dict]:
+    path = refresher_path(day, course_id)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def write_refresher(day: str, course_id: str, data: dict) -> None:
+    refresher_path(day, course_id).write_text(
+        json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def refreshers() -> List[tuple]:
+    """[(jour, cours)] de tous les rappels produits, du plus ancien au plus récent."""
+    from .paths import refresher_dir
+    out = []
+    for p in sorted(refresher_dir().glob("*.json")):
+        day, _, course_id = p.stem.partition("_")
+        if len(day) == 10 and course_id:
+            out.append((day, course_id))
+    return out
+
+
+def pending_refresher(day: str) -> Optional[str]:
+    """Cours d'un rappel prêt ce jour-là et pas encore fait."""
+    for d, course_id in refreshers():
+        if d != day:
+            continue
+        data = read_refresher(d, course_id) or {}
+        if data.get("qcm") and not data.get("done_at"):
+            return course_id
+    return None
+
+
+def mark_refresher_done(day: str, course_id: str) -> None:
+    data = read_refresher(day, course_id)
+    if data is not None:
+        data["done_at"] = time.time()
+        write_refresher(day, course_id, data)

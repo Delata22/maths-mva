@@ -121,3 +121,45 @@ def due_resolved(limit: Optional[int] = None,
         if limit is not None and len(out) >= limit:
             break
     return out
+
+
+# ------------------------------------------------------------ rappel ciblé
+def needs_refresher(answered: int, fails: int, repeated: int) -> bool:
+    """Assez de réponses pour juger, et des erreurs qui ne sont pas un accident."""
+    return answered >= 4 and fails >= 2 and (fails / answered >= 0.3 or repeated >= 2)
+
+
+def refresher_candidates(now: Optional[float] = None, window_days: int = 21,
+                         cooldown_days: int = 4) -> List[dict]:
+    """Cours où un rappel de cinq questions serait utile, le plus urgent d'abord.
+
+    On ne regarde que les réponses récentes (le reste relève des révisions
+    espacées), et on laisse quelques jours entre deux rappels sur un même cours.
+    """
+    import datetime as _dt
+    from . import content, store
+    now = now or time.time()
+    since = now - window_days * 86400
+    rows = store.conn().execute(
+        "SELECT course_id, COUNT(*) n,"
+        " SUM(CASE WHEN last_ok = 0 THEN 1 ELSE 0 END) fails,"
+        " SUM(CASE WHEN last_ok = 0 AND tries >= 2 THEN 1 ELSE 0 END) repeated"
+        " FROM question_result WHERE updated_at >= ? GROUP BY course_id", (since,)).fetchall()
+    cutoff = _dt.date.fromtimestamp(now - cooldown_days * 86400).isoformat()
+    recent = {cid for day, cid in content.refreshers() if day > cutoff}
+    out = []
+    for r in rows:
+        cid, n, fails, repeated = r["course_id"], r["n"], r["fails"] or 0, r["repeated"] or 0
+        if cid in recent or not content.has_exercises(cid):
+            continue
+        if not needs_refresher(n, fails, repeated):
+            continue
+        reason = "%d question%s ratée%s sur les %d dernières réponses" % (
+            fails, "s" if fails > 1 else "", "s" if fails > 1 else "", n)
+        if repeated:
+            reason += ", dont %d plusieurs fois" % repeated
+        out.append({"course_id": cid, "answered": n, "fails": fails,
+                    "repeated": repeated, "reason": reason,
+                    "urgency": fails / n + 0.1 * repeated})
+    out.sort(key=lambda item: -item["urgency"])
+    return out

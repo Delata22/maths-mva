@@ -323,6 +323,9 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- seances
     def start_session(self, kind: str) -> None:
+        if kind.startswith("refresher:"):
+            self.start_refresher(kind.split(":", 1)[1])
+            return
         statuses = st_mod.compute(self.syl)
         if kind == "daily":
             day = gamify.today()
@@ -371,6 +374,26 @@ class MainWindow(QMainWindow):
             self.session.start("challenge", questions, timed=True)
         self.go(PAGE_SESSION)
 
+    def start_refresher(self, course_id: str) -> None:
+        """Rappel ciblé de cinq questions : le lance s'il est prêt, sinon le prépare."""
+        day = gamify.today()
+        data = content.read_refresher(day, course_id)
+        if not data or not data.get("qcm"):
+            title = self.syl.title(course_id)
+            if self.queue.enqueue(course_id, "Rappel — %s" % title, "refresher") is None:
+                self.statusBar().showMessage("Rappel déjà en préparation", 6000)
+            else:
+                self.queue_dock.setVisible(True)
+                self.statusBar().showMessage(
+                    "Rappel sur « %s » en préparation — une minute environ" % title, 10000)
+            return
+        questions = [dict(q, day=day, course_id=course_id, set_id="rappel")
+                     for q in data["qcm"]]
+        self._refresher_key = (day, course_id)
+        self.session.start("refresher", questions)
+        self.session.title.setText("Rappel ciblé — %s" % self.syl.title(course_id))
+        self.go(PAGE_SESSION)
+
     def _on_session_finished(self, kind: str, payload: str) -> None:
         import json as _json
         try:
@@ -390,7 +413,8 @@ class MainWindow(QMainWindow):
         for cid, group in by_course.items():
             if not cid or cid not in self.syl.courses:
                 continue
-            set_id = "daily" if kind == "daily" else str(group[0].get("setId") or "1")
+            set_id = ({"daily": "daily", "refresher": "rappel"}.get(kind)
+                      or str(group[0].get("setId") or "1"))
             detail = {"answers": group, "session": kind}
             store.record_attempt(cid, len(group),
                                  sum(1 for a in group if a.get("ok")),
@@ -409,6 +433,12 @@ class MainWindow(QMainWindow):
             bonus = gamify.XP["review_done"]
         elif kind == "daily":
             bonus = gamify.XP["daily_quiz"]
+        elif kind == "refresher":
+            bonus = gamify.XP["refresher"]
+            key = getattr(self, "_refresher_key", None)
+            if key:
+                content.mark_refresher_done(*key)
+                self._refresher_key = None
         elif kind == "challenge" and data.get("correct") == data.get("total"):
             bonus = gamify.XP["challenge_perfect"]
         gamify.log("session_done:%s" % kind, brick=True, xp=bonus,
@@ -679,6 +709,10 @@ class MainWindow(QMainWindow):
         self._library_refresh.stop()
         if _kind == "td" and self.stack.currentIndex() == PAGE_TD:
             self.td_page.refresh()
+        if _kind == "refresher" and ok:
+            self.notice.show_message(
+                "Rappel prêt : cinq questions sur « %s »" % self.syl.title(course_id),
+                "Commencer", lambda c=course_id: self.start_refresher(c))
         if _kind == "td":
             from .. import td as td_mod
             title = "TD « %s »" % td_mod.title(course_id)

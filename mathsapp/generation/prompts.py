@@ -699,7 +699,7 @@ DAILY_SCHEMA = {
 }
 
 
-def daily_quiz_prompt(syl: Syllabus, items: List[dict], count: int = 20) -> str:
+def daily_quiz_prompt(syl: Syllabus, items: List[dict], count: int = 10) -> str:
     """Questions du jour, reparties sur plusieurs cours deja etudies.
 
     `items` : [{course, digest, seen}] ou `seen` liste les enonces deja poses.
@@ -740,8 +740,8 @@ Regles :
 - Aucune question deja posee, meme reformulee ou avec d'autres valeurs. Les
   enonces existants vous sont donnes pour cela.
 - Difficultes melangees, de 1 a 4 : le quiz du jour doit pouvoir se faire en
-  dix minutes. Pas plus de trois questions de difficulte 4, et au plus deux de
-  type `exercice`.
+  cinq a huit minutes. Pas plus de deux questions de difficulte 4, et au plus
+  une de type `exercice`.
 - Privilegiez ce qui se verifie vite et ce qui s'oublie : definitions exactes,
   hypotheses d'un theoreme, contre-exemples, signes et facteurs, ordre des
   quantificateurs.
@@ -1267,3 +1267,72 @@ CE QUI EST ATTENDU
 6. Français avec tous les accents.
 
 Sortie : le fragment HTML, rien d'autre."""
+
+
+# ---------------------------------------------------------------------------
+# Rappel ciblé : cinq questions sur les notions qui coincent dans un cours
+# ---------------------------------------------------------------------------
+def refresher_prompt(syl: Syllabus, course: Course, digest: str, missed: List[dict],
+                     seen: List[str], count: int = 5) -> str:
+    """`missed` : [{question, choices, answer, explanation, tries}] ratées récemment."""
+    letters = "ABCD"
+    blocks = []
+    for i, q in enumerate(missed, 1):
+        choices = "\n".join("      %s. %s%s" % (letters[k], c, "   ← bonne réponse"
+                                                  if k == q.get("answer") else "")
+                            for k, c in list(enumerate(q.get("choices") or []))[:4])
+        blocks.append("  %d. (ratée %s)\n      %s\n%s\n      Explication : %s"
+                      % (i, "plusieurs fois" if (q.get("tries") or 0) >= 2 else "récemment",
+                         q.get("question", ""), choices, q.get("explanation", "")))
+    missed_text = "\n\n".join(blocks) or "  (aucune question précise)"
+    seen_text = "\n".join("  - %s" % s[:110] for s in seen[:30]) or "  (aucune)"
+
+    return f"""{STYLE}
+
+Vous préparez un RAPPEL CIBLÉ sur le cours « {course.title} » [{course.id}],
+niveau {course.level}/5.
+
+L'étudiant a travaillé ce cours, mais ses dernières réponses montrent qu'une ou
+deux notions ne tiennent pas. Il ne s'agit pas de refaire le QCM : il s'agit de
+reprendre précisément ce qui coince, sous un autre angle, en cinq minutes.
+
+Objectifs du cours : {" ; ".join(course.objectives)}
+
+Extraits du cours :
+{digest}
+
+Questions ratées récemment :
+{missed_text}
+
+Questions déjà posées sur ce cours (à ne pas reprendre, même reformulées) :
+{seen_text}
+
+MÉTHODE :
+1. Diagnostiquez d'abord, pour vous, la confusion commune aux questions ratées :
+   hypothèse oubliée, définition approximative, quantificateurs inversés, erreur
+   de calcul typique… C'est elle qu'il faut viser.
+2. Produisez exactement {count} questions à choix unique, NOUVELLES, qui
+   attaquent cette confusion par des chemins différents, dans cet ordre :
+   - une ou deux questions de rappel (énoncé exact, hypothèses, définition),
+     difficulté 1 à 2 ;
+   - deux questions d'application directe où la confusion ferait tomber dans
+     le piège, difficulté 2 à 3 ;
+   - une dernière question un peu plus exigeante, difficulté 3 ou 4, qui montre
+     que la notion est vraiment en place (au plus une question `exercice`).
+3. Chaque explication est un PETIT RAPPEL DE COURS : en deux à quatre phrases,
+   énoncez le résultat ou la définition exacte, dites pourquoi la bonne
+   réponse en découle, et pourquoi le piège principal est tentant et faux.
+   L'étudiant doit pouvoir se remettre la notion en tête en lisant les
+   corrections, sans rouvrir le cours.
+
+Règles du QCM, toutes applicables : quatre propositions de longueur et de
+registre comparables, une seule correcte, distracteurs correspondant à des
+erreurs réelles (en priorité celle diagnostiquée), position de la bonne
+réponse variée, aucune proposition qui renvoie aux autres. Une proposition est
+une affirmation, pas une démonstration.
+
+`section` : le titre de la section du cours d'où vient la notion.
+Formules en LaTeX entre $…$. Français avec tous les accents.
+
+Répondez uniquement par {{"qcm": [...]}}, chaque question portant id, kind,
+difficulty, question, choices, answer, explanation, section."""

@@ -189,6 +189,9 @@ def test_prompts_integrity() -> None:
         "syllabus_prompt": lambda: prompts.syllabus_prompt(syl, "series temporelles", 8),
         "daily_quiz_prompt": lambda: prompts.daily_quiz_prompt(
             syl, [{"course": course, "digest": content.digest(cid, limit=800), "seen": []}]),
+        "refresher_prompt": lambda: prompts.refresher_prompt(
+            syl, course, content.digest(cid, limit=800), [dict(questions[0], tries=2)],
+            ["une question"]),
         "chat_system": lambda: prompts.chat_system(course, syl),
         "proof_helper_system": lambda: prompts.proof_helper_system(course, syl),
         "proof_walkthrough_prompt": lambda: prompts.proof_walkthrough_prompt("T", "texte"),
@@ -281,6 +284,43 @@ def test_td() -> None:
             os.environ.pop("MATHSAPP_LIBRARY", None)
         else:
             os.environ["MATHSAPP_LIBRARY"] = previous
+
+
+def test_refresher() -> None:
+    """Quiz du jour resserre et rappels cibles."""
+    import inspect
+    import tempfile
+    from mathsapp import content, review
+    from mathsapp.generation import pipeline
+
+    check("quiz du jour : dix questions par defaut",
+          inspect.signature(pipeline.generate_daily_quiz).parameters["count"].default == 10)
+    check("quiz du jour : quatre cours au plus",
+          inspect.signature(pipeline.pick_daily_courses).parameters["count"].default == 4)
+    check("rappel : pas sur une seule erreur", not review.needs_refresher(10, 1, 1))
+    check("rappel : pas avec trop peu de reponses", not review.needs_refresher(3, 2, 2))
+    check("rappel : erreurs frequentes", review.needs_refresher(8, 3, 0))
+    check("rappel : erreurs repetees", review.needs_refresher(20, 2, 2))
+    check("rappel : erreurs rares et isolees", not review.needs_refresher(20, 3, 0))
+
+    previous = os.environ.get("MATHSAPP_LIBRARY")
+    os.environ["MATHSAPP_LIBRARY"] = tempfile.mkdtemp(prefix="selftest-rappel-")
+    try:
+        day = "2026-09-14"
+        content.write_refresher(day, "pro-espaces", {"qcm": [{"id": "r1", "question": "Q"}]})
+        check("rappel : retrouve par jour", content.pending_refresher(day) == "pro-espaces")
+        check("rappel : questions indexees",
+              ("pro-espaces", "rappel", "r1") in content.question_index())
+        content.mark_refresher_done(day, "pro-espaces")
+        check("rappel : fait, plus propose", content.pending_refresher(day) is None)
+        check("rappel : liste", content.refreshers() == [(day, "pro-espaces")])
+    finally:
+        if previous is None:
+            os.environ.pop("MATHSAPP_LIBRARY", None)
+        else:
+            os.environ["MATHSAPP_LIBRARY"] = previous
+    check("rappel : detection sur les vraies donnees sans erreur",
+          isinstance(review.refresher_candidates(), list))
 
 
 def test_store() -> None:
@@ -1109,6 +1149,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- quiz du jour et rappels cibles ---")
+    test_refresher()
     print("\n--- sujets de TD ---")
     test_td()
     print("\n--- extension du syllabus ---")

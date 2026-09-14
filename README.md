@@ -277,11 +277,23 @@ ancien : il protege une serie qu'on entretient, il ne fabrique pas un passe.
 
 ### Quiz du jour
 
-Vingt questions **neuves**, reparties sur quatre a six chapitres deja
+Dix questions **neuves**, reparties sur trois ou quatre chapitres deja
 travailles, choisis parmi les plus fragiles et les plus anciens. Le modele
 recoit les questions deja posees et ne doit en reprendre aucune. L'interet est
 precisement de melanger : on passe de la logique aux probabilites sans
 transition, comme dans un examen.
+
+### Rappel cible
+
+Parfois, pas tous les jours : quand un cours montre des erreurs recentes qui ne
+sont pas un accident, l'accueil propose **Rappel conseille : <cours>**. Il faut
+au moins quatre reponses sur les trois dernieres semaines, dont deux ratees,
+et soit 30 % d'erreurs, soit deux questions ratees plusieurs fois. Le rappel
+compte cinq questions neuves, generees a partir des questions ratees. Le
+modele diagnostique la confusion commune, puis l'attaque sous plusieurs
+angles : rappel de la definition, application ou le piege guette, question
+de verification. Chaque correction est un petit rappel de cours. Un meme
+cours n'est pas repropose avant quatre jours.
 
 ### Defi eclair
 

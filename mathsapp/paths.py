@@ -44,3 +44,9 @@ def logs_dir() -> pathlib.Path:
     d = library_dir() / "_logs"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def refresher_dir() -> pathlib.Path:
+    d = library_dir() / "_rappels"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
