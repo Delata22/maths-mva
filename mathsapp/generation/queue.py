@@ -22,6 +22,7 @@ KIND_LABEL = {
     "sheet": "Fiche de révision",
     "quiz": "Série de QCM",
     "daily": "Quiz du jour",
+    "td": "Correction de TD",
 }
 
 
@@ -117,6 +118,9 @@ class _Task(QRunnable):
             elif job.kind == "exercises":
                 pipeline.regenerate_exercises(job.course_id, on_progress, cancel, syl)
                 msg = "Exercices régénérés"
+            elif job.kind == "td":
+                result = pipeline.run_td(job.course_id, on_progress, cancel, syl)
+                msg = "TD corrigé : %d exercices (%.2f $)" % (result["exercises"], result["cost"])
             elif job.kind == "daily":
                 day, cost = pipeline.generate_daily_quiz(
                     None, None, on_progress, cancel, syl)

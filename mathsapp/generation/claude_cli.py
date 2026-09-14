@@ -84,8 +84,14 @@ def check_available(override: Optional[str] = None) -> str:
 
 
 def _base_cmd(model: str, system: Optional[str], persist: bool,
-              exe: Optional[str] = None) -> List[str]:
-    cmd = [binary(exe), "-p", "--model", model, "--safe-mode", "--tools", ""]
+              exe: Optional[str] = None, tools: str = "",
+              add_dirs: Iterable[str] = ()) -> List[str]:
+    """Commande de base. Par defaut aucun outil : la generation n'a pas besoin
+    du disque. `tools="Read"` et `add_dirs` ouvrent la lecture d'un dossier
+    precis, par exemple pour lire un sujet de TD en PDF avec ses formules."""
+    cmd = [binary(exe), "-p", "--model", model, "--safe-mode", "--tools", tools]
+    for directory in add_dirs:
+        cmd += ["--add-dir", str(directory)]
     if not persist:
         cmd.append("--no-session-persistence")
     if system:
@@ -128,7 +134,10 @@ def run(prompt: str, model: str, system: Optional[str] = None,
         on_notice: Optional[Callable[[str], None]] = None,
         retries: Optional[int] = None,
         exe: Optional[str] = None,
-        stall_timeout: Optional[float] = None) -> Result:
+        stall_timeout: Optional[float] = None,
+        tools: str = "",
+        add_dirs: Iterable[str] = (),
+        cwd: Optional[str] = None) -> Result:
     """Lance une generation, en reessayant les echecs transitoires.
 
     Une coupure reseau ne doit pas perdre le travail deja fait : on attend et
@@ -140,7 +149,7 @@ def run(prompt: str, model: str, system: Optional[str] = None,
     for attempt in range(attempts):
         try:
             return _run_once(prompt, model, system, json_schema, timeout, cancel,
-                             on_progress, exe, stall_timeout)
+                             on_progress, exe, stall_timeout, tools, add_dirs, cwd)
         except Cancelled:
             raise
         except ClaudeError as exc:
@@ -166,7 +175,10 @@ def _run_once(prompt: str, model: str, system: Optional[str] = None,
               cancel: Optional[Callable[[], bool]] = None,
               on_progress: Optional[Callable[[int], None]] = None,
               exe: Optional[str] = None,
-              stall_timeout: Optional[float] = None) -> Result:
+              stall_timeout: Optional[float] = None,
+              tools: str = "",
+              add_dirs: Iterable[str] = (),
+              cwd: Optional[str] = None) -> Result:
     """Un seul appel au CLI.
 
     `exe` et `stall_timeout` permettent de viser un binaire precis sans toucher
@@ -174,7 +186,7 @@ def _run_once(prompt: str, model: str, system: Optional[str] = None,
     modifier depuis un test interromprait une generation en cours.
     """
     timeout = int(timeout or settings.get("claude/timeout") or 1800)
-    cmd = _base_cmd(model, system, persist=False, exe=exe)
+    cmd = _base_cmd(model, system, persist=False, exe=exe, tools=tools, add_dirs=add_dirs)
     cmd += ["--output-format", "stream-json", "--include-partial-messages", "--verbose"]
     if json_schema is not None:
         cmd += ["--json-schema", json.dumps(json_schema, ensure_ascii=False)]
@@ -183,7 +195,7 @@ def _run_once(prompt: str, model: str, system: Optional[str] = None,
     chunks: List[str] = []
     result_obj: dict = {}
     proc = subprocess.Popen(
-        cmd, cwd=_neutral_cwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        cmd, cwd=cwd or _neutral_cwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, bufsize=1, start_new_session=True,
     )
 

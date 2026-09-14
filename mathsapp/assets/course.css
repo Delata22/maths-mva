@@ -383,3 +383,15 @@ blockquote {
   #toc { display: none; }
   main { padding: 26px 20px 120px; }
 }
+
+/* renvoi vers un cours de l'application */
+a.course-ref {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+  cursor: pointer;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: .92em;
+}
+a.course-ref::before { content: "↗ "; font-size: .85em; }
+a.course-ref:hover { border-bottom-style: solid; }

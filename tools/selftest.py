@@ -196,6 +196,12 @@ def test_prompts_integrity() -> None:
         "proof_review_system (complete)": lambda: prompts.proof_review_system(course, syl,
                                                                               "complete"),
         "proof_review_prompt": lambda: prompts.proof_review_prompt("T", "E", "S", "copie"),
+        "td_structure_prompt": lambda: prompts.td_structure_prompt(syl, "/tmp/sujet.pdf"),
+        "td_correction_prompt": lambda: prompts.td_correction_prompt(
+            syl, "TD", {"number": "1", "title": "T", "statement": "<p>Énoncé</p>",
+                        "courses": [cid], "key_results": ["un résultat"]},
+            [{"course": course, "generated": True,
+              "substance": content.substance(cid, limit=1500)}], 0, 3),
     }
     failed = []
     for name, build in builders.items():
@@ -208,8 +214,73 @@ def test_prompts_integrity() -> None:
     check("chaque constructeur de prompt s'execute", not failed,
           "%d constructeurs%s" % (len(builders), (" — " + "; ".join(failed[:3])) if failed else ""))
     for schema in ("PLAN_SCHEMA", "EXERCISES_SCHEMA", "SYLLABUS_SCHEMA",
-                   "QCM_REPAIR_SCHEMA", "DAILY_SCHEMA"):
+                   "QCM_REPAIR_SCHEMA", "DAILY_SCHEMA", "TD_SCHEMA"):
         check("  schema %s present" % schema, isinstance(getattr(prompts, schema, None), dict))
+
+
+def test_td() -> None:
+    """Sujets de TD : import, lecture normalisée, cache des corrections."""
+    import tempfile
+    from mathsapp import td as td_mod
+    from mathsapp.generation import claude_cli as cc, pipeline
+    from mathsapp.syllabus import load
+
+    syl = load()
+    # bibliotheque jetable : on ne touche pas aux TD reels
+    previous = os.environ.get("MATHSAPP_LIBRARY")
+    os.environ["MATHSAPP_LIBRARY"] = tempfile.mkdtemp(prefix="selftest-td-")
+    try:
+        sample = pathlib.Path(tempfile.mkdtemp()) / "sujet.pdf"
+        sample.write_bytes(b"%PDF-1.4\n% selftest\n")
+        td_id = td_mod.import_pdf(str(sample))
+        check("import d'un sujet", td_mod.source_path(td_id).exists(), td_id)
+        check("reimport du meme fichier sans doublon",
+              td_mod.import_pdf(str(sample)) == td_id and len(td_mod.list_ids()) == 1)
+        try:
+            td_mod.import_pdf(str(sample.with_suffix(".txt")))
+            refused = False
+        except ValueError:
+            refused = True
+        check("un fichier non PDF est refuse", refused)
+
+        raw = {"title": "TD", "exercises": [
+            {"number": "1", "title": "A", "statement": "<p>Soit $x$.</p>",
+             "courses": ["pro-esperance", "inexistant", "pro-esperance"], "difficulty": 9},
+            {"number": "2", "title": "B", "statement": "   ", "courses": []},
+            {"number": "3", "title": "", "statement": "<p>C</p>", "courses": ["pro-convergences"],
+             "key_results": ["", "Borel-Cantelli"]}]}
+        data = pipeline.normalize_td_structure(raw, syl)
+        numbers = [e["number"] for e in data["exercises"]]
+        check("lecture : enonce vide ecarte", numbers == ["1", "3"], str(numbers))
+        check("lecture : cours inconnus et doublons retires",
+              data["exercises"][0]["courses"] == ["pro-esperance"],
+              str(data["exercises"][0]["courses"]))
+        check("lecture : difficulte bornee", data["exercises"][0]["difficulty"] == 5)
+        check("lecture : titre par defaut", data["exercises"][1]["title"] == "Exercice 3")
+
+        td_mod.write_structure(td_id, data)
+        first = data["exercises"][0]
+        td_mod.write_correction(td_id, 0, td_mod.exercise_fingerprint(first),
+                                "<h2>Corrigé</h2>" + "x" * 300)
+        state = td_mod.state(td_id)
+        check("etat : une correction sur deux", state["corrected"] == 1 and state["total"] == 2
+              and not state["complete"], str(state))
+        changed = dict(first, statement="<p>Autre énoncé</p>")
+        check("cache invalide si l'enonce change",
+              td_mod.read_correction(td_id, 0, td_mod.exercise_fingerprint(changed)) is None)
+
+        mats = pipeline.td_materials(syl, {"courses": ["pro-espaces", "pro-convergences"]})
+        check("matiere : un cours par rattachement", len(mats) == 2)
+        cmd = cc._base_cmd("sonnet", None, False, tools="Read", add_dirs=["/tmp/x"])
+        check("lecture du PDF : outil Read limite au dossier du TD",
+              cmd[cmd.index("--tools") + 1] == "Read" and "/tmp/x" in cmd)
+        default = cc._base_cmd("sonnet", None, False)
+        check("par defaut, toujours aucun outil", default[default.index("--tools") + 1] == "")
+    finally:
+        if previous is None:
+            os.environ.pop("MATHSAPP_LIBRARY", None)
+        else:
+            os.environ["MATHSAPP_LIBRARY"] = previous
 
 
 def test_store() -> None:
@@ -996,6 +1067,18 @@ def test_views() -> None:
     window.toggle_theme()
     window.toggle_theme()
     check("bascule de theme", True)
+
+    from mathsapp.ui.main_window import PAGE_TD
+    window.go(PAGE_TD)
+    check("page des TD ouverte", window.stack.currentIndex() == PAGE_TD,
+          "%d TD" % window.td_page.picker.count())
+    emitted = []
+    window.td_page.course_opened.disconnect(window.open_course)
+    window.td_page.course_opened.connect(emitted.append)
+    window.td_page.view.bridge.openCourse(first)
+    check("lien vers un cours depuis une correction", emitted == [first])
+    window.td_page.course_opened.disconnect(emitted.append)
+    window.td_page.course_opened.connect(window.open_course)
     window.close()
 
 
@@ -1026,6 +1109,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- sujets de TD ---")
+    test_td()
     print("\n--- extension du syllabus ---")
     test_syllabus_extra()
     print("\n--- progression ---")

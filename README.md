@@ -387,6 +387,46 @@ Claude commence par dire ce qui a progresse.
 
 ---
 
+## Corriger ses TD
+
+Onglet **TD** (Ctrl+5) → *Importer un TD…* : choisissez le sujet en PDF.
+
+1. **Lecture du sujet** (Sonnet, quelques centimes) : Claude lit le PDF avec
+   l'outil `Read`, limité au dossier du TD, et transcrit chaque exercice avec
+   ses formules en LaTeX. Il rattache chaque exercice aux cours du syllabus
+   qui contiennent les définitions et théorèmes utiles.
+2. **Correction** (modèle des cours, Opus par défaut) : un appel par exercice,
+   trois en parallèle. Chaque correction reçoit le contenu des cours
+   rattachés s'ils sont déjà rédigés, pour reprendre leurs notations. Sinon,
+   elle s'appuie sur leur fiche du programme. On y trouve d'abord *l'idée* :
+   pourquoi cette approche est naturelle, comment on la trouve. Viennent
+   ensuite ce qu'on utilise, avec des liens cliquables vers les cours, puis
+   la solution détaillée à déplier et les pièges à éviter.
+
+Chaque correction est enregistrée dès qu'elle est finie. Après une coupure,
+*Reprendre la correction* ne refait que les exercices manquants. Si la
+transcription d'un exercice change, sa correction est refaite.
+
+Dans la page :
+
+- **Cours utiles** : les puces vertes sont des cours déjà rédigés. Les
+  orange ne sont pas encore générés : un clic ouvre le cours pour le
+  lancer.
+- **Énoncé seul** masque la correction pour chercher d'abord.
+- La sélection d'un passage et *Décortiquer avec Claude* marchent comme dans
+  les cours.
+
+En ligne de commande :
+
+```bash
+python tools/td.py run ~/TD1.pdf        # importer, lire et corriger
+python tools/td.py correct td-mva-2026  # reprendre
+python tools/td.py list
+```
+
+Les sujets vivent dans `library/_td/<id>/` : `source.pdf`, `structure.json`
+et `corrections/NN.html`.
+
 ## Savoir si ca genere ou si c'est plante
 
 L'application montre en permanence, dans la barre de statut, un point de

@@ -193,6 +193,17 @@
     });
   }
 
+  // Renvois vers un cours de l'application : <a class="course-ref" data-course="id">
+  function setupCourseRefs() {
+    document.addEventListener('click', function (ev) {
+      var link = ev.target && ev.target.closest ? ev.target.closest('a.course-ref') : null;
+      if (!link) return;
+      ev.preventDefault();
+      var id = link.getAttribute('data-course');
+      if (bridge && id && bridge.openCourse) bridge.openCourse(id);
+    });
+  }
+
   window.setTheme = function (name) {
     document.documentElement.setAttribute('data-theme', name);
     window.dispatchEvent(new Event('mviz:theme'));
@@ -215,6 +226,7 @@
     renderMath();
     decorateProofs();
     setupMasks();
+    setupCourseRefs();
     connectBridge(setupAsk);
     // Les figures sont dessinees apres KaTeX pour avoir la bonne largeur.
     window.dispatchEvent(new Event('mviz:theme'));

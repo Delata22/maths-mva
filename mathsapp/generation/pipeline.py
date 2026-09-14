@@ -673,3 +673,197 @@ def propose_syllabus(request: str, count: int = 10,
     batch, notes = syllabus_extra.normalize(raw)
     on_progress("Terminé", 1.0)
     return batch, notes, (raw.get("notes") or "").strip()
+
+
+# ---------------------------------------------------------------------------
+# TD : lecture du sujet et correction commentée
+# ---------------------------------------------------------------------------
+def normalize_td_structure(raw: dict, syl: Syllabus) -> dict:
+    """Nettoie la transcription d'un sujet : cours inconnus retirés, bornes."""
+    items = []
+    for i, ex in enumerate(raw.get("exercises") or []):
+        statement = (ex.get("statement") or "").strip()
+        if not statement:
+            continue
+        courses: List[str] = []
+        for cid in ex.get("courses") or []:
+            cid = str(cid).strip()
+            if cid in syl.courses and cid not in courses:
+                courses.append(cid)
+        try:
+            difficulty = int(ex.get("difficulty") or 3)
+        except (TypeError, ValueError):
+            difficulty = 3
+        number = str(ex.get("number") or i + 1).strip()
+        items.append({
+            "number": number,
+            "title": (ex.get("title") or "").strip() or "Exercice %s" % number,
+            "statement": content.clean_html(statement),
+            "courses": courses[:6],
+            "key_results": [str(r).strip() for r in (ex.get("key_results") or [])
+                            if str(r).strip()][:8],
+            "difficulty": max(1, min(5, difficulty)),
+        })
+    return {"title": (raw.get("title") or "").strip() or "TD",
+            "subject": (raw.get("subject") or "").strip(),
+            "exercises": items}
+
+
+def structure_td(td_id: str, model: Optional[str] = None,
+                 on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+                 syl: Optional[Syllabus] = None) -> dict:
+    """Lit le PDF du sujet (formules comprises) et le découpe en exercices."""
+    from .. import td as td_mod
+    syl = syl or load_syllabus()
+    src = td_mod.source_path(td_id)
+    if not src.exists():
+        raise ValueError("Sujet introuvable : %s" % src)
+    model = model or str(settings.get("model/exercises"))
+    folder = str(td_mod.td_dir(td_id))
+    on_progress("Lecture du sujet", 0.03)
+    raw, res = cc.run_json(
+        prompts.td_structure_prompt(syl, str(src)),
+        model=model,
+        system=("Vous transcrivez fidèlement des sujets de mathématiques. "
+                "Vous répondez uniquement en JSON valide."),
+        schema=prompts.TD_SCHEMA,
+        cancel=cancel,
+        tools="Read", add_dirs=[folder], cwd=folder,
+        on_progress=lambda n: on_progress("Lecture du sujet", min(0.14, 0.03 + n / 60000.0)),
+        on_notice=lambda msg: on_progress("Lecture du sujet — %s" % msg, 0.03),
+    )
+    data = normalize_td_structure(raw, syl)
+    if not data["exercises"]:
+        raise cc.ClaudeError("Aucun exercice n'a pu être lu dans le sujet.")
+    td_mod.write_structure(td_id, data)
+    td_mod.update_meta(td_id, structured_at=time.time(), structure_model=model,
+                       structure_cost=round(res.cost_usd, 4),
+                       exercise_count=len(data["exercises"]))
+    return data
+
+
+def td_materials(syl: Syllabus, exercise: dict, budget: int = 14000) -> List[dict]:
+    """Matière des cours rattachés : contenu rédigé s'il existe, sinon programme."""
+    materials, used = [], 0
+    for cid in exercise.get("courses", []):
+        course = syl.get(cid)
+        if course is None:
+            continue
+        generated = content.has_course(cid)
+        substance = ""
+        if generated and used < budget:
+            substance = content.substance(cid, limit=min(6000, budget - used))
+            used += len(substance)
+        materials.append({"course": course, "generated": generated, "substance": substance})
+    return materials
+
+
+def correct_td(td_id: str, model: Optional[str] = None,
+               on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+               syl: Optional[Syllabus] = None, force: bool = False) -> tuple:
+    """Corrige les exercices en parallèle, avec reprise. Retourne (corrigés, coût)."""
+    from .. import td as td_mod
+    syl = syl or load_syllabus()
+    data = td_mod.read_structure(td_id)
+    if not data or not data.get("exercises"):
+        raise ValueError("Le sujet doit être lu avant d'être corrigé.")
+    items = data["exercises"]
+    n = len(items)
+    title = data.get("title") or td_id
+    model = model or str(settings.get("model/course"))
+    fingerprints = [td_mod.exercise_fingerprint(ex) for ex in items]
+
+    done: List[Optional[str]] = [None] * n
+    if not force:
+        for i in range(n):
+            done[i] = td_mod.read_correction(td_id, i, fingerprints[i])
+    todo = [i for i in range(n) if done[i] is None]
+    finished = n - len(todo)
+    chars: Dict[int, int] = {}
+    started: Dict[int, float] = {}
+    costs = [0.0] * n
+    lock = threading.Lock()
+
+    def report() -> None:
+        partial = sum(min(0.98, chars.get(i, 0) / 24000.0)
+                      for i in todo if done[i] is None and i in started)
+        frac = 0.15 + 0.85 * (finished + partial) / max(1, n)
+        running = [i for i in todo if done[i] is None and i in started]
+        if running:
+            i = running[0]
+            label = ("Exercice %s (%d/%d) — %s · %s caractères · %s"
+                     % (items[i].get("number", i + 1), i + 1, n, items[i].get("title", ""),
+                        _fmt_thousands(chars.get(i, 0)), _fmt_clock(time.time() - started[i])))
+            if len(running) > 1:
+                label += "  (+%d en parallèle)" % (len(running) - 1)
+        else:
+            label = "Exercices corrigés : %d/%d" % (finished, n)
+        on_progress(label, frac)
+
+    report()
+
+    def work(i: int) -> None:
+        nonlocal finished
+        _check(cancel)
+        with lock:
+            started[i] = time.time()
+            chars[i] = 0
+        report()
+
+        def progress(count: int, _i=i) -> None:
+            with lock:
+                chars[_i] = count
+            report()
+
+        res = cc.run(
+            prompts.td_correction_prompt(syl, title, items[i], td_materials(syl, items[i]), i, n),
+            model=model,
+            system=("Vous rédigez des corrections commentées de TD de mathématiques en "
+                    "HTML. Vous ne produisez que le fragment HTML demandé."),
+            cancel=cancel,
+            on_progress=progress,
+            on_notice=lambda msg, _i=i: on_progress(
+                "Exercice %d/%d — %s" % (_i + 1, n, msg), 0.15 + 0.85 * finished / max(1, n)),
+        )
+        body = content.clean_html(res.text)
+        with lock:
+            done[i] = body
+            costs[i] = res.cost_usd
+            finished += 1
+            td_mod.write_correction(td_id, i, fingerprints[i], body)
+        report()
+
+    workers = max(1, min(6, int(settings.get("gen/section_parallel") or 3), len(todo) or 1))
+    t0 = time.time()
+    if todo:
+        if workers == 1:
+            for i in todo:
+                work(i)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                for future in as_completed([pool.submit(work, i) for i in todo]):
+                    future.result()
+
+    cost = sum(costs)
+    meta = td_mod.read_meta(td_id)
+    td_mod.update_meta(td_id, corrected_at=time.time(), correction_model=model,
+                       correction_cost=round(float(meta.get("correction_cost") or 0) + cost, 4),
+                       correction_duration=round(time.time() - t0, 1))
+    on_progress("Terminé", 1.0)
+    return len(todo), cost
+
+
+def run_td(td_id: str, on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+           syl: Optional[Syllabus] = None) -> dict:
+    """Lit le sujet si nécessaire, puis corrige ce qui ne l'est pas encore."""
+    from .. import td as td_mod
+    syl = syl or load_syllabus()
+    cost = 0.0
+    if not td_mod.exercises(td_id):
+        structure_td(td_id, None, on_progress, cancel, syl)
+        cost += float(td_mod.read_meta(td_id).get("structure_cost") or 0)
+    corrected, spent = correct_td(td_id, None, on_progress, cancel, syl)
+    cost += spent
+    state = td_mod.state(td_id)
+    return {"exercises": state["total"], "corrected": corrected,
+            "cost": cost, "complete": state["complete"]}

@@ -1091,3 +1091,179 @@ laisse de cote, et abordez sous un autre angle ceux qu'elle traite deja.
 Repondez uniquement par un objet JSON de la forme {{"qcm": [...]}}, avec les
 memes champs que la premiere serie : id, kind, difficulty, question, choices,
 answer, explanation, section."""
+
+
+# ---------------------------------------------------------------------------
+# TD : lecture d'un sujet et correction commentée
+# ---------------------------------------------------------------------------
+TD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "subject": {"type": "string"},
+        "exercises": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "number": {"type": "string"},
+                    "title": {"type": "string"},
+                    "statement": {"type": "string"},
+                    "courses": {"type": "array", "items": {"type": "string"}},
+                    "key_results": {"type": "array", "items": {"type": "string"}},
+                    "difficulty": {"type": "integer"},
+                },
+                "required": ["number", "title", "statement", "courses", "key_results"],
+            },
+        },
+    },
+    "required": ["title", "exercises"],
+}
+
+
+def td_structure_prompt(syl: Syllabus, pdf_path: str) -> str:
+    """Lire un sujet de TD en PDF et le découper, formules comprises."""
+    return f"""Lisez le sujet de TD situé dans le fichier suivant, avec l'outil Read,
+page par page et en entier :
+
+    {pdf_path}
+
+Vous devez en produire une transcription STRUCTURÉE et FIDÈLE.
+
+1. `title` : le titre du TD tel qu'il apparaît ; `subject` : la matière en
+   quelques mots.
+2. `exercises` : TOUS les exercices, dans l'ordre, sans en omettre aucun.
+   Vérifiez à la fin que le nombre d'exercices correspond au dernier numéro du
+   sujet. Pour chacun :
+   - `number` : son numéro tel qu'écrit ;
+   - `title` : son titre, ou à défaut quelques mots qui le résument ;
+   - `statement` : l'énoncé COMPLET, questions comprises, en HTML simple
+     (p, ol, ul, li, b, em) avec toutes les mathématiques en LaTeX entre $…$
+     ou $$…$$. Recopiez les formules exactement : exposants, indices,
+     fractions, ensembles d'indices, conditions. N'inventez rien, ne résolvez
+     rien, ne reformulez pas. Les questions numérotées vont dans un <ol>.
+   - `courses` : les identifiants des cours du catalogue ci-dessous qui
+     contiennent les définitions et théorèmes nécessaires pour résoudre
+     l'exercice. Deux à cinq, du plus directement utile au plus général.
+     Uniquement des identifiants présents dans le catalogue.
+   - `key_results` : les résultats précis dont la résolution a besoin, nommés
+     comme dans un cours (« théorème de convergence dominée », « formule de
+     transfert », « lemme de Borel-Cantelli »), trois à six.
+   - `difficulty` : de 1 à 5, pour un étudiant qui entre en M2.
+
+CATALOGUE DES COURS (identifiant, niveau, titre) :
+
+{catalogue(syl)}
+
+Répondez uniquement par l'objet JSON."""
+
+
+TD_CONVENTIONS = r"""
+CONVENTIONS DE LA CORRECTION
+
+Fragment HTML uniquement : pas de ``` autour, pas de <html>, <head>, <body>.
+Mathématiques en LaTeX entre $…$ et $$…$$ (KaTeX). Macros disponibles :
+\R \N \Z \Q \C \E \P \1 \eps \dd \Var \Cov \rank \tr \diag \Id
+\argmin \argmax \norm{…} \abs{…} \scal{…}{…}.
+
+Pour renvoyer à un cours de l'application, utilisez exactement :
+    <a class="course-ref" data-course="IDENTIFIANT">Titre du cours</a>
+avec un identifiant pris dans la liste des cours rattachés. Le lecteur pourra
+cliquer pour l'ouvrir.
+
+Encadrés disponibles, et seulement ceux-là :
+    <div class="box intuition"><span class="box-title">L'idée</span>…</div>
+    <div class="box theorem"><span class="box-title">Ce qu'on utilise</span>…</div>
+    <div class="box definition"><span class="box-title">Définition</span>…</div>
+    <div class="box warning"><span class="box-title">Piège</span>…</div>
+    <div class="box example"><span class="box-title">Exemple</span>…</div>
+    <div class="box recap"><span class="box-title">À retenir</span>…</div>
+
+La solution détaillée de chaque question va dans un bloc repliable, pour que
+le lecteur puisse chercher avec l'idée seule avant de lire la suite :
+
+    <details class="proof" data-of="Exercice N, question k">
+      <summary>Solution détaillée</summary>
+      <div class="proof-body">
+        <div class="proof-step"><span class="step-label">Étape 1 — ce qu'on veut obtenir</span>
+          <p>…</p></div>
+        …
+        <p class="qed">&#8718;</p>
+      </div>
+    </details>
+"""
+
+
+def td_correction_prompt(syl: Syllabus, td_title: str, exercise: dict,
+                         materials: List[dict], index: int, total: int) -> str:
+    """Correction pédagogique d'un exercice de TD.
+
+    `materials` : [{course, generated, substance}] pour les cours rattachés.
+    """
+    blocks = []
+    for item in materials:
+        course = item["course"]
+        if item.get("generated") and item.get("substance"):
+            body = "Extraits du cours déjà rédigé dans l'application :\n" + item["substance"]
+        else:
+            body = ("Ce cours n'est pas encore rédigé dans l'application. Son programme :\n"
+                    "Résumé : %s\nObjectifs : %s\nMots-clés : %s"
+                    % (course.summary, " ; ".join(course.objectives),
+                       ", ".join(course.keywords)))
+        blocks.append("### %s  [identifiant : %s]\n%s" % (course.title, course.id, body))
+    material = "\n\n".join(blocks) or "(aucun cours rattaché)"
+    results = "\n".join("  - %s" % r for r in exercise.get("key_results", [])) or "  (non précisés)"
+
+    return f"""{STYLE}
+
+{MVIZ_API}
+
+{TD_CONVENTIONS}
+
+Vous rédigez la CORRECTION COMMENTÉE d'un exercice de TD, pour un étudiant qui
+entre en M2 MVA et vient de chercher l'exercice. Ce n'est pas un corrigé
+d'examen à recopier : c'est une correction qui fait COMPRENDRE, pour qu'il sache
+refaire seul un exercice voisin.
+
+TD : {td_title} — exercice {index + 1} sur {total}
+
+ÉNONCÉ :
+{exercise.get("statement", "")}
+
+RÉSULTATS QUE LA RÉSOLUTION MOBILISE (repérés à la lecture du sujet) :
+{results}
+
+COURS DE L'APPLICATION RATTACHÉS À CET EXERCICE :
+{material}
+
+CE QUI EST ATTENDU
+
+1. Ouvrez par <h2>Exercice {exercise.get("number", index + 1)} — {exercise.get("title", "")}</h2>,
+   puis un court paragraphe : ce que l'exercice fait vraiment travailler, et
+   pourquoi c'est utile (en apprentissage quand le lien est honnête).
+2. Pour CHAQUE question, dans l'ordre, un <h3> puis :
+   a. un encadré « L'idée » AVANT tout calcul : l'intuition, l'image mentale,
+      la stratégie de preuve en une ou deux phrases. C'est la partie la plus
+      importante : quelqu'un qui bloque doit pouvoir repartir avec elle seule.
+      Dites pourquoi c'est CETTE approche qui marche, et ce qui échouerait.
+   b. un encadré « Ce qu'on utilise » : les définitions et théorèmes du cours
+      invoqués, énoncés PRÉCISÉMENT avec leurs hypothèses, chacun avec un
+      renvoi au cours via <a class="course-ref" …>. Quand le cours n'est pas
+      encore rédigé dans l'application, énoncez quand même le résultat
+      complètement, et renvoyez au cours correspondant.
+   c. la solution détaillée dans un bloc <details class="proof"> découpé en
+      étapes nommées. Chaque étape dit ce qu'on cherche à obtenir avant de le
+      faire, et signale le moment où chaque hypothèse sert.
+   d. un encadré « Piège » quand il y a une erreur classique réelle à cette
+      question : hypothèse oubliée, interversion non justifiée, confusion
+      entre modes de convergence, indépendance supposée à tort.
+3. Une figure interactive quand elle éclaire vraiment : un lim sup comme
+   « infiniment souvent », une loi qui se déforme avec un paramètre, une
+   convergence en loi, une chaîne de Markov qui converge. Pas de décoration.
+4. Terminez par un encadré « À retenir » : les deux ou trois réflexes de méthode
+   réutilisables ailleurs.
+5. Rigueur complète, mais pas de formalisme gratuit. Le ton est celui d'un bon
+   chargé de TD qui explique au tableau.
+6. Français avec tous les accents.
+
+Sortie : le fragment HTML, rien d'autre."""
