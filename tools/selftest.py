@@ -286,6 +286,24 @@ def test_td() -> None:
             os.environ["MATHSAPP_LIBRARY"] = previous
 
 
+def test_math_lt() -> None:
+    """Un « < » de formule ne doit jamais etre pris pour une balise."""
+    from mathsapp import content
+    p = content.protect_math
+    check("somme sur i<j", p(r"<p>$\sum_{i<j} x_i$</p>") == r"<p>$\sum_{i&lt;j} x_i$</p>")
+    check("suite croissante", "u_{n+1}&lt;u_n" in p(r"<li>($u_{n+1}<u_n$ pour tout $n$)</li>"))
+    check("formule en display", "x&lt;y" in p(r"<p>$$x<y$$</p>"))
+    check("indice suivi d'un espace", r"k&lt;i \le n" in p(r"<em>$k<i \le n$</em>"))
+    check("vraies balises intactes", p('<p>$a$ <b>gras</b> et $c$ <a class="x" href="#">lien</a></p>')
+          == '<p>$a$ <b>gras</b> et $c$ <a class="x" href="#">lien</a></p>')
+    check("script intact", p("<script>if (a<b) { f('$x$') }</script>")
+          == "<script>if (a<b) { f('$x$') }</script>")
+    check("texte sans formule intact", p("<p>a < b</p>") == "<p>a < b</p>")
+    data = content.protect_math_data({"qcm": [{"choices": [r"$i<k$", "rien"], "answer": 1}]})
+    check("questions JSON traitees", data["qcm"][0]["choices"] == [r"$i&lt;k$", "rien"]
+          and data["qcm"][0]["answer"] == 1)
+
+
 def test_refresher() -> None:
     """Quiz du jour resserre et rappels cibles."""
     import inspect
@@ -1149,6 +1167,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- inegalites dans les formules ---")
+    test_math_lt()
     print("\n--- quiz du jour et rappels cibles ---")
     test_refresher()
     print("\n--- sujets de TD ---")

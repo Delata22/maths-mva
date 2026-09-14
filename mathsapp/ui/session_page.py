@@ -87,7 +87,7 @@ class SessionPage(QWidget):
         tpl = (ASSETS_DIR / "quiz.html").read_text(encoding="utf-8")
         page = (tpl.replace("__THEME__", theme.name())
                    .replace("__ASSETS__", content.assets_url())
-                   .replace("__SETS__", json.dumps(sets, ensure_ascii=False))
+                   .replace("__SETS__", json.dumps(content.protect_math_data(sets), ensure_ascii=False))
                    .replace("__HISTORY__", json.dumps({set_id: history or {}},
                                                       ensure_ascii=False)))
         # Le script de la page lit window.SESSION des son premier passage : il

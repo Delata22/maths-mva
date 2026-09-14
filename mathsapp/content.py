@@ -239,6 +239,44 @@ def clean_html(text: str) -> str:
 
 
 # ------------------------------------------------------------------- rendu
+# Dans une formule, « $\sum_{i<j}$ » ou « $u_{n+1}<u_n$ » : pour le navigateur,
+# « <j » ou « <u » ouvre une balise, qui avale le texte jusqu'au prochain « > ».
+# On neutralise donc, a l'affichage, tout « < » de formule qui n'est pas une
+# vraie balise. KaTeX lit le texte decode : il voit toujours « < ».
+_SCRIPT_BLOCK = re.compile(r"(<script\b.*?</script>|<style\b.*?</style>)", re.S | re.I)
+_MATH_SPAN = re.compile(
+    r"\$\$.+?\$\$|\\\[.+?\\\]|\\\(.+?\\\)|(?<![\\$])\$(?!\$).+?(?<![\\$])\$", re.S)
+_NOT_A_TAG = re.compile(
+    r"<(?!!--|/?[a-zA-Z][a-zA-Z0-9-]*"
+    r"""(?:\s+[a-zA-Z_:][-a-zA-Z0-9_:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*\s*/?>)""")
+
+
+def _escape_math_lt(match) -> str:
+    return _NOT_A_TAG.sub("&lt;", match.group(0))
+
+
+def protect_math(text: str) -> str:
+    """Neutralise les « < » des formules qui ressembleraient a une balise."""
+    if not text or "<" not in text or ("$" not in text and "\\" not in text):
+        return text
+    parts = _SCRIPT_BLOCK.split(text)
+    for i in range(0, len(parts), 2):
+        if "<" in parts[i]:
+            parts[i] = _MATH_SPAN.sub(_escape_math_lt, parts[i])
+    return "".join(parts)
+
+
+def protect_math_data(value):
+    """Meme traitement sur toutes les chaines d'une structure JSON."""
+    if isinstance(value, str):
+        return protect_math(value)
+    if isinstance(value, list):
+        return [protect_math_data(v) for v in value]
+    if isinstance(value, dict):
+        return {k: protect_math_data(v) for k, v in value.items()}
+    return value
+
+
 def _template() -> str:
     return (ASSETS_DIR / "template.html").read_text(encoding="utf-8")
 
@@ -253,7 +291,7 @@ def build_page(body: str, title: str, theme: str = "light", extra_css: str = "")
             .replace("__TITLE__", html.escape(title))
             .replace("__ASSETS__", assets_url())
             .replace("__EXTRA_CSS__", extra_css)
-            .replace("__BODY__", body))
+            .replace("__BODY__", protect_math(body)))
 
 
 def render_course_page(course_id: str, title: str, theme: str = "light") -> pathlib.Path:
@@ -397,7 +435,7 @@ def render_sheet_page(course_id: str, title: str, theme: str = "light",
             .replace("__TITLE__", html.escape(title))
             .replace("__ASSETS__", assets_url())
             .replace("__CLASS__", "print" if for_print else "screen")
-            .replace("__BODY__", read_sheet(course_id)))
+            .replace("__BODY__", protect_math(read_sheet(course_id))))
     out = course_dir(course_id) / ("_sheet_print.html" if for_print else "_sheet.html")
     out.write_text(page, encoding="utf-8")
     return out

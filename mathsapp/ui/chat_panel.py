@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
+from ..content import protect_math
 from .. import content, settings
 from ..chat import ChatSession, ChatWorker, clean_answer
 from ..paths import ASSETS_DIR, library_dir
@@ -158,7 +159,7 @@ class ChatPanel(QWidget):
             role = msg["role"]
             body = (html_mod.escape(msg["content"]) if role == "user"
                     else clean_answer(msg["content"]))
-            self._js("window.chatAdd(%s, %s);" % (json.dumps(role), json.dumps(body)))
+            self._js("window.chatAdd(%s, %s);" % (json.dumps(role), json.dumps(protect_math(body))))
 
     def reset(self) -> None:
         if self.session is None:
@@ -218,7 +219,7 @@ class ChatPanel(QWidget):
 
     def _on_done(self, text: str, session_id: str) -> None:
         answer = clean_answer(text)
-        self._js("window.chatFinalize(%s);" % json.dumps(answer))
+        self._js("window.chatFinalize(%s);" % json.dumps(protect_math(answer)))
         if self.session:
             self.session.record_assistant(answer, session_id)
 
