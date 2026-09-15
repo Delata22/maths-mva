@@ -42,9 +42,37 @@
     background: var(--accent); animation: blink 1s steps(2) infinite;
   }
   @keyframes blink { 50% { opacity: 0; } }
+  /* assistant : actions proposees, a valider d'un clic */
+  .actions { margin: -4px 0 16px; display: flex; flex-direction: column; gap: 8px; }
+  .action {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 9px; padding: .6em .85em;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px;
+  }
+  .action .t { font-weight: 650; }
+  .action .d { color: var(--muted); font-size: 12px; margin: 3px 0 0; }
+  .action .row { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+  .action button {
+    font: inherit; font-size: 12.5px; padding: 4px 13px; border-radius: 7px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .action button.secondary { background: transparent; color: var(--accent); }
+  .action button:disabled { opacity: .5; cursor: default; }
+  .action .s { font-size: 12px; color: var(--muted); }
+  .action.done { border-left-color: #0f9d76; }
+  .action.done .s { color: #0f9d76; }
+  .action.failed { border-left-color: #dc2626; }
+  .action.failed .s { color: #dc2626; }
+  .work {
+    font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 11.5px;
+    color: var(--muted); white-space: pre-wrap; max-height: 240px; overflow: auto;
+    border: 1px solid var(--line); border-radius: 8px; padding: .5em .7em; margin-top: .4em;
+  }
+  .msg pre { white-space: pre-wrap; font-size: 11.5px; max-height: 260px; overflow: auto; }
 </style>
 <script src="__ASSETS__/vendor/katex/katex.min.js"></script>
 <script src="__ASSETS__/vendor/katex/contrib/auto-render.min.js"></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 </head>
 <body>
 <div id="log"><div id="empty">__EMPTY__</div></div>
@@ -158,6 +186,79 @@ window.chatReset = function (emptyText) {
   current = null; buffer = '';
 };
 window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
+
+// ---- assistant : cartes d'action et journal d'une modification du code
+var bridge = null;
+if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTransport) {
+  new QWebChannel(window.qt.webChannelTransport, function (channel) {
+    bridge = channel.objects.app || null;
+    window.app = bridge;
+  });
+}
+window.chatActions = function (list) {
+  if (!list || !list.length) return;
+  dropEmpty();
+  var wrap = document.createElement('div');
+  wrap.className = 'actions';
+  list.forEach(function (a) {
+    var card = document.createElement('div');
+    card.className = 'action';
+    card.id = 'action-' + a.id;
+    var t = document.createElement('div');
+    t.className = 't'; t.textContent = a.label;
+    card.appendChild(t);
+    if (a.detail) {
+      var d = document.createElement('div');
+      d.className = 'd'; d.textContent = a.detail;
+      card.appendChild(d);
+    }
+    var row = document.createElement('div');
+    row.className = 'row';
+    var b = document.createElement('button');
+    b.textContent = a.button || (a.costly ? 'Lancer' : 'Faire');
+    if (a.secondary) b.className = 'secondary';
+    b.onclick = function () {
+      if (!bridge) return;
+      window.chatActionState(a.id, 'running', 'en cours…');
+      bridge.runAction(a.id);
+    };
+    var s = document.createElement('span');
+    s.className = 's';
+    row.appendChild(b); row.appendChild(s);
+    card.appendChild(row);
+    wrap.appendChild(card);
+  });
+  log.appendChild(wrap);
+  toBottom(true);
+};
+window.chatActionState = function (id, state, text) {
+  var card = document.getElementById('action-' + id);
+  if (!card) return;
+  card.classList.remove('done', 'failed', 'running');
+  if (state) card.classList.add(state);
+  card.querySelector('.s').textContent = text || '';
+  card.querySelector('button').disabled = (state === 'done' || state === 'running');
+};
+var work = null;
+window.chatWorkBegin = function (title) {
+  var b = makeMsg('assistant', 'Modification du code');
+  var p = document.createElement('p');
+  p.textContent = title;
+  work = document.createElement('div');
+  work.className = 'work';
+  b.appendChild(p); b.appendChild(work);
+  toBottom(true);
+};
+window.chatWorkLine = function (line) {
+  if (!work) return;
+  work.textContent += line + '\n';
+  work.scrollTop = work.scrollHeight;
+  toBottom(false);
+};
+window.chatWorkEnd = function (html) {
+  work = null;
+  window.chatAdd('assistant', html);
+};
 </script>
 </body>
 </html>

@@ -399,6 +399,34 @@ Claude commence par dire ce qui a progresse.
 
 ---
 
+## L'assistant : demander un changement
+
+Bouton **Assistant** (Ctrl+J) : un chat qui agit sur l'application. On lui dit
+ce qu'on veut, par exemple « génère les cours de probas utiles pour le TD »,
+« une nouvelle série de QCM sur les séries entières », « passe les exercices en
+Opus » ou « ajoute un bouton pour exporter mes notes ».
+
+Claude reçoit à chaque message l'état de l'application : les cours avec leur
+rédaction, leur score et leurs prérequis, les parcours, les TD, la file de
+génération et les réglages. Il répond brièvement et propose des **cartes
+d'action**. Rien ne part sans un clic sur la carte.
+
+- générer des cours (dans l'ordre des prérequis, avec durée et coût estimés),
+  en régénérer un, ajouter une série de QCM, produire des fiches ;
+- corriger un TD importé, étendre le syllabus ;
+- changer un réglage (modèles, parallélisme, seuil de maîtrise, objectif du
+  jour) ;
+- arrêter des générations, ouvrir une page, lancer une séance ;
+- **modifier l'application**. Claude rédige un cahier des charges précis, puis
+  un `claude` limité aux outils Read, Edit, Write, Glob et Grep travaille dans
+  le dossier du projet. Il n'a ni shell ni accès à `library/`. L'application
+  lance ensuite `tools/selftest.py` : en cas d'échec, Claude corrige, deux tours
+  au plus. Si tout passe, le changement est committé et poussé. Des cartes
+  proposent alors de redémarrer l'application ou d'annuler le changement
+  (`git revert`). Si les tests échouent encore, rien n'est enregistré : on
+  choisit de retirer les modifications ou de les garder. Une modification ne
+  démarre que si le code n'a pas de changement en attente.
+
 ## Corriger ses TD
 
 Onglet **TD** (Ctrl+5) → *Importer un TD…* : choisissez le sujet en PDF.

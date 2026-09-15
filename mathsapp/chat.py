@@ -63,6 +63,7 @@ class ChatSession:
         self.syl = syl
         self.context_key = context_key
         self.mode = mode
+        self.state_provider = None     # assistant : etat de l'app, relu a chaque tour
         course_id = course.id if course else None
         row = store.find_thread(course_id, context_key)
         if row is None:
@@ -81,6 +82,9 @@ class ChatSession:
             return proof_review_system(self.course, self.syl, "complete")
         if self.mode == "review-etape":
             return proof_review_system(self.course, self.syl, "etape")
+        if self.mode == "assistant":
+            from .generation.prompts import assistant_system
+            return assistant_system(self.state_provider() if self.state_provider else "")
         return chat_system(self.course, self.syl)
 
     @property

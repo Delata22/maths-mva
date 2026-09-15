@@ -192,6 +192,13 @@ def test_prompts_integrity() -> None:
         "refresher_prompt": lambda: prompts.refresher_prompt(
             syl, course, content.digest(cid, limit=800), [dict(questions[0], tries=2)],
             ["une question"]),
+        "assistant_system": lambda: prompts.assistant_system("ÉTAT"),
+        "code_change_system": lambda: prompts.code_change_system(),
+        "code_change_prompt": lambda: prompts.code_change_prompt(
+            "Sur la page d'accueil, ajouter un bouton « Exporter mes notes » qui écrit "
+            "toutes les notes de cours dans un fichier Markdown choisi par l'utilisateur. "
+            "Le bouton est désactivé tant qu'aucune note n'existe. " * 3),
+        "code_fix_prompt": lambda: prompts.code_fix_prompt("ECHEC test x\nTraceback ..."),
         "chat_system": lambda: prompts.chat_system(course, syl),
         "proof_helper_system": lambda: prompts.proof_helper_system(course, syl),
         "proof_walkthrough_prompt": lambda: prompts.proof_walkthrough_prompt("T", "texte"),
@@ -284,6 +291,50 @@ def test_td() -> None:
             os.environ.pop("MATHSAPP_LIBRARY", None)
         else:
             os.environ["MATHSAPP_LIBRARY"] = previous
+
+
+def test_assistant() -> None:
+    """Assistant : lecture des actions proposees, garde-fous, etat de l'app."""
+    from mathsapp import assistant, status as st_mod
+    from mathsapp.syllabus import load
+    syl = load()
+
+    text = ('<p>Voici.</p><actions>[{"type": "generate_courses", "courses": '
+            '["pro-convergences", "pro-esperance", "inexistant", "pro-espaces"]},'
+            '{"type": "set_setting", "key": "gen/section_parallel", "value": "4"},'
+            '{"type": "set_setting", "key": "claude/binary", "value": "rm"},'
+            '{"type": "set_setting", "key": "goal/bricks", "value": 99},'
+            '{"type": "open", "page": "course", "course": "Chaînes de Markov"},'
+            '{"type": "modify_app", "request": "court"},'
+            '{"type": "inconnu"}]</actions>')
+    visible, actions = assistant.parse_actions(text, syl)
+    kinds = [a["type"] for a in actions]
+    check("assistant : texte sans le bloc d'actions", visible == "<p>Voici.</p>", visible)
+    check("assistant : actions invalides ecartees",
+          kinds == ["generate_courses", "set_setting", "open"], str(kinds))
+    gen = actions[0]
+    check("assistant : cours inconnus et deja rediges ecartes",
+          "inexistant" not in gen["courses"] and "pro-espaces" not in gen["courses"],
+          str(gen["courses"]))
+    rank = {cid: i for i, cid in enumerate(syl.topo)}
+    check("assistant : cours ranges dans l'ordre des prerequis",
+          gen["courses"] == sorted(gen["courses"], key=rank.get), str(gen["courses"]))
+    check("assistant : reglage converti", actions[1]["value"] == 4)
+    check("assistant : cours retrouve par son titre", actions[2]["course"] == "pro-markov")
+    check("assistant : bloc non termine masque",
+          assistant.split_answer("ok <actions>[{\"type\"")[0] == "ok")
+    check("assistant : JSON illisible sans action",
+          assistant.parse_actions("<p>a</p><actions>pas du json</actions>", syl)
+          == ("<p>a</p>", []))
+    check("assistant : flux coupe avant le bloc",
+          [assistant.visible_limit(s) for s in ("abc", "abc<act", "abc<actions>[", "a<b")]
+          == [3, 3, 3, 3])
+    state = assistant.app_state(syl, st_mod.compute(syl))
+    check("assistant : etat complet",
+          "pro-markov" in state and "RÉGLAGES MODIFIABLES" in state and "TD IMPORTÉS" in state,
+          "%d caracteres" % len(state))
+    check("assistant : etat assez court pour la ligne de commande",
+          len(state.encode("utf-8")) < 100000, "%d octets" % len(state.encode("utf-8")))
 
 
 def test_math_lt() -> None:
@@ -1126,6 +1177,17 @@ def test_views() -> None:
     window.toggle_theme()
     check("bascule de theme", True)
 
+    window.open_assistant()
+    check("assistant ouvert", window.chat.is_assistant and window.chat_dock.isVisible())
+    check("assistant : etat fourni a Claude",
+          "RÉGLAGES MODIFIABLES" in window.chat.session.system)
+    window.chat.show_actions([{"id": "t1", "type": "open", "page": "graph",
+                               "label": "Ouvrir le graphe", "detail": ""}])
+    window.chat.view.bridge.runAction("t1")
+    check("assistant : une action validee s'execute",
+          window.stack.currentIndex() == PAGE_GRAPH)
+    window.chat.set_context(None, "general")
+
     from mathsapp.ui.main_window import PAGE_TD
     window.go(PAGE_TD)
     check("page des TD ouverte", window.stack.currentIndex() == PAGE_TD,
@@ -1167,6 +1229,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- assistant ---")
+    test_assistant()
     print("\n--- inegalites dans les formules ---")
     test_math_lt()
     print("\n--- quiz du jour et rappels cibles ---")

@@ -164,6 +164,14 @@ class MainWindow(QMainWindow):
         self.btn_chat.setAutoRaise(True)
         lay.addWidget(self.btn_chat)
 
+        self.btn_assistant = QToolButton()
+        self.btn_assistant.setText("Assistant")
+        self.btn_assistant.setToolTip(
+            "Demander un changement : générer des cours, régler, modifier l'application  (Ctrl+J)")
+        self.btn_assistant.setAutoRaise(True)
+        self.btn_assistant.clicked.connect(self.open_assistant)
+        lay.addWidget(self.btn_assistant)
+
         self.btn_queue = QToolButton()
         self.btn_queue.setText("Générations")
         self.btn_queue.setCheckable(True)
@@ -220,6 +228,8 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.chat_dock)
         self.chat_dock.setVisible(False)
         self.chat.set_context(None, "general")
+        self.chat.state_provider = self._assistant_state
+        self.chat.action_triggered.connect(self.run_assistant_action)
 
         self.queue_panel = QueuePanel(self.queue)
         self.queue_dock = QDockWidget("File de génération", self)
@@ -285,6 +295,7 @@ class MainWindow(QMainWindow):
 
     def _shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+K"), self, self.focus_chat)
+        QShortcut(QKeySequence("Ctrl+J"), self, self.open_assistant)
         QShortcut(QKeySequence("Ctrl+1"), self, self.go_home)
         QShortcut(QKeySequence("Ctrl+2"), self, lambda: self.go(PAGE_LIBRARY))
         QShortcut(QKeySequence("Ctrl+3"), self, lambda: self.go(PAGE_COURSE))
@@ -845,6 +856,192 @@ class MainWindow(QMainWindow):
             self.library.refresh()
         elif index == PAGE_GRAPH:
             self.graph.rebuild()
+
+    # ------------------------------------------------------------ assistant
+    def open_assistant(self) -> None:
+        self.chat_dock.setVisible(True)
+        self.chat.set_context(None, "assistant", mode="assistant",
+                              title="Assistant de l'application")
+        self.chat.composer.setFocus()
+
+    def _assistant_state(self) -> str:
+        from .. import assistant
+        return assistant.app_state(self.syl, st_mod.compute(self.syl), self.queue.jobs)
+
+    def run_assistant_action(self, action: dict) -> None:
+        """Exécute une action validée d'un clic dans l'assistant."""
+        from .. import assistant
+        kind, aid = action.get("type"), action["id"]
+
+        def done(text: str) -> None:
+            self.chat.set_action_state(aid, "done", text)
+
+        def undone(text: str = "") -> None:
+            self.chat.set_action_state(aid, "", text)
+
+        try:
+            if kind == "generate_courses":
+                before = self.queue.active_count()
+                self.enqueue(action["courses"])
+                added = self.queue.active_count() - before
+                if added:
+                    done("%d ajouté%s à la file" % (added, "s" if added > 1 else ""))
+                else:
+                    undone("rien d'ajouté")
+            elif kind == "regenerate_course":
+                self.queue.enqueue(action["course"], self.syl.title(action["course"]),
+                                   "regenerate")
+                self.queue_dock.setVisible(True)
+                done("ajouté à la file")
+            elif kind == "new_quiz_set":
+                self.enqueue_quiz_set(action["course"])
+                done("série en production")
+            elif kind == "generate_sheets":
+                self.enqueue_sheets(action["courses"])
+                done("fiches en production")
+            elif kind == "correct_td":
+                before = self.queue.active_count()
+                self.enqueue_td(action["td"])
+                if self.queue.active_count() > before:
+                    done("correction lancée")
+                else:
+                    undone()
+            elif kind == "extend_syllabus":
+                self.open_syllabus_dialog()
+                dialog = self._syllabus_dialog
+                dialog.request.setPlainText(action["request"])
+                dialog.count.setValue(int(action["count"]))
+                dialog.propose()
+                done("proposition en cours, fenêtre Syllabus")
+            elif kind == "set_setting":
+                settings.put(action["key"], action["value"])
+                done("réglé")
+            elif kind == "cancel_generation":
+                targets = ([j.course_id for j in self.queue.jobs if j.active]
+                           if action.get("all") else action["courses"])
+                for cid in targets:
+                    self.queue.cancel(cid)
+                done("%d arrêt%s demandé%s" % (len(targets), "s" if len(targets) > 1 else "",
+                                              "s" if len(targets) > 1 else ""))
+            elif kind == "open":
+                if action["page"] == "course":
+                    self.open_course(action["course"])
+                else:
+                    self.go({"home": PAGE_HOME, "library": PAGE_LIBRARY,
+                             "graph": PAGE_GRAPH, "td": PAGE_TD}[action["page"]])
+                done("ouvert")
+            elif kind == "start_session":
+                self.start_session(action["kind"])
+                done("lancé")
+            elif kind == "modify_app":
+                self._start_code_change(action)
+            elif kind == "restart_app":
+                undone()
+                self.restart_app()
+            elif kind == "revert_change":
+                sha = assistant.revert_commit(action["commit"])
+                done("annulé (commit %s) : redémarrez pour l'appliquer" % sha)
+            elif kind == "discard_changes":
+                assistant.discard_changes(action["tracked"], action["created"])
+                done("modifications retirées")
+            elif kind == "keep_changes":
+                sha = assistant.commit_changes(
+                    action["files"],
+                    "assistant: %s (gardé malgré les tests)\n\n"
+                    "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+                    % action["request"].splitlines()[0][:60])
+                done("enregistré (commit %s)" % sha)
+        except Exception as exc:  # noqa: BLE001
+            self.chat.set_action_state(aid, "failed", str(exc)[:200])
+
+    def _start_code_change(self, action: dict) -> None:
+        from .. import assistant
+        aid = action["id"]
+        if getattr(self, "_code_worker", None) is not None:
+            self.chat.set_action_state(aid, "", "une modification est déjà en cours")
+            return
+        answer = QMessageBox.question(
+            self, "Modifier l'application",
+            "Claude va modifier le code de l'application :\n\n%s\n\n"
+            "Il peut seulement lire et éditer les fichiers du projet, pas vos cours ni votre "
+            "progression. L'application lance ensuite les tests. Si tout passe, le "
+            "changement est enregistré dans git, et vous pouvez redémarrer ou l'annuler.\n\n"
+            "Comptez quelques minutes et de l'ordre de 1 à 5 $." % action["detail"],
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            self.chat.set_action_state(aid, "", "")
+            return
+        worker = assistant.CodeChangeWorker(action["request"], self)
+        self._code_worker = worker
+        self.chat.set_action_state(aid, "running", "en cours…")
+        self.chat.work_begin("Modification : %s" % action["detail"])
+        worker.activity.connect(self.chat.work_line)
+        worker.done.connect(lambda result, a=aid: self._on_code_change_done(a, result))
+        worker.finished.connect(lambda: setattr(self, "_code_worker", None))
+        worker.start()
+
+    def _on_code_change_done(self, aid: str, result: dict) -> None:
+        import html as html_mod
+        import uuid
+        summary = result.get("summary") or ""
+        cost = float(result.get("cost") or 0.0)
+        if result.get("ok"):
+            self.chat.set_action_state(aid, "done", "fait, commit %s" % result["commit"])
+            body = (summary or "<p>Modification faite.</p>") + (
+                "<p><em>Tests : %s · commit %s · %.2f $</em></p>"
+                % (html_mod.escape(result.get("tests", "")), result["commit"], cost))
+            self.chat.work_end(body, [
+                {"id": uuid.uuid4().hex[:8], "type": "restart_app", "button": "Redémarrer",
+                 "label": "Redémarrer l'application",
+                 "detail": "Pour charger la modification."},
+                {"id": uuid.uuid4().hex[:8], "type": "revert_change", "button": "Annuler",
+                 "secondary": True, "commit": result["commit"],
+                 "label": "Annuler ce changement",
+                 "detail": "Revient à la version précédente (git revert %s)." % result["commit"]},
+            ])
+            self.notice.show_message("Modification de l'application prête",
+                                     "Redémarrer", self.restart_app)
+        elif result.get("files"):
+            self.chat.set_action_state(aid, "failed", "pas enregistré")
+            body = summary + "<p><strong>%s</strong> Rien n'a été enregistré.</p>" % (
+                html_mod.escape(result["error"]) if result.get("error")
+                else "Les tests échouent encore.")
+            if result.get("tests"):
+                body += "<pre>%s</pre>" % html_mod.escape(result["tests"][-2500:])
+            self.chat.work_end(body, [
+                {"id": uuid.uuid4().hex[:8], "type": "discard_changes", "button": "Retirer",
+                 "tracked": result.get("tracked", []), "created": result.get("created", []),
+                 "label": "Retirer ces modifications",
+                 "detail": ", ".join(result["files"][:8])},
+                {"id": uuid.uuid4().hex[:8], "type": "keep_changes", "button": "Garder",
+                 "secondary": True, "files": result["files"], "request": result["request"],
+                 "label": "Les garder quand même",
+                 "detail": "Enregistre dans git malgré les tests."},
+            ])
+        else:
+            self.chat.set_action_state(aid, "failed", "échec")
+            self.chat.work_end("<p>%s</p>%s" % (
+                html_mod.escape(result.get("error") or "Échec."), summary))
+
+    def restart_app(self) -> None:
+        import sys
+        from PySide6.QtCore import QProcess
+        from PySide6.QtWidgets import QApplication
+        from ..paths import PROJECT_ROOT
+        running = self.queue.active_count()
+        if running and QMessageBox.question(
+                self, "Redémarrer",
+                "%d génération%s en cours s'arrêter%s. Elles reprendront là où elles en "
+                "étaient avec « Reprendre ». Redémarrer quand même ?"
+                % (running, "s" if running > 1 else "", "ont" if running > 1 else "a"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        self.close()
+        if self.isVisible():
+            return
+        QProcess.startDetached(sys.executable, ["-m", "mathsapp"], str(PROJECT_ROOT))
+        QApplication.quit()
 
     def open_syllabus_dialog(self) -> None:
         dialog = getattr(self, "_syllabus_dialog", None)

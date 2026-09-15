@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..content import protect_math
-from .. import content, settings
+from .. import assistant, content, settings
 from ..chat import ChatSession, ChatWorker, clean_answer
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
@@ -24,6 +24,13 @@ EMPTY_GENERAL = (
     "Sélectionnez un passage d'un cours pour le mettre en contexte."
 )
 EMPTY_COURSE = "Questions sur ce cours. Le contexte du cursus est déjà fourni à Claude."
+EMPTY_ASSISTANT = (
+    "Demandez ce que vous voulez changer dans l'application.<br>"
+    "« Génère les cours de probas utiles pour le TD »<br>"
+    "« Passe les exercices en Opus »<br>"
+    "« Ajoute un bouton pour exporter mes notes »<br>"
+    "Rien n'est lancé sans votre clic."
+)
 
 
 class Composer(QPlainTextEdit):
@@ -52,6 +59,7 @@ class ChatPanel(QWidget):
     et l'assistant de demonstration."""
 
     busy_changed = Signal(bool)
+    action_triggered = Signal(dict)
 
     def __init__(self, syllabus: Optional[Syllabus] = None, parent=None):
         super().__init__(parent)
@@ -61,6 +69,10 @@ class ChatPanel(QWidget):
         self._empty_text = EMPTY_GENERAL
         self._ready = False
         self._queued_calls: list[str] = []
+        self.state_provider = None          # fourni par la fenetre, pour l'assistant
+        self._actions: dict = {}
+        self._raw = ""
+        self._sent = 0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -87,8 +99,9 @@ class ChatPanel(QWidget):
         hl.addWidget(self.btn_clear)
         root.addWidget(head)
 
-        self.view = WebView(self)
+        self.view = WebView(self, with_bridge=True)
         self.view.loadFinished.connect(self._on_loaded)
+        self.view.bridge.action_requested.connect(self._on_action_clicked)
         root.addWidget(self.view, 1)
 
         bottom = QWidget()
@@ -151,7 +164,9 @@ class ChatPanel(QWidget):
             return
         self.stop()
         self.session = ChatSession(course, self.syl, context_key, mode)
-        self._empty_text = EMPTY_COURSE if course else EMPTY_GENERAL
+        self.session.state_provider = self.state_provider
+        self._empty_text = (EMPTY_ASSISTANT if mode == "assistant"
+                            else EMPTY_COURSE if course else EMPTY_GENERAL)
         self.title.setText(title or (course.title if course else "Discussion générale"))
         self.hint.setText("modèle : %s" % settings.get("model/chat"))
         self._js("window.chatReset(%s);" % json.dumps(self._empty_text))
@@ -198,6 +213,7 @@ class ChatPanel(QWidget):
         self._start(prompt)
 
     def _start(self, prompt: str) -> None:
+        self._raw, self._sent = "", 0
         self._js("window.chatBegin();")
         self.worker = ChatWorker(prompt, self.session.model, self.session.system,
                                  self.session.session_id, self)
@@ -214,14 +230,61 @@ class ChatPanel(QWidget):
         self.btn_stop.setVisible(busy)
         self.busy_changed.emit(busy)
 
+    @property
+    def is_assistant(self) -> bool:
+        return self.session is not None and self.session.mode == "assistant"
+
     def _on_delta(self, chunk: str) -> None:
-        self._js("window.chatDelta(%s);" % json.dumps(chunk))
+        if not self.is_assistant:
+            self._js("window.chatDelta(%s);" % json.dumps(chunk))
+            return
+        # le bloc <actions> ne doit pas s'afficher pendant la reception
+        self._raw += chunk
+        limit = assistant.visible_limit(self._raw)
+        if limit > self._sent:
+            self._js("window.chatDelta(%s);" % json.dumps(self._raw[self._sent:limit]))
+            self._sent = limit
 
     def _on_done(self, text: str, session_id: str) -> None:
+        actions: list = []
+        if self.is_assistant:
+            text, actions = assistant.parse_actions(text, self.syl)
+            if not text.strip() and actions:
+                text = "<p>Voici ce que je propose :</p>"
         answer = clean_answer(text)
         self._js("window.chatFinalize(%s);" % json.dumps(protect_math(answer)))
         if self.session:
             self.session.record_assistant(answer, session_id)
+        self.show_actions(actions)
+
+    # ------------------------------------------------------------ assistant
+    def show_actions(self, actions: list) -> None:
+        if not actions:
+            return
+        for action in actions:
+            self._actions[action["id"]] = action
+        self._js("window.chatActions(%s);" % json.dumps(actions, ensure_ascii=False))
+
+    def _on_action_clicked(self, action_id: str) -> None:
+        action = self._actions.get(action_id)
+        if action is not None:
+            self.action_triggered.emit(action)
+
+    def set_action_state(self, action_id: str, state: str, text: str = "") -> None:
+        self._js("window.chatActionState(%s, %s, %s);"
+                 % (json.dumps(action_id), json.dumps(state), json.dumps(text)))
+
+    def work_begin(self, title: str) -> None:
+        self._js("window.chatWorkBegin(%s);" % json.dumps(title))
+
+    def work_line(self, line: str) -> None:
+        self._js("window.chatWorkLine(%s);" % json.dumps(line))
+
+    def work_end(self, html: str, actions: Optional[list] = None) -> None:
+        self._js("window.chatWorkEnd(%s);" % json.dumps(protect_math(html)))
+        if self.session:
+            self.session.record_assistant(html, "")
+        self.show_actions(actions or [])
 
     def _on_failed(self, message: str) -> None:
         self._js("window.chatError(%s);" % json.dumps(html_mod.escape(message)))
