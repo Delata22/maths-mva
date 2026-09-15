@@ -90,6 +90,13 @@ def app_state(syl: Syllabus, statuses: dict, jobs=()) -> str:
             tid, td_mod.title(tid),
             "%d/%d exercices corrigés" % (st["corrected"], st["total"])
             if st["structured"] else "sujet pas encore lu"))
+        linked: Dict[str, int] = {}
+        for ex in td_mod.exercises(tid):
+            for cid in ex.get("courses") or []:
+                linked[cid] = linked.get(cid, 0) + 1
+        if linked:
+            lines.append("  cours utilisés (nombre d'exercices) : %s" % ", ".join(
+                "%s (%d)" % (cid, n) for cid, n in sorted(linked.items(), key=lambda kv: -kv[1])))
     if not tds:
         lines.append("- (aucun)")
 
@@ -406,9 +413,10 @@ class CodeChangeWorker(QThread):
 
     MAX_FIX_ROUNDS = 2
 
-    def __init__(self, request: str, parent=None):
+    def __init__(self, request: str, parent=None, title: str = ""):
         super().__init__(parent)
         self.request = request
+        self.title = title
         self._stop = False
         self._proc: Optional[subprocess.Popen] = None
 
@@ -437,6 +445,7 @@ class CodeChangeWorker(QThread):
         killer = threading.Timer(2400, self.request_stop)
         killer.start()
         final, cost = "", 0.0
+        seen_tools = set()
         try:
             assert self._proc.stdout is not None
             for line in self._proc.stdout:
@@ -448,7 +457,9 @@ class CodeChangeWorker(QThread):
                     continue
                 if obj.get("type") == "assistant":
                     for block in obj.get("message", {}).get("content", []):
-                        if block.get("type") == "tool_use":
+                        # un meme appel d'outil peut revenir dans plusieurs messages
+                        if block.get("type") == "tool_use" and block.get("id") not in seen_tools:
+                            seen_tools.add(block.get("id"))
                             self.activity.emit(_describe_tool(block))
                 elif obj.get("type") == "result":
                     final = obj.get("result") or ""
@@ -496,7 +507,7 @@ class CodeChangeWorker(QThread):
                 if ok:
                     message = ("assistant: %s\n\n%s\n\nCo-Authored-By: Claude Opus 5 "
                                "<noreply@anthropic.com>"
-                               % (self.request.splitlines()[0][:68],
+                               % (_subject(self.title or self.request),
                                   re.sub(r"<[^>]+>", "", summary).strip()[:1500]))
                     result["commit"] = commit_changes(result["files"], message)
                     result["ok"] = True
@@ -516,14 +527,25 @@ class CodeChangeWorker(QThread):
         self.done.emit(result)
 
 
+def _subject(text: str, width: int = 68) -> str:
+    """Titre de commit : première ligne, coupée à un mot entier."""
+    line = re.sub(r"\s+", " ", text.strip().splitlines()[0] if text.strip() else "modification")
+    if len(line) <= width:
+        return line
+    return line[:width].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
+
+
 def _describe_tool(block: dict) -> str:
     name = block.get("name", "")
     data = block.get("input") or {}
     path = str(data.get("file_path") or data.get("path") or data.get("pattern") or "")
-    try:
-        path = str(os.path.relpath(path, PROJECT_ROOT)) if path.startswith("/") else path
-    except ValueError:
-        pass
+    if path.startswith("/"):
+        # chemins resolus des deux cotes : /tmp ou le dossier personnel peuvent
+        # etre des liens symboliques
+        root = os.path.realpath(str(PROJECT_ROOT))
+        real = os.path.realpath(path)
+        if real == root or real.startswith(root + os.sep):
+            path = os.path.relpath(real, root)
     verb = {"Read": "Lecture", "Edit": "Modification", "Write": "Écriture",
             "Glob": "Recherche de fichiers", "Grep": "Recherche"}.get(name, name)
     return "%s : %s" % (verb, path) if path else verb

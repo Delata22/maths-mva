@@ -971,7 +971,7 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             self.chat.set_action_state(aid, "", "")
             return
-        worker = assistant.CodeChangeWorker(action["request"], self)
+        worker = assistant.CodeChangeWorker(action["request"], self, title=action["detail"])
         self._code_worker = worker
         self.chat.set_action_state(aid, "running", "en cours…")
         self.chat.work_begin("Modification : %s" % action["detail"])

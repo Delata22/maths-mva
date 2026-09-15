@@ -329,6 +329,9 @@ def test_assistant() -> None:
     check("assistant : flux coupe avant le bloc",
           [assistant.visible_limit(s) for s in ("abc", "abc<act", "abc<actions>[", "a<b")]
           == [3, 3, 3, 3])
+    subject = assistant._subject("Dans la page TD, renommer le bouton « Énoncé seul » en « Masquer la correction »")
+    check("assistant : titre de commit coupe a un mot entier",
+          len(subject) <= 69 and subject.endswith("…") and "Énonc…" not in subject, subject)
     state = assistant.app_state(syl, st_mod.compute(syl))
     check("assistant : etat complet",
           "pro-markov" in state and "RÉGLAGES MODIFIABLES" in state and "TD IMPORTÉS" in state,
@@ -523,7 +526,9 @@ def test_quiz_sets() -> None:
           == len(content.all_questions(cid)))
 
     # suivi par question, sans polluer les scores du cours ni l'historique reel
-    saved = store.question_history(cid)
+    # copie brute de toutes les colonnes : echeances et intervalles compris
+    saved = [dict(r) for r in store.conn().execute(
+        "SELECT * FROM question_result WHERE course_id=?", (cid,))]
     before = len(store.attempts(cid))
     qs = sets[0]["qcm"][:3]
     try:
@@ -541,15 +546,16 @@ def test_quiz_sets() -> None:
         check("questions ratees identifiables", ko == [qs[1]["id"]], str(ko))
     finally:
         store.reset_question_history(cid)
-        now = __import__("time").time()
-        for set_id, items in saved.items():
-            for qid, h in items.items():
-                store.conn().execute(
-                    "INSERT OR REPLACE INTO question_result "
-                    "(course_id, set_id, question_id, last_ok, tries, ok_count, updated_at) "
-                    "VALUES (?,?,?,?,?,?,?)",
-                    (cid, set_id, qid, 1 if h["ok"] else 0, h["tries"], h["okCount"], now))
+        for row in saved:
+            store.conn().execute(
+                "INSERT OR REPLACE INTO question_result (%s) VALUES (%s)"
+                % (", ".join(row), ", ".join("?" * len(row))), tuple(row.values()))
         store.conn().commit()
+        restored = [dict(r) for r in store.conn().execute(
+            "SELECT * FROM question_result WHERE course_id=?", (cid,))]
+        key = lambda r: (r["set_id"], r["question_id"])
+        check("historique reel restaure a l'identique",
+              sorted(restored, key=key) == sorted(saved, key=key))
 
     # requalification des faux exercices
     batch = [
@@ -734,7 +740,9 @@ def test_score_updates() -> None:
     if len(questions) < 6:
         return
 
-    saved = store.question_history(cid)
+    # copie brute de toutes les colonnes : echeances et intervalles compris
+    saved = [dict(r) for r in store.conn().execute(
+        "SELECT * FROM question_result WHERE course_id=?", (cid,))]
     saved_attempts = list(store.attempts(cid))
     try:
         store.reset_question_history(cid)
@@ -787,15 +795,16 @@ def test_score_updates() -> None:
                 "VALUES (?,?,?,?,?)",
                 (cid, row["finished_at"], row["total"], row["correct"], row["detail"]))
         store.conn().commit()
-        now = __import__("time").time()
-        for set_id, items in saved.items():
-            for qid, h in items.items():
-                store.conn().execute(
-                    "INSERT OR REPLACE INTO question_result "
-                    "(course_id, set_id, question_id, last_ok, tries, ok_count, updated_at) "
-                    "VALUES (?,?,?,?,?,?,?)",
-                    (cid, set_id, qid, 1 if h["ok"] else 0, h["tries"], h["okCount"], now))
+        for row in saved:
+            store.conn().execute(
+                "INSERT OR REPLACE INTO question_result (%s) VALUES (%s)"
+                % (", ".join(row), ", ".join("?" * len(row))), tuple(row.values()))
         store.conn().commit()
+        restored = [dict(r) for r in store.conn().execute(
+            "SELECT * FROM question_result WHERE course_id=?", (cid,))]
+        key = lambda r: (r["set_id"], r["question_id"])
+        check("historique reel restaure a l'identique",
+              sorted(restored, key=key) == sorted(saved, key=key))
 
 
 def test_sheet() -> None:
