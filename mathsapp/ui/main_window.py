@@ -26,9 +26,10 @@ from .prefs import PrefsDialog
 from .queue_panel import QueuePanel
 from .session_page import SessionPage
 from .td_page import TdPage
+from .questions_page import QuestionsPage
 from .syllabus_dialog import SyllabusDialog
 
-PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH, PAGE_SESSION, PAGE_TD = range(6)
+PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH, PAGE_SESSION, PAGE_TD, PAGE_QUESTIONS = range(7)
 
 
 class NoticeBar(QWidget):
@@ -145,6 +146,8 @@ class MainWindow(QMainWindow):
             (PAGE_COURSE, "Cours", "Le cours ouvert"),
             (PAGE_GRAPH, "Graphe", "Le cursus comme graphe de prérequis"),
             (PAGE_TD, "TD", "Sujets de TD importés et leurs corrections commentées"),
+            (PAGE_QUESTIONS, "Questions",
+             "Une question libre : la réponse et les cours qui la traitent  (Ctrl+6)"),
         ]:
             btn = QToolButton()
             btn.setText(label)
@@ -205,8 +208,9 @@ class MainWindow(QMainWindow):
         self.graph = GraphPage(self.syl)
         self.session = SessionPage(self.syl)
         self.td_page = TdPage(self.syl)
+        self.questions_page = QuestionsPage(self.syl)
         for page in (self.dashboard, self.library, self.course_page, self.graph,
-                     self.session, self.td_page):
+                     self.session, self.td_page, self.questions_page):
             self.stack.addWidget(page)
 
         central = QWidget()
@@ -230,6 +234,7 @@ class MainWindow(QMainWindow):
         self.chat.set_context(None, "general")
         self.chat.state_provider = self._assistant_state
         self.chat.action_triggered.connect(self.run_assistant_action)
+        self.chat.course_opened.connect(self.open_course_at)
 
         self.queue_panel = QueuePanel(self.queue)
         self.queue_dock = QDockWidget("File de génération", self)
@@ -282,6 +287,7 @@ class MainWindow(QMainWindow):
         self.td_page.ask_requested.connect(self.ask_about)
         self.td_page.proof_help_requested.connect(self.open_proof_helper)
         self.td_page.correct_requested.connect(self.enqueue_td)
+        self.questions_page.course_opened.connect(self.open_course_at)
 
         self.queue_panel.course_opened.connect(self.open_course)
         self.queue_panel.retried.connect(lambda: self.statusBar().showMessage(
@@ -301,6 +307,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+3"), self, lambda: self.go(PAGE_COURSE))
         QShortcut(QKeySequence("Ctrl+4"), self, lambda: self.go(PAGE_GRAPH))
         QShortcut(QKeySequence("Ctrl+5"), self, lambda: self.go(PAGE_TD))
+        QShortcut(QKeySequence("Ctrl+6"), self, lambda: self.go(PAGE_QUESTIONS))
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("Ctrl+N"), self, self.open_syllabus_dialog)
         QShortcut(QKeySequence("Ctrl+G"), self, lambda: self.queue_dock.setVisible(
@@ -321,6 +328,8 @@ class MainWindow(QMainWindow):
             self.graph.rebuild()
         elif page == PAGE_TD:
             self.td_page.refresh()
+        elif page == PAGE_QUESTIONS:
+            self.questions_page.refresh()
 
     def go_home(self) -> None:
         self.go(PAGE_HOME)
@@ -847,6 +856,7 @@ class MainWindow(QMainWindow):
         self.course_page.apply_theme()
         self.session.apply_theme()
         self.td_page.apply_theme()
+        self.questions_page.apply_theme()
         for window in self._proof_windows:
             window.chat.apply_theme()
         index = self.stack.currentIndex()
@@ -856,6 +866,14 @@ class MainWindow(QMainWindow):
             self.library.refresh()
         elif index == PAGE_GRAPH:
             self.graph.rebuild()
+
+    def open_course_at(self, course_id: str, section: str = "") -> None:
+        """Lien d'une reponse : ouvre le cours, a la section citee s'il y en a une."""
+        if course_id not in self.syl.courses:
+            return
+        self.open_course(course_id)
+        if section:
+            self.course_page.scroll_to_section(section)
 
     # ------------------------------------------------------------ assistant
     def open_assistant(self) -> None:
@@ -1061,6 +1079,7 @@ class MainWindow(QMainWindow):
             page.set_syllabus(self.syl)
         self.session.syl = self.syl
         self.td_page.set_syllabus(self.syl)
+        self.questions_page.set_syllabus(self.syl)
         self.chat.syl = self.syl
         for window in self._proof_windows:
             window.chat.syl = self.syl

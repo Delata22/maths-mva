@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..content import protect_math
-from .. import assistant, content, settings
+from .. import assistant, content, questions, settings
 from ..chat import ChatSession, ChatWorker, clean_answer
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
@@ -24,6 +24,12 @@ EMPTY_GENERAL = (
     "Sélectionnez un passage d'un cours pour le mettre en contexte."
 )
 EMPTY_COURSE = "Questions sur ce cours. Le contexte du cursus est déjà fourni à Claude."
+EMPTY_QUESTION = (
+    "Posez n'importe quelle question de maths.<br>"
+    "« Pourquoi la variance d'une somme n'est-elle pas la somme des variances ? »<br>"
+    "« À quoi sert l'uniforme intégrabilité ? »<br>"
+    "La réponse se termine par les cours qui en parlent, avec un lien vers la section."
+)
 EMPTY_ASSISTANT = (
     "Demandez ce que vous voulez changer dans l'application.<br>"
     "« Génère les cours de probas utiles pour le TD »<br>"
@@ -60,6 +66,7 @@ class ChatPanel(QWidget):
 
     busy_changed = Signal(bool)
     action_triggered = Signal(dict)
+    course_opened = Signal(str, str)     # cours, section (liens des reponses)
 
     def __init__(self, syllabus: Optional[Syllabus] = None, parent=None):
         super().__init__(parent)
@@ -102,6 +109,8 @@ class ChatPanel(QWidget):
         self.view = WebView(self, with_bridge=True)
         self.view.loadFinished.connect(self._on_loaded)
         self.view.bridge.action_requested.connect(self._on_action_clicked)
+        self.view.bridge.course_open_requested.connect(lambda cid: self.course_opened.emit(cid, ""))
+        self.view.bridge.course_section_requested.connect(self.course_opened.emit)
         root.addWidget(self.view, 1)
 
         bottom = QWidget()
@@ -166,6 +175,7 @@ class ChatPanel(QWidget):
         self.session = ChatSession(course, self.syl, context_key, mode)
         self.session.state_provider = self.state_provider
         self._empty_text = (EMPTY_ASSISTANT if mode == "assistant"
+                            else EMPTY_QUESTION if mode == "question"
                             else EMPTY_COURSE if course else EMPTY_GENERAL)
         self.title.setText(title or (course.title if course else "Discussion générale"))
         self.hint.setText("modèle : %s" % settings.get("model/chat"))
@@ -174,6 +184,8 @@ class ChatPanel(QWidget):
             role = msg["role"]
             body = (html_mod.escape(msg["content"]) if role == "user"
                     else clean_answer(msg["content"]))
+            if mode == "question" and role != "user":
+                body = questions.link_courses(body, self.syl)
             self._js("window.chatAdd(%s, %s);" % (json.dumps(role), json.dumps(protect_math(body))))
 
     def reset(self) -> None:
@@ -252,6 +264,8 @@ class ChatPanel(QWidget):
             if not text.strip() and actions:
                 text = "<p>Voici ce que je propose :</p>"
         answer = clean_answer(text)
+        if self.session and self.session.mode == "question":
+            answer = questions.link_courses(answer, self.syl)
         self._js("window.chatFinalize(%s);" % json.dumps(protect_math(answer)))
         if self.session:
             self.session.record_assistant(answer, session_id)

@@ -19,6 +19,7 @@ class Bridge(QObject):
     quiz_set_requested = Signal()                 # nouvelle serie de QCM
     course_open_requested = Signal(str)           # identifiant de cours
     action_requested = Signal(str)                # assistant : identifiant d'action
+    course_section_requested = Signal(str, str)   # cours, titre de section
 
     @Slot(str, str)
     def askAbout(self, text: str, heading: str) -> None:  # noqa: N802 (appele par JS)
@@ -39,6 +40,10 @@ class Bridge(QObject):
     @Slot(str)
     def openCourse(self, course_id: str) -> None:  # noqa: N802
         self.course_open_requested.emit(course_id)
+
+    @Slot(str, str)
+    def openCourseAt(self, course_id: str, section: str) -> None:  # noqa: N802
+        self.course_section_requested.emit(course_id, section)
 
     @Slot(str)
     def runAction(self, action_id: str) -> None:  # noqa: N802

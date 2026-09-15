@@ -259,6 +259,18 @@ window.chatWorkEnd = function (html) {
   work = null;
   window.chatAdd('assistant', html);
 };
+
+// liens vers les cours dans les reponses : ouvrir le cours, a la bonne section
+document.addEventListener('click', function (ev) {
+  var link = ev.target && ev.target.closest ? ev.target.closest('a.course-ref') : null;
+  if (!link) return;
+  ev.preventDefault();
+  var id = link.getAttribute('data-course');
+  var section = link.getAttribute('data-section') || '';
+  if (!bridge || !id) return;
+  if (section && bridge.openCourseAt) bridge.openCourseAt(id, section);
+  else if (bridge.openCourse) bridge.openCourse(id);
+});
 </script>
 </body>
 </html>

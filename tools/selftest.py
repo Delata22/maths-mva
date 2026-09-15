@@ -193,6 +193,7 @@ def test_prompts_integrity() -> None:
             syl, course, content.digest(cid, limit=800), [dict(questions[0], tries=2)],
             ["une question"]),
         "assistant_system": lambda: prompts.assistant_system("ÉTAT"),
+        "question_system": lambda: prompts.question_system("CATALOGUE"),
         "code_change_system": lambda: prompts.code_change_system(),
         "code_change_prompt": lambda: prompts.code_change_prompt(
             "Sur la page d'accueil, ajouter un bouton « Exporter mes notes » qui écrit "
@@ -291,6 +292,51 @@ def test_td() -> None:
             os.environ.pop("MATHSAPP_LIBRARY", None)
         else:
             os.environ["MATHSAPP_LIBRARY"] = previous
+
+
+def test_questions() -> None:
+    """Questions libres : catalogue, verification des liens, fils."""
+    import html
+    from mathsapp import content, questions, store
+    from mathsapp.syllabus import load
+    syl = load()
+
+    ready = next((c.id for c in syl.all()
+                  if content.is_complete(c.id) and questions.section_titles(c.id)), None)
+    todo = next(c.id for c in syl.all() if not content.is_complete(c.id))
+    cat = questions.catalogue(syl)
+    check("questions : catalogue complet",
+          todo in cat and (ready is None or questions.section_titles(ready)[0] in cat),
+          "%d octets" % len(cat.encode("utf-8")))
+    check("questions : catalogue assez court pour la ligne de commande",
+          len(cat.encode("utf-8")) < 100000)
+    if ready:
+        title = questions.section_titles(ready)[0]
+        src = ('<p>Voir <a class="course-ref" data-course="%s" data-section="%s">A</a>, '
+               '<a class="course-ref" data-course="%s">B</a> et '
+               '<a class="course-ref" data-course="inexistant">C</a> puis '
+               '<a class="course-ref" data-course="%s" data-section="Section imaginaire">D</a>.</p>'
+               % (ready, title.upper(), todo, ready))
+        out = questions.link_courses(src, syl)
+        check("questions : section retrouvee malgre la casse",
+              'data-section="%s"' % html.escape(title, quote=True) in out, out[:240])
+        check("questions : cours pas encore redige signale",
+              'class="course-ref todo" data-course="%s"' % todo in out)
+        check("questions : cours inconnu retire", "inexistant" not in out and " et C puis " in out)
+        check("questions : section imaginaire ignoree", "Section imaginaire" not in out)
+        check("questions : verification idempotente", questions.link_courses(out, syl) == out)
+        check("questions : cours cites", questions.referenced_courses(out)[:2] == [ready, todo])
+
+    thread = store.create_thread(None, questions.new_key(), "Nouvelle question")
+    try:
+        check("questions : fil vide non liste",
+              all(r["id"] != thread for r in questions.threads()))
+        store.add_message(thread, "user", "Qu'est-ce qu'une tribu ?")
+        check("questions : fil liste des le premier message",
+              any(r["id"] == thread for r in questions.threads()))
+    finally:
+        store.delete_thread(thread)
+    check("questions : fil supprime", all(r["id"] != thread for r in questions.threads()))
 
 
 def test_assistant() -> None:
@@ -1197,6 +1243,21 @@ def test_views() -> None:
           window.stack.currentIndex() == PAGE_GRAPH)
     window.chat.set_context(None, "general")
 
+    from mathsapp.ui.main_window import PAGE_QUESTIONS
+    from mathsapp import questions as questions_mod, store as store_mod
+    window.go(PAGE_QUESTIONS)
+    qpanel = window.questions_page.panel
+    check("page des questions ouverte",
+          window.stack.currentIndex() == PAGE_QUESTIONS and qpanel.session is not None
+          and qpanel.session.mode == "question")
+    check("questions : catalogue fourni a Claude", "CATALOGUE DU CURSUS" in qpanel.session.system)
+    opened = []
+    window.questions_page.course_opened.disconnect(window.open_course_at)
+    window.questions_page.course_opened.connect(lambda c, s: opened.append((c, s)))
+    qpanel.view.bridge.openCourseAt(first, "Une section")
+    check("questions : lien vers une section transmis", opened == [(first, "Une section")])
+    store_mod.delete_empty_threads(questions_mod.PREFIX)
+
     from mathsapp.ui.main_window import PAGE_TD
     window.go(PAGE_TD)
     check("page des TD ouverte", window.stack.currentIndex() == PAGE_TD,
@@ -1238,6 +1299,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- questions libres ---")
+    test_questions()
     print("\n--- assistant ---")
     test_assistant()
     print("\n--- inegalites dans les formules ---")

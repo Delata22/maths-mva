@@ -200,9 +200,38 @@
       if (!link) return;
       ev.preventDefault();
       var id = link.getAttribute('data-course');
-      if (bridge && id && bridge.openCourse) bridge.openCourse(id);
+      var section = link.getAttribute('data-section') || '';
+      if (!bridge || !id) return;
+      if (section && bridge.openCourseAt) bridge.openCourseAt(id, section);
+      else if (bridge.openCourse) bridge.openCourse(id);
     });
   }
+
+  // Aller a une section d'apres son titre (liens des reponses aux questions).
+  // Correspondance souple : les titres contiennent parfois des formules rendues.
+  window.scrollToSection = function (title) {
+    function norm(s) {
+      return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+    var want = norm(title), best = null, bestScore = 0;
+    var words = want.split(' ').filter(function (w) { return w.length > 3; });
+    Array.prototype.forEach.call(document.querySelectorAll('article h2, article h3'), function (h) {
+      var got = norm(h.textContent), score = 0;
+      if (got === want) score = 3;
+      else if (want && (got.indexOf(want) >= 0 || want.indexOf(got) >= 0)) score = 2;
+      else if (words.length) {
+        var hits = words.filter(function (w) { return got.indexOf(w) >= 0; }).length;
+        if (hits / words.length >= 0.6) score = 1 + hits / 100;
+      }
+      if (score > bestScore) { bestScore = score; best = h; }
+    });
+    if (!best) return false;
+    window.scrollTo(0, best.getBoundingClientRect().top + window.scrollY - 60);
+    best.classList.add('flash');
+    setTimeout(function () { best.classList.remove('flash'); }, 1800);
+    return true;
+  };
 
   window.setTheme = function (name) {
     document.documentElement.setAttribute('data-theme', name);

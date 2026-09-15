@@ -242,6 +242,9 @@ class CoursePage(QWidget):
             [self.course.id] if self.course else []))
 
         self.course_view = WebView(with_bridge=True)
+        self._pending_section = ""
+        self._course_loading = False
+        self.course_view.loadFinished.connect(self._on_course_loaded)
         self.course_view.bridge.ask_requested.connect(self._forward_ask)
         self.course_view.bridge.proof_help_requested.connect(self._forward_proof_help)
 
@@ -337,6 +340,28 @@ class CoursePage(QWidget):
             self.refresh()
 
     # -------------------------------------------------------------- chargement
+    def scroll_to_section(self, title: str) -> None:
+        """Amene la vue du cours sur une section, des que la page est prete."""
+        if not title or self.course is None:
+            return
+        self._pending_section = title
+        self.tabs.setCurrentIndex(TAB_COURSE)
+        if TAB_COURSE in self._loaded_tabs and not self._course_loading:
+            self._apply_pending_section()
+
+    def _on_course_loaded(self, _ok: bool) -> None:
+        self._course_loading = False
+        if self._pending_section:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(450, self._apply_pending_section)
+
+    def _apply_pending_section(self) -> None:
+        import json as _json
+        title, self._pending_section = self._pending_section, ""
+        if title:
+            self.course_view.run_js("window.scrollToSection && window.scrollToSection(%s);"
+                                    % _json.dumps(title))
+
     def show_course(self, course_id: str) -> None:
         same = self.course is not None and self.course.id == course_id
         self.course = self.syl.get(course_id)
@@ -424,6 +449,7 @@ class CoursePage(QWidget):
         cid = self.course.id
         if index == TAB_COURSE and self.status and self.status.generated:
             path = content.render_course_page(cid, self.course.title, theme.name())
+            self._course_loading = True
             self.course_view.load_file(path)
             self._loaded_tabs.add(index)
         elif index == TAB_SHEET and content.has_sheet(cid):

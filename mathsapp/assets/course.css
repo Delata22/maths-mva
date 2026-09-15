@@ -395,3 +395,8 @@ a.course-ref {
 }
 a.course-ref::before { content: "↗ "; font-size: .85em; }
 a.course-ref:hover { border-bottom-style: solid; }
+
+/* cours pas encore redige : le lien l'ouvre pour le generer */
+a.course-ref.todo { color: var(--warn, #c2740a); border-bottom-color: var(--warn, #c2740a); }
+/* section atteinte par un lien */
+article h2.flash, article h3.flash { background: var(--accent-soft); transition: background .4s; }

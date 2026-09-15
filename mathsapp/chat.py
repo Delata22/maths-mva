@@ -82,6 +82,10 @@ class ChatSession:
             return proof_review_system(self.course, self.syl, "complete")
         if self.mode == "review-etape":
             return proof_review_system(self.course, self.syl, "etape")
+        if self.mode == "question":
+            from .generation.prompts import question_system
+            from .questions import catalogue
+            return question_system(catalogue(self.syl))
         if self.mode == "assistant":
             from .generation.prompts import assistant_system
             return assistant_system(self.state_provider() if self.state_provider else "")
@@ -95,6 +99,8 @@ class ChatSession:
         return store.messages(self.thread_id)
 
     def record_user(self, text: str) -> None:
+        if self.mode == "question" and not store.messages(self.thread_id):
+            store.set_thread_title(self.thread_id, " ".join(text.split())[:120])
         store.add_message(self.thread_id, "user", text)
 
     def record_assistant(self, text: str, session_id: str) -> None:

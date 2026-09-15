@@ -491,3 +491,34 @@ def clear_thread(thread_id: int) -> None:
     c.execute("DELETE FROM chat_message WHERE thread_id=?", (thread_id,))
     c.execute("UPDATE chat_thread SET session_id=NULL WHERE id=?", (thread_id,))
     c.commit()
+
+
+# ------------------------------------------------------------ questions libres
+def question_threads(prefix: str) -> List[sqlite3.Row]:
+    """Fils dont la cle commence par `prefix` et qui ont au moins un message."""
+    return list(conn().execute(
+        "SELECT t.*, COUNT(m.id) AS n FROM chat_thread t "
+        "JOIN chat_message m ON m.thread_id = t.id "
+        "WHERE t.context_key LIKE ? GROUP BY t.id ORDER BY t.updated_at DESC",
+        (prefix + "%",)))
+
+
+def set_thread_title(thread_id: int, title: str) -> None:
+    c = conn()
+    c.execute("UPDATE chat_thread SET title=? WHERE id=?", (title, thread_id))
+    c.commit()
+
+
+def delete_thread(thread_id: int) -> None:
+    c = conn()
+    c.execute("DELETE FROM chat_message WHERE thread_id=?", (thread_id,))
+    c.execute("DELETE FROM chat_thread WHERE id=?", (thread_id,))
+    c.commit()
+
+
+def delete_empty_threads(prefix: str, keep: Optional[int] = None) -> None:
+    c = conn()
+    c.execute("DELETE FROM chat_thread WHERE context_key LIKE ? AND id != ? AND NOT EXISTS "
+              "(SELECT 1 FROM chat_message m WHERE m.thread_id = chat_thread.id)",
+              (prefix + "%", keep if keep is not None else -1))
+    c.commit()

@@ -399,6 +399,25 @@ Claude commence par dire ce qui a progresse.
 
 ---
 
+## Questions libres
+
+Onglet **Questions** (Ctrl+6) : on pose n'importe quelle question de maths, par
+exemple « pourquoi la variance d'une somme n'est pas la somme des variances ? ».
+Claude (modèle du chat) reçoit le catalogue du cursus : chaque cours avec ses
+mots-clés, et les titres de section des cours déjà rédigés. Il répond, puis
+termine par **Où c'est traité** : un à quatre liens, en commençant par le cours
+où la notion est introduite.
+
+Chaque lien est vérifié par l'application avant affichage. Un cours inconnu
+est retiré. Une section n'est gardée que si elle existe vraiment. Un cours pas
+encore rédigé apparaît en orange : un clic l'ouvre pour le générer. Un clic sur
+un cours rédigé l'ouvre directement à la bonne section, surlignée un instant.
+Si la notion n'est traitée nulle part, Claude le dit et renvoie vers
+l'Assistant pour étendre le syllabus.
+
+Les questions restent dans la liste de gauche. On peut y revenir, poser une
+question de suivi dans le même fil, ou supprimer le fil.
+
 ## L'assistant : demander un changement
 
 Bouton **Assistant** (Ctrl+J) : un chat qui agit sur l'application. On lui dit
