@@ -133,9 +133,15 @@ class LibraryPage(QWidget):
         bl.addWidget(self.f_track)
 
         bl.addStretch(1)
+        # les filtres gardent leur largeur naturelle quand il y a la place, mais
+        # peuvent retrecir : sinon la page imposait sa largeur a toute la fenetre
+        self.search.setMinimumWidth(150)
+        for combo in (self.f_domain, self.f_level, self.f_state, self.f_track):
+            combo.setMinimumWidth(100)
         self.summary = QLabel("")
         self.summary.setObjectName("Muted")
         bl.addWidget(self.summary)
+        self.summary.setMinimumWidth(40)
         root.addWidget(bar)
 
         self.tree = QTreeWidget()
@@ -336,6 +342,7 @@ class LibraryPage(QWidget):
         if partial:
             text += "  ·  %d interrompu%s" % (partial, "s" if partial > 1 else "")
         self.summary.setText(text)
+        self.summary.setToolTip(text)
 
     def select(self, course_id: str) -> None:
         for i in range(self.tree.topLevelItemCount()):

@@ -16,6 +16,7 @@ from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
 from . import theme
 from .webview import WebView
+from .widgets import FlowLayout
 
 TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES, TAB_EXERCISES = range(6)
 
@@ -225,7 +226,7 @@ class CoursePage(QWidget):
         line1.addWidget(self.btn_more)
         hv.addLayout(line1)
 
-        self.chips_row = QHBoxLayout()
+        self.chips_row = FlowLayout(spacing=6)
         self.chips_row.setSpacing(6)
         self.chips_row.addStretch(1)
         chips_host = QWidget()

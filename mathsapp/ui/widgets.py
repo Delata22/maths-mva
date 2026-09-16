@@ -4,9 +4,9 @@ from __future__ import annotations
 import datetime as dt
 from typing import Dict, Optional
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import QSizePolicy, QWidget
+from PySide6.QtWidgets import QLayout, QSizePolicy, QWidget
 
 from . import theme
 
@@ -112,3 +112,81 @@ class Heatmap(QWidget):
                 painter.drawRoundedRect(
                     QRectF(column * (cell + gap), row * (cell + gap), cell, cell), 3, 3)
         painter.end()
+
+
+class FlowLayout(QLayout):
+    """Rangée qui passe à la ligne quand la place manque (puces de cours).
+
+    Une QHBoxLayout impose la somme des largeurs de ses éléments : quelques
+    prérequis aux titres longs suffisaient à rendre la fenêtre plus large que
+    l'écran dès qu'un panneau latéral s'ouvrait.
+    """
+
+    def __init__(self, parent=None, spacing: int = 6):
+        super().__init__(parent)
+        self._items = []
+        self._spacing = spacing
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item) -> None:  # noqa: N802
+        self._items.append(item)
+
+    def addStretch(self, _stretch: int = 0) -> None:  # noqa: N802
+        """Sans objet dans une rangée qui passe à la ligne."""
+
+    def setSpacing(self, spacing: int) -> None:  # noqa: N802
+        self._spacing = spacing
+
+    def spacing(self) -> int:
+        return self._spacing
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int):  # noqa: N802
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index: int):  # noqa: N802
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):  # noqa: N802
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802
+        return self._arrange(QRect(0, 0, width, 0), dry_run=True)
+
+    def setGeometry(self, rect) -> None:  # noqa: N802
+        super().setGeometry(rect)
+        self._arrange(rect, dry_run=False)
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:  # noqa: N802
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        return size + QSize(m.left() + m.right(), m.top() + m.bottom())
+
+    def _arrange(self, rect, dry_run: bool) -> int:
+        m = self.contentsMargins()
+        area = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        x, y, line = area.x(), area.y(), 0
+        for item in self._items:
+            widget = item.widget()
+            if widget is not None and widget.isHidden():
+                continue
+            hint = item.sizeHint()
+            if x > area.x() and x + hint.width() > area.right() + 1:
+                x = area.x()
+                y += line + self._spacing
+                line = 0
+            if not dry_run:
+                item.setGeometry(QRect(QPoint(x, y), hint))
+            x += hint.width() + self._spacing
+            line = max(line, hint.height())
+        return y + line - rect.y() + m.bottom()

@@ -16,6 +16,7 @@ from ..paths import library_dir
 from ..syllabus import Syllabus
 from . import theme
 from .webview import WebView
+from .widgets import FlowLayout
 
 
 class TdPage(QWidget):
@@ -92,7 +93,7 @@ class TdPage(QWidget):
         self.btn_view.clicked.connect(self._toggle_view)
         line.addWidget(self.btn_view)
         hv.addLayout(line)
-        self.chips = QHBoxLayout()
+        self.chips = FlowLayout(spacing=6)
         self.chips.setSpacing(6)
         chips_host = QWidget()
         chips_host.setLayout(self.chips)

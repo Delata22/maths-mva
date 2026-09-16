@@ -92,6 +92,8 @@ class ChatPanel(QWidget):
         hl.setSpacing(8)
         self.title = QLabel("Discussion générale")
         self.title.setObjectName("H2")
+        # un titre de cours long ne doit pas elargir le panneau : il est coupe
+        self.title.setMinimumWidth(60)
         hl.addWidget(self.title)
         hl.addStretch(1)
         self.btn_stop = QPushButton("Stop")
@@ -178,6 +180,7 @@ class ChatPanel(QWidget):
                             else EMPTY_QUESTION if mode == "question"
                             else EMPTY_COURSE if course else EMPTY_GENERAL)
         self.title.setText(title or (course.title if course else "Discussion générale"))
+        self.title.setToolTip(self.title.text())
         self.hint.setText("modèle : %s" % settings.get("model/chat"))
         self._js("window.chatReset(%s);" % json.dumps(self._empty_text))
         for msg in self.session.history():

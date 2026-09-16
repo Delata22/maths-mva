@@ -1317,6 +1317,23 @@ def test_views() -> None:
     window.toggle_theme()
     check("bascule de theme", True)
 
+    # la fenetre doit tenir sur un ecran de 1920 px avec le chat ouvert, meme sur
+    # le cours aux prerequis les plus nombreux
+    widest = max(window.syl.all(), key=lambda c: sum(len(window.syl.title(p)) for p in c.prereqs))
+    window.open_course(widest.id)
+    window.focus_chat()
+    QApplication.instance().processEvents()
+    width = window.minimumSizeHint().width()
+    parts = {"barre": window.topbar, "pages": window.stack, "chat": window.chat_dock,
+             "cours": window.course_page, "biblio": window.library, "td": window.td_page,
+             "questions": window.questions_page, "seance": window.session,
+             "graphe": window.graph, "accueil": window.dashboard, "file": window.queue_dock}
+    check("la fenetre tient sur l'ecran avec le chat ouvert", width <= 1600,
+          "%d px (%s) ; %s" % (width, widest.id, ", ".join(
+              "%s %d" % (k, w.minimumSizeHint().width()) for k, w in parts.items())))
+    window.chat_dock.setVisible(False)
+    window.open_course(first)
+
     from mathsapp.ui.course_page import TAB_EXERCISES
     check("cours ordinaire : pas d'onglet Exercices du cours",
           not window.course_page.tabs.isTabVisible(TAB_EXERCISES))

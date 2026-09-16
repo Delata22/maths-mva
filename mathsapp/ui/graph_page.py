@@ -214,6 +214,12 @@ class GraphPage(QWidget):
         self.legend = QLabel()
         self.legend.setTextFormat(Qt.TextFormat.RichText)
         bl.addWidget(self.legend)
+        # barre compressible : la legende passe a la ligne plutot que d'elargir
+        # la fenetre au-dela de l'ecran quand un panneau lateral est ouvert
+        self.f_scope.setMinimumWidth(120)
+        self.legend.setWordWrap(True)
+        self.legend.setMinimumWidth(160)
+        self.lit.setMinimumWidth(40)
         root.addWidget(bar)
 
         self.scene = GraphScene(self)
