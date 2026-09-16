@@ -233,6 +233,8 @@ def exercises_body(doc: str) -> str:
         correction = td_mod.read_correction(doc, i, td_mod.exercise_fingerprint(ex))
         if correction:
             correction = re.sub(r"^\s*<h2\b.*?</h2>", "", correction, count=1, flags=re.S)
+            # les titres internes d'une correction repliee n'ont rien a faire au sommaire
+            correction = re.sub(r"<(/?)h[23]\b", r"<\1h4", correction)
             parts.append('<details class="exo-solution"><summary>Voir la correction</summary>'
                          '<div class="exo-solution-body">%s</div></details>' % correction)
         else:
