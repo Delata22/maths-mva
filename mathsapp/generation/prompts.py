@@ -308,7 +308,7 @@ Figures prevues :
 {figures}
 Demonstrations attendues dans cette section :
 {proofs}
-{intro}
+{intro}{_source_block(plan, index)}
 Commencez par <h2>{section['title']}</h2>. Utilisez des <h3> pour structurer.
 Ne redigez que cette section. Pas de preambule, pas de conclusion generale du
 cours (sauf si c'est la derniere section). Sortie : HTML brut, rien d'autre."""
@@ -1479,3 +1479,129 @@ Français avec tous les accents.
 CATALOGUE DU CURSUS (id | titre | niveau | rédaction | mots-clés ; puis les
 sections des cours rédigés) :
 {catalogue}"""
+
+
+# ---------------------------------------------------------------------------
+# Cours importés depuis un PDF
+# ---------------------------------------------------------------------------
+_STR = {"type": "string"}
+_STRS = {"type": "array", "items": {"type": "string"}}
+COURSE_IMPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": _STR, "original_title": _STR, "author": _STR, "language": _STR,
+        "summary": _STR, "level": {"type": "integer"},
+        "keywords": _STRS, "objectives": _STRS, "prereqs": _STRS, "related": _STRS,
+        "sections": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"id": _STR, "title": _STR, "pages": _STR, "goal": _STR,
+                           "content": _STR, "intuitions": _STRS, "proofs": _STRS,
+                           "exercises": _STRS},
+            "required": ["title", "pages", "goal", "content"]}},
+        "exercises": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"number": _STR, "title": _STR, "pages": _STR, "statement": _STR,
+                           "courses": _STRS, "key_results": _STRS,
+                           "difficulty": {"type": "integer"}},
+            "required": ["number", "title", "statement"]}},
+    },
+    "required": ["title", "summary", "level", "prereqs", "related", "sections", "exercises"],
+}
+
+
+def course_import_prompt(syl: Syllabus, pdf_path: str) -> str:
+    return f"""Vous préparez l'import d'un cours magistral dans « Maths MVA », une
+application qui prépare au master MVA. Le cours sera réécrit section par
+section, fidèlement mais avec plus d'intuition, et ses exercices seront corrigés.
+Votre travail ici : lire le document et en établir le plan détaillé.
+
+LE DOCUMENT : {pdf_path}
+Lisez-le EN ENTIER avec l'outil Read, par tranches de 20 pages au plus
+(paramètre pages). Les transparents Beamer répètent souvent la même page en
+ajoutant un élément à chaque fois : ne comptez chaque contenu qu'une fois, mais
+notez les pages où il se trouve.
+
+À PRODUIRE :
+- title : titre français précis du cours (par exemple « Rappels d'optimisation —
+  partie I »). original_title, author, language (fr, en…).
+- summary : deux ou trois phrases sur ce que couvre le cours.
+- level : de 1 à 5 sur l'échelle de l'application (4 = M1, 5 = M2).
+- keywords : 5 à 12 ; objectives : 4 à 8, formulés « savoir … ».
+- prereqs : identifiants du catalogue ci-dessous que le cours suppose connus, les
+  plus directs (2 à 6).
+- related : identifiants du catalogue qui traitent des notions utilisées ou
+  prolongées par le cours (jusqu'à 12). Ils serviront aux liens dans le texte.
+- sections : 4 à 10 sections qui suivent l'ordre du document. Pour chacune :
+  title (français) ; pages (plage du PDF, par exemple "5-18") ; goal (une
+  phrase) ; content (6 à 12 phrases qui citent TOUTES les définitions, énoncés
+  avec hypothèses, exemples et remarques de ces pages, avec leurs notations) ;
+  intuitions (endroits où les transparents sont trop elliptiques et où une
+  intuition, un dessin ou un calcul intermédiaire aiderait) ; proofs (résultats à
+  démontrer dans la section : ceux prouvés dans le document, et ceux dont une
+  preuve courte éclaire) ; exercises (numéros des exercices situés dans ces pages).
+- exercises : TOUS les exercices du document, dans l'ordre. Pour chacun : number
+  (tel qu'imprimé), title (court, en français), pages, statement (énoncé complet
+  et fidèle, traduit en français, en HTML simple avec les maths en LaTeX entre
+  $…$, mêmes notations, sous-questions dans une liste <ol>), courses (identifiants
+  du catalogue utiles pour le résoudre, 1 à 4), key_results (résultats à
+  mobiliser), difficulty (1 à 5).
+
+Ne résumez pas à la légère : ce plan sert à réécrire le cours sans rien perdre.
+Répondez uniquement par le JSON demandé.
+
+CATALOGUE DES COURS EXISTANTS (identifiant, niveau, titre) :
+{catalogue(syl, max_per_domain=400)}"""
+
+
+def _source_block(plan: dict, index: int) -> str:
+    """Consignes propres à un cours importé : relire les pages, garder les exercices."""
+    source = plan.get("source")
+    if not source:
+        return ""
+    section = plan["sections"][index]
+    origin = source.get("original_title") or "cours magistral"
+    if source.get("author"):
+        origin += ", " + source["author"]
+    pages = section.get("pages") or "(voir le plan)"
+    intuitions = "\n".join("  - %s" % t for t in section.get("intuitions") or []) \
+        or "  (à vous de juger)"
+    exercises = "\n".join("  - Exercice %s : %s" % (e["number"], e["title"])
+                          for e in section.get("exercises") or []) or "  (aucun dans ces pages)"
+    related = "\n".join("  - %s : %s" % (r["id"], r["title"])
+                        for r in source.get("related") or []) or "  (aucun)"
+    return f"""
+
+SOURCE : ce cours réécrit un cours magistral du master MVA (« {origin} »).
+Le PDF se lit avec l'outil Read : {source.get("pdf", "")}
+Votre section correspond aux pages {pages}. Lisez ces pages AVANT d'écrire
+(outil Read, paramètre pages), et au besoin une page avant ou après pour le
+contexte. Votre réponse finale ne contient que le HTML de la section.
+
+FIDÉLITÉ : tout ce que contiennent ces pages figure dans votre section :
+définitions, notations (gardez exactement celles du document), énoncés avec leurs
+hypothèses, exemples, remarques. Les transparents répètent souvent une page en
+ajoutant un élément : n'écrivez chaque chose qu'une fois. Rédigez en français ;
+à la première occurrence d'un terme, donnez entre parenthèses le terme anglais
+du document.
+
+AJOUTS : les transparents sont télégraphiques, votre cours ne doit pas l'être.
+Ajoutez l'intuition avant le formalisme, les étapes de calcul sautées, des
+démonstrations courtes quand elles éclairent, des exemples et des figures mviz
+utiles. Points signalés comme trop elliptiques :
+{intuitions}
+
+EXERCICES DU DOCUMENT DANS CES PAGES :
+{exercises}
+Insérez chacun à l'endroit où il apparaît dans le document, avec son énoncé
+complet et fidèle, SANS solution ni indication :
+  <div class="box exercise" data-exercise="NUMÉRO"><span class="box-title">Exercice NUMÉRO — titre</span>
+    <p>énoncé…</p>
+    <p><a class="exercise-ref" data-exercise="NUMÉRO">Correction détaillée dans l'onglet Exercices</a></p></div>
+La classe « exercise » s'ajoute exceptionnellement aux encadrés autorisés.
+
+LIENS VERS LES COURS DE L'APPLICATION : quand la section s'appuie sur une notion
+traitée dans l'un de ces cours, liez-la à sa première mention avec
+<a class="course-ref" data-course="IDENTIFIANT">texte</a>. Un à quatre liens par
+section, là où ils aident vraiment :
+{related}
+"""

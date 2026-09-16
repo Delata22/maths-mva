@@ -24,6 +24,7 @@ KIND_LABEL = {
     "daily": "Quiz du jour",
     "td": "Correction de TD",
     "refresher": "Rappel ciblé",
+    "import": "Import de cours",
 }
 
 
@@ -122,6 +123,9 @@ class _Task(QRunnable):
             elif job.kind == "td":
                 result = pipeline.run_td(job.course_id, on_progress, cancel, syl)
                 msg = "TD corrigé : %d exercices (%.2f $)" % (result["exercises"], result["cost"])
+            elif job.kind == "import":
+                result = pipeline.run_course_import(job.course_id, on_progress, cancel, syl)
+                msg = "Cours « %s » importé (%.2f $)" % (result["title"], result["cost"])
             elif job.kind == "refresher":
                 _day, cost = pipeline.generate_refresher(
                     job.course_id, None, None, on_progress, cancel, syl)

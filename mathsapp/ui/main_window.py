@@ -288,6 +288,8 @@ class MainWindow(QMainWindow):
         self.td_page.proof_help_requested.connect(self.open_proof_helper)
         self.td_page.correct_requested.connect(self.enqueue_td)
         self.questions_page.course_opened.connect(self.open_course_at)
+        self.course_page.open_course_at.connect(self.open_course_at)
+        self.library.import_requested.connect(self.import_course)
 
         self.queue_panel.course_opened.connect(self.open_course)
         self.queue_panel.retried.connect(lambda: self.statusBar().showMessage(
@@ -729,6 +731,15 @@ class MainWindow(QMainWindow):
         self._library_refresh.stop()
         if _kind == "td" and self.stack.currentIndex() == PAGE_TD:
             self.td_page.refresh()
+        if _kind == "import":
+            from .. import course_import
+            title = course_import.read_import(course_id) or {}
+            title = title.get("title") or course_id
+            self.reload_syllabus()
+            cid = course_import.course_of(course_id)
+            if ok and cid:
+                self.notice.show_message("Cours importé : « %s »" % title, "Ouvrir",
+                                         lambda c=cid: self.open_course(c))
         if _kind == "refresher" and ok:
             self.notice.show_message(
                 "Rappel prêt : cinq questions sur « %s »" % self.syl.title(course_id),
@@ -866,6 +877,39 @@ class MainWindow(QMainWindow):
             self.library.refresh()
         elif index == PAGE_GRAPH:
             self.graph.rebuild()
+
+    def import_course(self, path: str = "") -> None:
+        """Importer un cours magistral en PDF : lecture, rédaction, exercices corrigés."""
+        from PySide6.QtWidgets import QFileDialog
+        from .. import course_import
+        if not path:
+            path, _filter = QFileDialog.getOpenFileName(
+                self, "Importer un cours", str(pathlib.Path.home()), "PDF (*.pdf)")
+            if not path:
+                return
+        try:
+            doc = course_import.import_pdf(path)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Import impossible", str(exc))
+            return
+        per_course_s, per_course_cost = content.generation_estimate()
+        if QMessageBox.question(
+                self, "Importer un cours",
+                "Importer « %s » ?\n\nClaude lit tout le document, inscrit le cours au "
+                "syllabus (domaine « Cours du MVA »), le réécrit section par section en "
+                "relisant les pages, avec intuitions et liens vers vos cours, puis produit "
+                "QCM, fiche et corrections des exercices du document.\n\n"
+                "Comptez environ %d min et de l'ordre de %.0f à %.0f $. Tout reprend "
+                "après une coupure." % (pathlib.Path(path).name, per_course_s / 60 * 1.5,
+                                        per_course_cost * 1.5, per_course_cost * 2.5),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        if self.queue.enqueue(doc, "Import — %s" % pathlib.Path(path).stem, "import") is None:
+            self.statusBar().showMessage("Import déjà en cours", 6000)
+            return
+        self.queue_dock.setVisible(True)
+        self.statusBar().showMessage("Import du cours lancé en arrière-plan", 8000)
 
     def open_course_at(self, course_id: str, section: str = "") -> None:
         """Lien d'une reponse : ouvre le cours, a la section citee s'il y en a une."""

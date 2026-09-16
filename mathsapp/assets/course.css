@@ -400,3 +400,14 @@ a.course-ref:hover { border-bottom-style: solid; }
 a.course-ref.todo { color: var(--warn, #c2740a); border-bottom-color: var(--warn, #c2740a); }
 /* section atteinte par un lien */
 article h2.flash, article h3.flash { background: var(--accent-soft); transition: background .4s; }
+
+/* cours importe : exercice du document, et sa correction depliable */
+.box.exercise { border-left: 4px solid #0ea5e9; background: color-mix(in srgb, #0ea5e9 7%, transparent); }
+.box.exercise .box-title { color: #0284c7; }
+a.exercise-ref { color: #0284c7; cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .92em; }
+a.exercise-ref::before { content: "→ "; }
+details.exo-solution { margin: .6em 0 2.2em; }
+details.exo-solution > summary {
+  cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 600;
+  color: var(--accent); padding: .35em 0;
+}

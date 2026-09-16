@@ -267,6 +267,10 @@ def _run_once(prompt: str, model: str, system: Optional[str] = None,
 
     stderr = (proc.stderr.read() if proc.stderr else "") or ""
     text = "".join(chunks).strip()
+    # Avec des outils, le flux contient aussi les messages intermediaires
+    # (« je lis les pages 5 a 20 ») : seule la reponse finale compte.
+    if tools and (result_obj.get("result") or "").strip():
+        text = result_obj["result"].strip()
     if not text:
         text = (result_obj.get("result") or "").strip()
     if result_obj.get("is_error") or (proc.returncode not in (0, None) and not text):

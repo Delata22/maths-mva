@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import random
 import re
 import threading
@@ -200,6 +201,7 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
             cancel=cancel,
             on_progress=progress,
             on_notice=notice,
+            **source_tools(plan),
         )
         body = content.clean_html(res.text)
         with lock:
@@ -943,3 +945,79 @@ def generate_refresher(course_id: str, day: Optional[str] = None,
         "cost_usd": round(res.cost_usd, 4)})
     on_progress("Terminé", 1.0)
     return day, res.cost_usd
+
+
+# ---------------------------------------------------------------------------
+# Cours importés depuis un PDF
+# ---------------------------------------------------------------------------
+def source_tools(plan: dict) -> dict:
+    """Un cours importé relit son PDF : outil Read, limité au dossier du document."""
+    pdf = (plan.get("source") or {}).get("pdf")
+    if not pdf or not os.path.exists(pdf):
+        return {}
+    folder = os.path.dirname(pdf)
+    return {"tools": "Read", "add_dirs": [folder], "cwd": folder}
+
+
+def read_course_document(doc: str, model: Optional[str] = None,
+                         on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+                         syl: Optional[Syllabus] = None) -> dict:
+    """Lit tout le PDF et en tire le plan détaillé et les exercices."""
+    from .. import course_import, td as td_mod
+    syl = syl or load_syllabus()
+    src = td_mod.source_path(doc)
+    folder = str(td_mod.td_dir(doc))
+    model = model or str(settings.get("model/exercises"))
+    on_progress("Lecture du document", 0.01)
+    raw, res = cc.run_json(
+        prompts.course_import_prompt(syl, str(src)),
+        model=model,
+        system=("Vous analysez des cours de mathématiques pour les réécrire. "
+                "Vous répondez uniquement en JSON valide."),
+        schema=prompts.COURSE_IMPORT_SCHEMA,
+        cancel=cancel,
+        tools="Read", add_dirs=[folder], cwd=folder,
+        on_progress=lambda n: on_progress("Lecture du document", min(0.05, 0.01 + n / 400000.0)),
+        on_notice=lambda msg: on_progress("Lecture du document — %s" % msg, 0.01),
+    )
+    data = course_import.normalize_import(raw, syl)
+    if not data["sections"]:
+        raise cc.ClaudeError("Aucune section n'a pu être tirée du document.")
+    course_import.write_import(doc, data)
+    td_mod.update_meta(doc, read_cost=round(res.cost_usd, 4), read_model=model,
+                       title=data["title"])
+    return data
+
+
+def run_course_import(doc: str, on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+                      syl: Optional[Syllabus] = None) -> dict:
+    """Tout l'import, reprenable à chaque étape : lecture, inscription, cours, corrections."""
+    from .. import course_import, td as td_mod
+    from ..syllabus import reload as reload_syllabus
+    syl = syl or load_syllabus()
+    cost = 0.0
+
+    data = course_import.read_import(doc)
+    if data is None:
+        data = read_course_document(doc, None, on_progress, cancel, syl)
+        cost += float(td_mod.read_meta(doc).get("read_cost") or 0)
+
+    course_id = course_import.register(doc, syl)
+    syl = reload_syllabus()
+
+    def scaled(lo: float, hi: float) -> ProgressCb:
+        return lambda label, frac: on_progress(label, lo + (hi - lo) * max(0.0, min(1.0, frac)))
+
+    if not content.is_complete(course_id):
+        meta = generate_course(course_id, scaled(0.06, 0.82), cancel, True, syl)
+        cost += float(meta.get("cost_usd") or 0)
+
+    corrected = 0
+    if td_mod.exercises(doc):
+        corrected, spent = correct_td(doc, None, scaled(0.82, 1.0), cancel, syl)
+        cost += spent
+    on_progress("Terminé", 1.0)
+    plan = content.read_plan(course_id) or {}
+    return {"course_id": course_id, "title": syl.title(course_id), "cost": cost,
+            "sections": len(plan.get("sections") or []),
+            "exercises": td_mod.state(doc)["corrected"], "corrected_now": corrected}

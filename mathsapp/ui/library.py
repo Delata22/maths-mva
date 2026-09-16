@@ -68,6 +68,7 @@ class LibraryPage(QWidget):
     sheets_requested = Signal(list)
     cancel_requested = Signal(str)
     delete_requested = Signal(str)
+    import_requested = Signal()
 
     def __init__(self, syllabus: Syllabus, parent=None):
         super().__init__(parent)
@@ -92,6 +93,13 @@ class LibraryPage(QWidget):
         self.search.setMinimumWidth(230)
         self.search.textChanged.connect(self.refresh)
         bl.addWidget(self.search, 2)
+        from PySide6.QtWidgets import QPushButton
+        self.btn_import = QPushButton("Importer un cours (PDF)…")
+        self.btn_import.setToolTip(
+            "Un cours magistral en PDF devient un cours de l'application : réécrit avec "
+            "des intuitions, relié au cursus, exercices corrigés à part.")
+        self.btn_import.clicked.connect(self.import_requested.emit)
+        bl.addWidget(self.btn_import)
 
         self.f_domain = QComboBox()
         self._fill_domains()

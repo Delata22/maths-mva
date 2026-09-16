@@ -194,6 +194,7 @@ def test_prompts_integrity() -> None:
             ["une question"]),
         "assistant_system": lambda: prompts.assistant_system("ÉTAT"),
         "question_system": lambda: prompts.question_system("CATALOGUE"),
+        "course_import_prompt": lambda: prompts.course_import_prompt(syl, "/tmp/cours.pdf"),
         "code_change_system": lambda: prompts.code_change_system(),
         "code_change_prompt": lambda: prompts.code_change_prompt(
             "Sur la page d'accueil, ajouter un bouton « Exporter mes notes » qui écrit "
@@ -287,6 +288,90 @@ def test_td() -> None:
               cmd[cmd.index("--tools") + 1] == "Read" and "/tmp/x" in cmd)
         default = cc._base_cmd("sonnet", None, False)
         check("par defaut, toujours aucun outil", default[default.index("--tools") + 1] == "")
+    finally:
+        if previous is None:
+            os.environ.pop("MATHSAPP_LIBRARY", None)
+        else:
+            os.environ["MATHSAPP_LIBRARY"] = previous
+
+
+def test_course_import() -> None:
+    """Cours importes : lecture nettoyee, plan avec source, rangement a part des TD."""
+    import tempfile
+    from mathsapp import content, course_import, td as td_mod
+    from mathsapp.generation import pipeline, prompts
+    from mathsapp.syllabus import load
+    syl = load()
+
+    raw = {"title": "", "level": 9, "prereqs": ["alg-espaces-vectoriels", "inexistant"],
+           "related": ["opt-convexite", "zzz"], "keywords": ["a", "a", "b"],
+           "sections": [
+               {"title": "Espaces de Hilbert", "pages": "4-12", "goal": "g", "content": "c",
+                "intuitions": ["norme induite"], "exercises": ["1", "9"]},
+               {"title": "  ", "pages": "13", "goal": "", "content": ""},
+               {"title": "Convexité", "pages": "13-30", "goal": "g", "content": "c",
+                "exercises": ["2"]}],
+           "exercises": [
+               {"number": "1", "title": "", "statement": "<p>Soit $f$.</p>",
+                "courses": ["opt-convexite", "inexistant"], "difficulty": 0},
+               {"number": "2", "title": "Projection", "statement": "<p>Montrer.</p>"},
+               {"number": "3", "title": "Vide", "statement": " "}]}
+    data = course_import.normalize_import(raw, syl)
+    check("import : titre par defaut", data["title"] == "Cours importé")
+    check("import : niveau borne", data["level"] == 5)
+    check("import : identifiants inconnus retires",
+          "inexistant" not in data["prereqs"] and "zzz" not in data["related"],
+          str((data["prereqs"], data["related"])))
+    check("import : section sans titre ecartee, identifiants renumerotes",
+          [s["id"] for s in data["sections"]] == ["s1", "s2"])
+    check("import : exercice vide ecarte", [e["number"] for e in data["exercises"]] == ["1", "2"])
+    check("import : renvoi vers un exercice inexistant ignore",
+          data["sections"][0]["exercises"] == ["1"])
+    check("import : doublons de mots-cles retires", data["keywords"] == ["a", "b"])
+    entry = course_import.course_entry(dict(data, title="Rappels d'optimisation — partie I"))
+    check("import : cours range dans le domaine des cours du MVA",
+          entry["domain"] == course_import.DOMAIN["id"] and entry["id"].startswith("mva-"),
+          entry["id"])
+
+    previous = os.environ.get("MATHSAPP_LIBRARY")
+    os.environ["MATHSAPP_LIBRARY"] = tempfile.mkdtemp(prefix="selftest-import-")
+    try:
+        folder = pathlib.Path(tempfile.mkdtemp())
+        course_pdf = folder / "cours.pdf"
+        course_pdf.write_bytes(b"%PDF-1.4\n% cours\n")
+        td_pdf = folder / "td.pdf"
+        td_pdf.write_bytes(b"%PDF-1.4\n% td\n")
+        doc = course_import.import_pdf(str(course_pdf))
+        td_id = td_mod.import_pdf(str(td_pdf))
+        check("import : cours et TD ranges a part",
+              course_import.list_ids() == [doc] and td_mod.list_ids() == [td_id],
+              str((course_import.list_ids(), td_mod.list_ids())))
+        check("import : meme fichier, meme document", course_import.import_pdf(str(course_pdf)) == doc)
+
+        plan = course_import.build_plan(data, doc, syl)
+        check("import : le plan garde la source et les pages",
+              plan["source"]["pdf"].endswith("source.pdf") and plan["sections"][0]["pages"] == "4-12"
+              and plan["sections"][0]["exercises"] == [{"number": "1", "title": "Exercice 1"}])
+        tools = pipeline.source_tools(plan)
+        check("import : chaque section relit son PDF, outil Read limite au dossier",
+              tools.get("tools") == "Read" and tools["add_dirs"] == [str(td_mod.td_dir(doc))])
+        check("cours ordinaire : aucun outil", pipeline.source_tools({"sections": []}) == {})
+        course = syl.get("log-propositions")
+        with_source = prompts.section_prompt(syl, course, plan, 0, [])
+        plain = prompts.section_prompt(syl, course, dict(plan, source=None), 0, [])
+        check("import : consignes de fidelite et exercices dans la section",
+              "pages 4-12" in with_source and 'class="box exercise"' in with_source
+              and "course-ref" in with_source and "SOURCE" not in plain)
+
+        td_mod.write_structure(doc, {"title": "T", "exercises": data["exercises"]})
+        first = data["exercises"][0]
+        td_mod.write_correction(doc, 0, td_mod.exercise_fingerprint(first),
+                                "<h2>Exercice 1 — titre</h2><p>Corrigé détaillé.</p>" + "x" * 200)
+        body = course_import.exercises_body(doc)
+        check("import : onglet Exercices",
+              'id="exercice-1"' in body and "Corrigé détaillé" in body
+              and "<h2>Exercice 1 — titre</h2>" not in body
+              and "Correction pas encore produite" in body)
     finally:
         if previous is None:
             os.environ.pop("MATHSAPP_LIBRARY", None)
@@ -1232,6 +1317,10 @@ def test_views() -> None:
     window.toggle_theme()
     check("bascule de theme", True)
 
+    from mathsapp.ui.course_page import TAB_EXERCISES
+    check("cours ordinaire : pas d'onglet Exercices du cours",
+          not window.course_page.tabs.isTabVisible(TAB_EXERCISES))
+
     window.open_assistant()
     check("assistant ouvert", window.chat.is_assistant and window.chat_dock.isVisible())
     check("assistant : etat fourni a Claude",
@@ -1299,6 +1388,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- cours importes ---")
+    test_course_import()
     print("\n--- questions libres ---")
     test_questions()
     print("\n--- assistant ---")

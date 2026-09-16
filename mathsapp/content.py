@@ -296,7 +296,9 @@ def build_page(body: str, title: str, theme: str = "light", extra_css: str = "")
 
 def render_course_page(course_id: str, title: str, theme: str = "light") -> pathlib.Path:
     """Ecrit la page complete du cours et retourne son chemin."""
-    page = build_page(read_body(course_id), title, theme)
+    from .questions import link_courses
+    from .syllabus import load
+    page = build_page(link_courses(read_body(course_id), load()), title, theme)
     out = course_dir(course_id, create=True) / "_render.html"
     out.write_text(page, encoding="utf-8")
     return out

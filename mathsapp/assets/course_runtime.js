@@ -196,6 +196,12 @@
   // Renvois vers un cours de l'application : <a class="course-ref" data-course="id">
   function setupCourseRefs() {
     document.addEventListener('click', function (ev) {
+      var exo = ev.target && ev.target.closest ? ev.target.closest('a.exercise-ref') : null;
+      if (exo) {
+        ev.preventDefault();
+        if (bridge && bridge.openExercise) bridge.openExercise(exo.getAttribute('data-exercise') || '');
+        return;
+      }
       var link = ev.target && ev.target.closest ? ev.target.closest('a.course-ref') : null;
       if (!link) return;
       ev.preventDefault();

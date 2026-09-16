@@ -399,6 +399,36 @@ Claude commence par dire ce qui a progresse.
 
 ---
 
+## Importer un cours magistral
+
+**Bibliothèque → Importer un cours (PDF)…**, ou en ligne de commande :
+`python tools/import_course.py run cours.pdf`. Le PDF peut être un poly ou des
+transparents Beamer, en français ou en anglais.
+
+1. **Lecture** (modèle des exercices) : Claude lit tout le document avec l'outil
+   `Read`, par tranches de 20 pages. Il en tire le titre, les prérequis et les
+   cours liés pris dans le catalogue, puis un plan de 4 à 10 sections. Chaque
+   section indique ses pages, tout ce qu'elles contiennent et les passages trop
+   elliptiques. Il transcrit aussi fidèlement chaque exercice.
+2. **Inscription** : le cours rejoint le syllabus dans le domaine « Cours du
+   MVA », avec ses prérequis. Le plan tiré du document remplace le plan habituel.
+3. **Rédaction** : c'est la génération habituelle. Chaque section **relit ses
+   pages** et garde toutes les définitions, notations, hypothèses et exemples,
+   en français avec les termes anglais entre parenthèses. Elle ajoute les
+   intuitions, les calculs sautés, des démonstrations courtes et des figures.
+   Les exercices du document restent **à leur place dans le cours**, sans
+   solution. Un lien « Correction détaillée dans l'onglet Exercices » y renvoie.
+   Des liens pointent aussi vers les cours existants de l'application.
+   Viennent ensuite QCM, démonstrations et fiche, comme pour tout cours.
+4. **Corrections** : chaque exercice est corrigé avec le contenu du cours
+   importé et des cours liés, comme un TD. Les corrections apparaissent dans
+   l'onglet **Exercices du cours**, dépliables.
+
+Chaque étape est enregistrée : une coupure reprend où on en était
+(`python tools/import_course.py resume <id>`). Le document vit dans
+`library/_td/<id>/` (type « course ») : `source.pdf`, `import.json`,
+`td.json` et `corrections/`. Le cours lui-même vit dans `library/<id-du-cours>/`.
+
 ## Questions libres
 
 Onglet **Questions** (Ctrl+6) : on pose n'importe quelle question de maths, par

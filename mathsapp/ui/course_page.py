@@ -17,7 +17,7 @@ from ..syllabus import Course, Syllabus
 from . import theme
 from .webview import WebView
 
-TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES = range(5)
+TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES, TAB_EXERCISES = range(6)
 
 
 def _page_path(name: str):
@@ -168,6 +168,7 @@ class EmptyState(QWidget):
 
 class CoursePage(QWidget):
     open_course = Signal(str)
+    open_course_at = Signal(str, str)                  # cours, section
     ask_requested = Signal(str, str, str)          # course_id, extrait, section
     proof_help_requested = Signal(str, str, str, str)  # course_id, proof_id, titre, texte
     proof_review_requested = Signal(str, str, str)     # course_id, proof_id, charge utile
@@ -247,6 +248,18 @@ class CoursePage(QWidget):
         self.course_view.loadFinished.connect(self._on_course_loaded)
         self.course_view.bridge.ask_requested.connect(self._forward_ask)
         self.course_view.bridge.proof_help_requested.connect(self._forward_proof_help)
+        self.course_view.bridge.course_open_requested.connect(self.open_course.emit)
+        self.course_view.bridge.course_section_requested.connect(self.open_course_at.emit)
+        self.course_view.bridge.exercise_requested.connect(self.show_exercise)
+
+        # cours importe : exercices du document et leurs corrections
+        self.exercises_view = WebView(with_bridge=True)
+        self._pending_exercise = ""
+        self.exercises_view.loadFinished.connect(self._on_exercises_loaded)
+        self.exercises_view.bridge.ask_requested.connect(self._forward_ask)
+        self.exercises_view.bridge.proof_help_requested.connect(self._forward_proof_help)
+        self.exercises_view.bridge.course_open_requested.connect(self.open_course.emit)
+        self.exercises_view.bridge.course_section_requested.connect(self.open_course_at.emit)
 
         self.course_holder = QWidget()
         ch = QVBoxLayout(self.course_holder)
@@ -329,6 +342,8 @@ class CoursePage(QWidget):
         self.tabs.addTab(self.quiz_view, "QCM")
         self.tabs.addTab(self.proofs_view, "Démonstrations")
         self.tabs.addTab(notes_host, "Notes")
+        self.tabs.addTab(self.exercises_view, "Exercices du cours")
+        self.tabs.setTabVisible(TAB_EXERCISES, False)
 
     def set_syllabus(self, syl: Syllabus) -> None:
         self.syl = syl
@@ -361,6 +376,30 @@ class CoursePage(QWidget):
         if title:
             self.course_view.run_js("window.scrollToSection && window.scrollToSection(%s);"
                                     % _json.dumps(title))
+
+    def show_exercise(self, number: str) -> None:
+        """Lien « correction » d'un exercice dans le cours : onglet Exercices, au bon endroit."""
+        if not getattr(self, "_doc", None):
+            return
+        self._pending_exercise = number
+        already = TAB_EXERCISES in self._loaded_tabs and not getattr(self, "_exercises_loading", False)
+        self.tabs.setCurrentIndex(TAB_EXERCISES)
+        if already:
+            self._apply_pending_exercise()
+
+    def _on_exercises_loaded(self, _ok: bool) -> None:
+        self._exercises_loading = False
+        if self._pending_exercise:
+            QTimer.singleShot(450, self._apply_pending_exercise)
+
+    def _apply_pending_exercise(self) -> None:
+        number, self._pending_exercise = self._pending_exercise, ""
+        if number:
+            self.exercises_view.run_js(
+                "var e=document.getElementById(%s);"
+                "if(e){window.scrollTo(0, e.getBoundingClientRect().top + window.scrollY - 50);"
+                "var d=e.nextElementSibling&&e.nextElementSibling.nextElementSibling;}"
+                % json.dumps("exercice-" + number))
 
     def show_course(self, course_id: str) -> None:
         same = self.course is not None and self.course.id == course_id
@@ -395,6 +434,9 @@ class CoursePage(QWidget):
         self.sheet_empty.setVisible(not has_sheet)
         if not has_sheet:
             self.sheet_empty.set_sheet_placeholder(self.course)
+        from .. import course_import
+        self._doc = course_import.doc_for_course(cid)
+        self.tabs.setTabVisible(TAB_EXERCISES, bool(self._doc))
         self.tabs.setTabEnabled(TAB_QUIZ, self.status.has_exercises)
         self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
         if not readable:
@@ -458,6 +500,15 @@ class CoursePage(QWidget):
             self._loaded_tabs.add(index)
         elif index == TAB_QUIZ and self.status and self.status.has_exercises:
             self._load_quiz()
+            self._loaded_tabs.add(index)
+        elif index == TAB_EXERCISES and getattr(self, "_doc", None):
+            from .. import course_import
+            path = _page_path("exercices_%s.html" % cid)
+            path.write_text(content.build_page(course_import.exercises_body(self._doc),
+                                               "Exercices — %s" % self.course.title,
+                                               theme.name()), encoding="utf-8")
+            self._exercises_loading = True
+            self.exercises_view.load_file(path)
             self._loaded_tabs.add(index)
         elif index == TAB_PROOFS and self.status and self.status.has_exercises:
             self._load_proofs()

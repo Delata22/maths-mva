@@ -56,7 +56,7 @@ def import_pdf(path: str, name: Optional[str] = None) -> str:
         raise ValueError("Un sujet de TD doit être un fichier PDF existant : %s" % src)
     digest = hashlib.sha1(src.read_bytes()).hexdigest()[:8]
     # le meme fichier importe deux fois retombe sur le meme TD
-    for existing in list_ids():
+    for existing in list_ids(None):
         meta = read_meta(existing)
         if meta.get("sha1") == digest:
             return existing
@@ -72,10 +72,12 @@ def import_pdf(path: str, name: Optional[str] = None) -> str:
     return td_id
 
 
-def list_ids() -> List[str]:
-    return sorted((d.name for d in root().iterdir()
-                   if d.is_dir() and (d / SOURCE).exists()),
-                  key=lambda i: read_meta(i).get("imported_at", 0), reverse=True)
+def list_ids(kind: Optional[str] = "td") -> List[str]:
+    """Documents importés d'un type (« td » ou « course ») ; None pour tous."""
+    ids = [d.name for d in root().iterdir() if d.is_dir() and (d / SOURCE).exists()]
+    if kind is not None:
+        ids = [i for i in ids if read_meta(i).get("kind", "td") == kind]
+    return sorted(ids, key=lambda i: read_meta(i).get("imported_at", 0), reverse=True)
 
 
 def source_path(td_id: str) -> pathlib.Path:
