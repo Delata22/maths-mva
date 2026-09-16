@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pathlib
+import time
 from typing import List, Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -233,6 +234,7 @@ class MainWindow(QMainWindow):
         self.chat_dock.setVisible(False)
         self.chat.set_context(None, "general")
         self.chat.state_provider = self._assistant_state
+        self.chat.queue_provider = self._assistant_queue_state
         self.chat.action_triggered.connect(self.run_assistant_action)
         self.chat.course_opened.connect(self.open_course_at)
 
@@ -252,6 +254,7 @@ class MainWindow(QMainWindow):
 
     def _wire(self) -> None:
         self.library.set_queue_lookup(self._queue_label)
+        self.library.set_pause_lookup(self.queue.pause_reason)
         self.dashboard.set_queue_lookup(self._queue_label)
         self.library.course_opened.connect(self.open_course)
         self.library.generate_requested.connect(self.enqueue)
@@ -673,6 +676,9 @@ class MainWindow(QMainWindow):
         job = self.queue.job_for(course_id)
         if job is None:
             return None
+        status, reason = self.queue.explain(job)
+        if status == "en pause" or (status == "en attente" and reason):
+            return "%s : %s  %d %%" % (status.capitalize(), reason, int(job.progress * 100))
         short = job.label.split(" — ")[0].split(" · ")[0]
         return "%s  %d %%" % (short, int(job.progress * 100))
 
@@ -926,9 +932,24 @@ class MainWindow(QMainWindow):
                               title="Assistant de l'application")
         self.chat.composer.setFocus()
 
+    def _assistant_statuses(self) -> dict:
+        """Statuts relus au plus une fois par envoi : l'état complet et celui de
+        la file sont construits coup sur coup, inutile de relire le disque deux fois."""
+        cached = getattr(self, "_assistant_cache", None)
+        if cached and time.monotonic() - cached[0] < 2.0:
+            return cached[1]
+        statuses = st_mod.compute(self.syl)
+        self._assistant_cache = (time.monotonic(), statuses)
+        return statuses
+
     def _assistant_state(self) -> str:
         from .. import assistant
-        return assistant.app_state(self.syl, st_mod.compute(self.syl), self.queue.jobs)
+        return assistant.app_state(self.syl, self._assistant_statuses(), self.queue.jobs)
+
+    def _assistant_queue_state(self) -> str:
+        from .. import assistant
+        return assistant.queue_state(self.syl, self._assistant_statuses(), list(self.queue.jobs),
+                                     limit=self.queue.concurrency())
 
     def run_assistant_action(self, action: dict) -> None:
         """Exécute une action validée d'un clic dans l'assistant."""

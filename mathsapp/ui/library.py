@@ -75,6 +75,7 @@ class LibraryPage(QWidget):
         self.syl = syllabus
         self.statuses: Dict[str, Status] = {}
         self._queue_lookup = None
+        self._pause_lookup = None
         self._first_build = True
 
         root = QVBoxLayout(self)
@@ -193,6 +194,10 @@ class LibraryPage(QWidget):
     def set_queue_lookup(self, fn) -> None:
         """fn(course_id) -> texte d'avancement ou None."""
         self._queue_lookup = fn
+
+    def set_pause_lookup(self, fn) -> None:
+        """fn(course_id) -> raison d'une génération interrompue, ou texte vide."""
+        self._pause_lookup = fn
 
     def selected_id(self) -> Optional[str]:
         item = self.tree.currentItem()
@@ -325,6 +330,11 @@ class LibraryPage(QWidget):
                         extra = "  (%d/%d sections)" % (s.sections_done, s.sections_total)
                     elif s.generated and s.proofs_total:
                         extra = "  (%d/%d démos)" % (s.proofs_done, s.proofs_total)
+                    reason = (self._pause_lookup(cid) if s.partial and self._pause_lookup
+                              else "")
+                    if reason:
+                        extra += "  — %s" % reason
+                        item.setToolTip(COL_STATE, "Génération interrompue : %s" % reason)
                     item.setText(COL_STATE, s.label + extra)
                     item.setForeground(COL_STATE, QColor(pal[STATE_COLOR[s.state]]))
                 if s.state == LOCKED:

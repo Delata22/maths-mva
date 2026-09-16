@@ -64,6 +64,7 @@ class ChatSession:
         self.context_key = context_key
         self.mode = mode
         self.state_provider = None     # assistant : etat de l'app, relu a chaque tour
+        self.queue_provider = None     # assistant : file de generation, jointe a chaque message
         course_id = course.id if course else None
         row = store.find_thread(course_id, context_key)
         if row is None:
@@ -90,6 +91,16 @@ class ChatSession:
             from .generation.prompts import assistant_system
             return assistant_system(self.state_provider() if self.state_provider else "")
         return chat_system(self.course, self.syl)
+
+    def turn_prompt(self, prompt: str) -> str:
+        """Message envoye a Claude. Pour l'assistant, l'etat de la file est joint
+        a chaque message : une conversation reprise garde sinon en memoire les
+        etats des tours precedents, et l'assistant se fie a une file perimee."""
+        if self.mode != "assistant" or not self.queue_provider:
+            return prompt
+        return ("<etat_a_jour>\nÉtat actuel de l'application, qui remplace tout état "
+                "donné plus tôt dans la conversation :\n%s\n</etat_a_jour>\n\n%s"
+                % (self.queue_provider(), prompt))
 
     @property
     def model(self) -> str:

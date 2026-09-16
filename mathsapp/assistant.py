@@ -100,12 +100,7 @@ def app_state(syl: Syllabus, statuses: dict, jobs=()) -> str:
     if not tds:
         lines.append("- (aucun)")
 
-    active = [j for j in jobs if j.active]
-    lines.append("\nFILE DE GÉNÉRATION")
-    for j in active:
-        lines.append("- [%s] %s (%s) : %s" % (j.kind, j.course_id, j.title, j.label))
-    if not active:
-        lines.append("- (vide)")
+    lines.append("\n" + queue_state(syl, statuses, jobs))
 
     lines.append("\nRÉGLAGES MODIFIABLES")
     for key in SETTINGS_ALLOWED:
@@ -113,6 +108,74 @@ def app_state(syl: Syllabus, statuses: dict, jobs=()) -> str:
 
     lines.append("\nCOÛT MOYEN D'UN COURS COMPLET : environ %d min et %.2f $ "
                  "(d'après les générations passées)." % (per_course_s / 60, per_course_cost))
+    return "\n".join(lines)
+
+
+QUEUE_MAX_ITEMS = 15
+
+
+def _clock(ts: float) -> str:
+    return time.strftime("%H:%M:%S", time.localtime(ts)) if ts else "—"
+
+
+def queue_state(syl: Syllabus, statuses: dict, jobs=(), now: Optional[float] = None,
+                limit: Optional[int] = None) -> str:
+    """Section FILE DE GÉNÉRATION : statut, avancement, horodatages et raison de
+    chaque attente ou pause. Reconstruite à chaque message de l'utilisateur."""
+    from .generation import queue as queue_mod
+    now = time.time() if now is None else now
+    if limit is None:
+        limit = max(1, min(4, int(settings.get("gen/concurrency") or 1)))
+    jobs = list(jobs)
+    running = sum(1 for j in jobs if j.state == queue_mod.RUNNING)
+    recent = [j for j in jobs if j.active
+              or now - (j.finished_at or j.last_activity) < queue_mod.RECENT_AFTER]
+    rank = {queue_mod.RUNNING: 0, queue_mod.QUEUED: 1, queue_mod.ERROR: 2,
+            queue_mod.CANCELLED: 3, queue_mod.DONE: 4}
+    recent.sort(key=lambda j: rank.get(j.state, 5))
+    lines = ["FILE DE GÉNÉRATION (état à %s ; %d en cours, limite gen/concurrency = %d ; "
+             "statut | avancement | ajouté, démarré, dernière progression | raison)"
+             % (_clock(now), running, limit)]
+    if not recent:
+        lines.append("- file vide : aucune génération en cours, en attente ni récente")
+    active_ids = {j.course_id for j in jobs if j.active}
+    for j in recent[:QUEUE_MAX_ITEMS]:
+        status, reason = queue_mod.explain(j, running, limit, now)
+        progress = "%d %%" % int(j.progress * 100)
+        s = statuses.get(j.course_id)
+        if s is not None and j.kind in ("course", "regenerate") and s.sections_total:
+            progress += ", %d/%d sections" % (s.sections_done, s.sections_total)
+        if j.state == queue_mod.QUEUED and j.course_id in syl.courses:
+            waiting = [p for p in syl.get(j.course_id).prereqs if p in active_ids]
+            if waiting:
+                # la file n'attend pas les prérequis : on le signale seulement
+                reason += (" ; prérequis du même lot encore en file : %s "
+                           "(la file ne les attend pas)" % ", ".join(waiting))
+        line = "- [%s] %s (%s) : %s | %s | %s, %s, %s" % (
+            j.kind, j.course_id, j.title, status, progress, _clock(j.queued_at),
+            _clock(j.started_at), _clock(j.last_activity))
+        if reason:
+            line += " | %s" % reason
+        if j.active and j.label:
+            line += " | étape : %s" % j.label.split(" · ")[0][:120]
+        if j.last_notice and j.state != queue_mod.ERROR:
+            line += " | dernier message d'erreur : %s" % j.last_notice[:200]
+        lines.append(line)
+    if len(recent) > QUEUE_MAX_ITEMS:
+        lines.append("- … et %d autres éléments non détaillés" % (len(recent) - QUEUE_MAX_ITEMS))
+
+    paused = [cid for cid in syl.order
+              if statuses.get(cid) is not None and statuses[cid].partial
+              and cid not in active_ids]
+    if paused:
+        lines.append("Cours interrompus sans génération active (« Incomplet » dans la "
+                     "bibliothèque) :")
+        for cid in paused[:QUEUE_MAX_ITEMS]:
+            s = statuses[cid]
+            lines.append("- %s : %d/%d sections | %s" % (
+                cid, s.sections_done, s.sections_total, queue_mod.pause_reason(jobs, cid)))
+        if len(paused) > QUEUE_MAX_ITEMS:
+            lines.append("- … et %d autres cours interrompus" % (len(paused) - QUEUE_MAX_ITEMS))
     return "\n".join(lines)
 
 

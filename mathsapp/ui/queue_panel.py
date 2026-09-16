@@ -145,10 +145,16 @@ class QueuePanel(QWidget):
                     text = "%s  rien depuis %s" % (mark, _age(job.silent_for))
                 else:
                     text = "%s  muet depuis %s" % (mark, _age(job.silent_for))
+                status, reason = self.queue.explain(job)
+                tip = ("Démarré il y a %s.\nDernier signe de vie il y a %s."
+                       % (_age(job.elapsed), _age(job.silent_for)))
+                if status == "en pause":
+                    text = "en pause : %s" % reason
+                    tip += "\n%s" % job.last_notice if job.last_notice else ""
                 item.setText(3, text)
-                item.setForeground(3, QColor(pal[HEALTH_COLOR[health]]))
-                item.setToolTip(3, "Démarré il y a %s.\nDernier signe de vie il y a %s."
-                                % (_age(job.elapsed), _age(job.silent_for)))
+                item.setForeground(3, QColor(pal["warn" if status == "en pause"
+                                                 else HEALTH_COLOR[health]]))
+                item.setToolTip(3, tip)
                 bar = QProgressBar()
                 bar.setRange(0, 1000)
                 bar.setValue(int(job.progress * 1000))
@@ -165,6 +171,8 @@ class QueuePanel(QWidget):
                 labels = {DONE: "terminé", QUEUED: "en attente"}
                 item.setText(4, labels.get(job.state, ""))
                 item.setForeground(4, QColor(pal["muted"]))
+                if job.state == QUEUED:
+                    item.setToolTip(4, self.queue.explain(job)[1])
                 if job.state == DONE and job.elapsed:
                     item.setText(3, "en %s" % _age(job.elapsed))
                     item.setForeground(3, QColor(pal["muted"]))

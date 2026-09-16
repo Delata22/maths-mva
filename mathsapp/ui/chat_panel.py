@@ -77,6 +77,7 @@ class ChatPanel(QWidget):
         self._ready = False
         self._queued_calls: list[str] = []
         self.state_provider = None          # fourni par la fenetre, pour l'assistant
+        self.queue_provider = None          # idem : file de generation, a chaque message
         self._actions: dict = {}
         self._raw = ""
         self._sent = 0
@@ -176,6 +177,7 @@ class ChatPanel(QWidget):
         self.stop()
         self.session = ChatSession(course, self.syl, context_key, mode)
         self.session.state_provider = self.state_provider
+        self.session.queue_provider = self.queue_provider
         self._empty_text = (EMPTY_ASSISTANT if mode == "assistant"
                             else EMPTY_QUESTION if mode == "question"
                             else EMPTY_COURSE if course else EMPTY_GENERAL)
@@ -230,7 +232,12 @@ class ChatPanel(QWidget):
     def _start(self, prompt: str) -> None:
         self._raw, self._sent = "", 0
         self._js("window.chatBegin();")
-        self.worker = ChatWorker(prompt, self.session.model, self.session.system,
+        # l'etat de l'application est reconstruit ici, a chaque message, avec les
+        # fournisseurs courants de la fenetre (la session a pu naitre avant eux)
+        self.session.state_provider = self.state_provider or self.session.state_provider
+        self.session.queue_provider = self.queue_provider or self.session.queue_provider
+        system = self.session.system
+        self.worker = ChatWorker(self.session.turn_prompt(prompt), self.session.model, system,
                                  self.session.session_id, self)
         self.worker.delta.connect(self._on_delta)
         self.worker.finished_ok.connect(self._on_done)

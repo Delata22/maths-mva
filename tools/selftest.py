@@ -470,6 +470,34 @@ def test_assistant() -> None:
     check("assistant : etat assez court pour la ligne de commande",
           len(state.encode("utf-8")) < 100000, "%d octets" % len(state.encode("utf-8")))
 
+    import time as _time
+    from types import SimpleNamespace
+    from mathsapp.chat import ChatSession
+    from mathsapp.generation.queue import CANCELLED, QUEUED, RUNNING, Job
+    statuses = st_mod.compute(syl)
+    empty = assistant.queue_state(syl, statuses, [], limit=2)
+    check("assistant : file vide signalee", "file vide" in empty, empty.splitlines()[1])
+    now = _time.time()
+    jobs = [Job(course_id="x%d" % i, title="X%d" % i, state=QUEUED) for i in range(20)]
+    jobs[0].state = jobs[1].state = RUNNING
+    jobs.append(Job(course_id="annule", title="Annulé", state=CANCELLED, finished_at=now - 60))
+    jobs.append(Job(course_id="ancien", title="Ancien", state=CANCELLED, finished_at=now - 7200))
+    text = assistant.queue_state(syl, statuses, jobs, now=now, limit=2)
+    check("assistant : file longue tronquee",
+          "et 6 autres éléments" in text and text.count("\n- [") == assistant.QUEUE_MAX_ITEMS,
+          text.splitlines()[-1])
+    check("assistant : raison de l'attente donnee", "limite gen/concurrency atteinte (2/2" in text)
+    short = assistant.queue_state(syl, statuses, jobs[:2] + jobs[-2:], now=now, limit=2)
+    check("assistant : annulation recente signalee, ancienne omise",
+          "annule (Annulé) : annulé" in short and "ancien" not in short, short)
+    fake = SimpleNamespace(mode="assistant", queue_provider=lambda: "FILE DE GÉNÉRATION\n- x")
+    sent = ChatSession.turn_prompt(fake, "Pourquoi en pause ?")
+    check("assistant : etat joint a chaque message",
+          "FILE DE GÉNÉRATION" in sent and sent.endswith("Pourquoi en pause ?"), sent)
+    fake.mode = "general"
+    check("discussion ordinaire : message intact",
+          ChatSession.turn_prompt(fake, "salut") == "salut")
+
 
 def test_math_lt() -> None:
     """Un « < » de formule ne doit jamais etre pris pour une balise."""
@@ -1187,6 +1215,32 @@ def test_queue() -> None:
     live.last_activity = _time.time()
     check("retour a la normale", queue.health()[0] == "vivant")
     check("duree ecoulee mesuree", 115 < live.elapsed < 130, "%.0f s" % live.elapsed)
+
+    from mathsapp.generation import claude_cli
+    from mathsapp.generation.queue import explain, pause_reason
+    check("raison d'un echec transitoire",
+          [claude_cli.transient_reason(m) for m in ("API Error: 429 rate limit", "ECONNRESET")]
+          == ["limite de débit de l'API", "erreur réseau"])
+    live.note_progress("Section 2/5 — limite de débit de l'API, nouvelle tentative dans 30 s "
+                       "(essai 2/3) · API Error: 429 rate limit")
+    status, reason = queue.explain(live)
+    check("pause sur limite de debit expliquee",
+          status == "en pause" and reason.startswith("limite de débit de l'API, nouvelle tentative"),
+          "%s : %s" % (status, reason))
+    check("dernier message d'erreur conserve", "429" in live.last_notice, live.last_notice)
+    live.retry_until = 0.0
+    check("fin de pause", queue.explain(live)[0] == "en cours", str(queue.explain(live)))
+    status, reason = explain(queue.jobs[3], 2, 2)
+    check("attente sur la limite de concurrence",
+          status == "en attente" and "gen/concurrency" in reason, reason)
+    queue.jobs[1].error = "Délai dépassé.\ndétail"
+    check("cours interrompu par un echec", queue.pause_reason("b") == "échec : Délai dépassé.",
+          queue.pause_reason("b"))
+    check("cours interrompu avant cette session",
+          pause_reason([], "b") == "interrompu lors d'une session précédente")
+    queue.jobs[0].state = CANCELLED
+    check("cours arrete manuellement", pause_reason(queue.jobs, "a") == "arrêté manuellement")
+    queue.jobs[0].state = DONE
 
     before = len(queue.jobs)
     queue.retry("b")

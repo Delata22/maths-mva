@@ -1386,6 +1386,10 @@ FORME DE LA RÉPONSE :
 - Pour une question de mathématiques pure, répondez brièvement et signalez que
   le bouton « Chat » ouvre le tuteur, plus adapté.
 - Français avec tous les accents.
+- Chaque message de l'utilisateur commence par un bloc <etat_a_jour> : la file
+  de génération la plus récente, qui prévaut sur tout état plus ancien. Pour
+  diagnostiquer une génération en attente, en pause ou interrompue, citez la
+  raison qui y figure.
 
 ÉTAT ACTUEL DE L'APPLICATION :
 {state}"""

@@ -460,6 +460,20 @@ rédaction, leur score et leurs prérequis, les parcours, les TD, la file de
 génération et les réglages. Il répond brièvement et propose des **cartes
 d'action**. Rien ne part sans un clic sur la carte.
 
+L'état est reconstruit à chaque envoi. De plus, la file de génération à jour
+est jointe au début de chaque message : dans une conversation reprise, Claude
+ne se fie donc pas à une file périmée. Pour chaque travail de la file, cet état
+donne le statut (en attente, en cours, en pause, erreur, terminé, annulé),
+l'avancement et les sections faites, les heures d'ajout, de démarrage et de
+dernière progression. Il donne aussi la raison d'une attente ou d'une pause :
+limite `gen/concurrency` atteinte, limite de débit de l'API ou erreur réseau
+avec le délai avant la nouvelle tentative, annulation, dernier message
+d'erreur. Au-delà de 15 éléments, la liste est coupée et le nombre d'éléments
+restants est indiqué. Les travaux terminés ou annulés depuis plus d'une heure
+ne sont plus listés. Les cours « Incomplet » sans génération active sont listés
+avec leur raison : échec, arrêt manuel ou interruption lors d'une session
+précédente. La bibliothèque affiche cette même raison à côté de l'état.
+
 - générer des cours (dans l'ordre des prérequis, avec durée et coût estimés),
   en régénérer un, ajouter une série de QCM, produire des fiches ;
 - corriger un TD importé, étendre le syllabus ;

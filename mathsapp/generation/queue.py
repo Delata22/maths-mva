@@ -1,6 +1,7 @@
 """File d'attente de generation, executee en arriere-plan."""
 from __future__ import annotations
 
+import re
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -33,6 +34,12 @@ KIND_LABEL = {
 SLOW_AFTER = 75.0
 SILENT_AFTER = 180.0
 
+# Annonce d'une nouvelle tentative par claude_cli.run, reprise dans le libelle
+_RETRY = re.compile(r"(?:— )?([^—]*?), nouvelle tentative dans (\d+) s")
+
+# Travaux termines ou annules encore signales a l'assistant pendant ce delai
+RECENT_AFTER = 3600.0
+
 
 @dataclass
 class Job:
@@ -47,6 +54,20 @@ class Job:
     queued_at: float = field(default_factory=time.time)
     started_at: float = 0.0
     last_activity: float = 0.0
+    finished_at: float = 0.0
+    retry_until: float = 0.0     # pause avant une nouvelle tentative de l'appel
+    retry_reason: str = ""       # « limite de débit de l'API », « erreur réseau »…
+    last_notice: str = ""        # dernier message d'erreur transitoire
+
+    def note_progress(self, label: str, now: Optional[float] = None) -> None:
+        """Repere dans un libelle d'avancement l'annonce d'une nouvelle tentative."""
+        now = time.time() if now is None else now
+        m = _RETRY.search(label or "")
+        if m:
+            self.retry_reason = m.group(1).strip()
+            self.retry_until = now + int(m.group(2))
+            detail = label.split(" · ", 1)
+            self.last_notice = detail[1].strip() if len(detail) > 1 else label
 
     @property
     def active(self) -> bool:
@@ -104,6 +125,7 @@ class _Task(QRunnable):
             job.label = label
             job.progress = max(0.0, min(1.0, frac))
             job.last_activity = time.time()
+            job.note_progress(label, job.last_activity)
             self.signals.progress.emit(job.course_id, job.kind, job.progress, label)
 
         def cancel() -> bool:
@@ -165,6 +187,48 @@ def _fmt_duration(seconds: float) -> str:
     return "%dmin %02ds" % (seconds // 60, seconds % 60)
 
 
+def explain(job: Job, running: int, limit: int, now: Optional[float] = None) -> tuple:
+    """(statut, raison) d'un travail, en clair.
+
+    Statuts : en attente, en cours, en pause, erreur, terminé, annulé. La raison
+    est vide quand il n'y a rien a expliquer."""
+    now = time.time() if now is None else now
+    if job.state == DONE:
+        return ("terminé", "")
+    if job.state == CANCELLED:
+        return ("annulé", "arrêt demandé par l'utilisateur")
+    if job.state == ERROR:
+        first = (job.error or "erreur inconnue").strip().splitlines()
+        return ("erreur", first[0] if first else "erreur inconnue")
+    if job.cancel_requested:
+        return ("en cours" if job.state == RUNNING else "en attente", "annulation demandée")
+    if job.state == QUEUED:
+        if running >= limit:
+            return ("en attente", "limite gen/concurrency atteinte (%d/%d en cours)"
+                    % (running, limit))
+        return ("en attente", "démarrage imminent")
+    if job.retry_until > now:
+        return ("en pause", "%s, nouvelle tentative dans %d s"
+                % (job.retry_reason or "erreur réseau", job.retry_until - now + 0.5))
+    if job.health == "muet":
+        return ("en cours", "aucun signe de vie depuis %s" % _fmt_duration(job.silent_for))
+    if job.health == "lent":
+        return ("en cours", "rien reçu depuis %s" % _fmt_duration(job.silent_for))
+    return ("en cours", "")
+
+
+def pause_reason(jobs, course_id: str) -> str:
+    """Raison d'une generation de cours interrompue, d'apres son dernier travail."""
+    last = [j for j in jobs if j.course_id == course_id
+            and j.kind in ("course", "regenerate") and j.state in (ERROR, CANCELLED)]
+    if not last:
+        return "interrompu lors d'une session précédente"
+    status, reason = explain(last[-1], 0, 1)
+    if status == "annulé":
+        return "arrêté manuellement"
+    return "échec : %s" % reason
+
+
 class GenerationQueue(QObject):
     """Ordonnanceur simple : N generations en parallele, le reste en attente."""
 
@@ -200,6 +264,19 @@ class GenerationQueue(QObject):
             if j.course_id == course_id and j.active:
                 return j
         return None
+
+    def concurrency(self) -> int:
+        return self._pool.maxThreadCount()
+
+    def explain(self, job: Job) -> tuple:
+        """(statut, raison) d'un travail de la file, voir `explain`."""
+        return explain(job, len(self.running_jobs()), self.concurrency())
+
+    def pause_reason(self, course_id: str) -> str:
+        """Pourquoi un cours est interrompu (« Incomplet ») sans travail actif."""
+        if self.job_for(course_id) is not None:
+            return ""
+        return pause_reason(self.jobs, course_id)
 
     def active_count(self) -> int:
         return sum(1 for j in self.jobs if j.active)
@@ -283,6 +360,8 @@ class GenerationQueue(QObject):
         job = self._by_key.get((course_id, kind))
         if job is not None:
             job.last_activity = time.time()
+            job.finished_at = job.last_activity
+            job.retry_until = 0.0
             if ok:
                 job.state = DONE
                 job.progress = 1.0

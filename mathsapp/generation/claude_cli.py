@@ -47,6 +47,19 @@ def is_transient(message: str) -> bool:
     return any(token in low for token in TRANSIENT)
 
 
+def transient_reason(message: str) -> str:
+    """Nature d'un echec transitoire, en clair, pour expliquer une pause."""
+    low = (message or "").lower()
+    if any(t in low for t in ("rate limit", "429", "overloaded")):
+        return "limite de débit de l'API"
+    if "silence" in low:
+        return "appel resté muet"
+    if any(t in low for t in ("500", "502", "503", "504", "internal server",
+                              "service unavailable", "temporarily")):
+        return "service indisponible"
+    return "erreur réseau"
+
+
 @dataclass
 class Result:
     text: str
@@ -158,8 +171,9 @@ def run(prompt: str, model: str, system: Optional[str] = None,
                 raise
             delay = delays[min(attempt, len(delays) - 1)]
             if on_notice is not None:
-                on_notice("connexion perdue, nouvelle tentative dans %d s "
-                          "(essai %d/%d)" % (delay, attempt + 2, attempts))
+                on_notice("%s, nouvelle tentative dans %d s (essai %d/%d) · %s"
+                          % (transient_reason(str(exc)), delay, attempt + 2, attempts,
+                             " ".join(str(exc).split())[:160]))
             waited = 0.0
             while waited < delay:
                 if cancel is not None and cancel():
