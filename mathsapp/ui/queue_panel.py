@@ -27,6 +27,7 @@ from . import theme
 class QueuePanel(QWidget):
     course_opened = Signal(str)
     retried = Signal()
+    hide_requested = Signal()      # « Masquer » : la file se replie en pastille
 
     def __init__(self, queue: GenerationQueue, parent=None):
         super().__init__(parent)
@@ -56,6 +57,12 @@ class QueuePanel(QWidget):
         self.btn_cancel.setProperty("flat", True)
         self.btn_cancel.clicked.connect(self.queue.cancel_all)
         bl.addWidget(self.btn_cancel)
+        self.btn_hide = QPushButton("Masquer")
+        self.btn_hide.setProperty("flat", True)
+        self.btn_hide.setToolTip("Replier la file en pastille dans l'en-tête. Les générations "
+                                 "continuent en arrière-plan.  (Ctrl+G)")
+        self.btn_hide.clicked.connect(self.hide_requested.emit)
+        bl.addWidget(self.btn_hide)
         root.addWidget(bar)
 
         self.tree = QTreeWidget()

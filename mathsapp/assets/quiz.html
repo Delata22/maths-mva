@@ -148,6 +148,17 @@
   .missed { margin-top: 26px; }
   .missed h4 { font-size: .95em; margin-bottom: .5em; }
   .missed a { display: block; padding: 5px 0; cursor: pointer; font-size: .95em; }
+  /* ------------------------------------------------ tentative en cours */
+  .resume-box {
+    margin: 0 0 18px; padding: 13px 15px; border-radius: 10px;
+    border: 1px solid var(--accent); background: var(--accent-soft);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; color: var(--fg-soft);
+  }
+  .resume-box.stale { border-color: var(--warn); background: var(--warn-soft); }
+  .resume-box .actions { margin-top: 10px; }
+  .resume-box b { color: var(--fg); }
+  #shell.resume-only { padding-top: 60px; }
+  button.btn.danger { border-color: var(--warn); color: var(--warn); }
 </style>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="__ASSETS__/vendor/katex/katex.min.js"></script>
@@ -194,6 +205,11 @@ var timerStart = 0, timerId = null;
 var setIndex = 0;          // serie courante
 var selection = [];        // indices des questions retenues
 var partial = false;       // session sur une selection seulement
+var reported = false;      // fin de tentative deja transmise : jamais deux fois
+// Tentatives en cours, par serie : ecrites a chaque reponse validee.
+var PROGRESS = (window.QUIZ_PROGRESS && typeof window.QUIZ_PROGRESS === 'object')
+  ? window.QUIZ_PROGRESS : {};
+var COURSE_ID = window.QUIZ_COURSE || null;
 
 function currentSet() { return SETS[setIndex] || { id: '1', title: '', qcm: [] }; }
 function hist(qid) {
@@ -211,6 +227,136 @@ function plain(html) {
   return d.innerText.trim();
 }
 
+// ----------------------------------------------------- tentative en cours
+// Empreinte d'une question : une serie regeneree peut reutiliser les memes
+// identifiants pour d'autres questions, dont les anciennes reponses ne valent rien.
+function sig(q) {
+  var s = String(q.question) + '|' + (q.choices || []).join('|') + '|' + q.answer, h = 5381;
+  for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+function firstUnanswered() {
+  for (var i = 0; i < DATA.qcm.length; i++) if (!answers[i]) return i;
+  return -1;
+}
+function elapsedSeconds() {
+  return timerStart ? Math.round((Date.now() - timerStart) / 1000) : 0;
+}
+
+function saveProgress() {
+  var set = currentSet();
+  var list = DATA.qcm.map(function (_q, i) { return answers[i] || null; });
+  var done = list.filter(function (a) { return a; });
+  var correct = done.filter(function (a) { return a.ok; }).length;
+  var state = {
+    v: 1, setId: set.id, courseId: COURSE_ID, session: SESSION ? SESSION.kind : null,
+    partial: partial,
+    order: DATA.qcm.map(function (q) { return q.id; }),
+    sigs: DATA.qcm.map(sig),
+    refs: DATA.qcm.map(function (q) {
+      return { id: q.id, courseId: q.course_id || null, setId: q.set_id || null, day: q.day || null };
+    }),
+    // les propositions sont affichees dans l'ordre de la serie
+    choiceOrder: DATA.qcm.map(function (q) { return q.choices.map(function (_c, i) { return i; }); }),
+    answers: list,
+    answered: done.length, total: DATA.qcm.length, correct: correct,
+    score: done.length ? Math.round(100 * correct / done.length) : 0,
+    seconds: elapsedSeconds(),
+    savedAt: Date.now() / 1000
+  };
+  PROGRESS[set.id] = state;
+  if (bridge && bridge.saveQuizProgress) bridge.saveQuizProgress(JSON.stringify(state));
+}
+
+function clearProgress(setId) {
+  delete PROGRESS[setId];
+  if (bridge && bridge.clearQuizProgress) bridge.clearQuizProgress(String(setId));
+}
+
+/* Ce qui reste reprenable d'une tentative : les questions encore presentes et
+   inchangees, avec leurs reponses. null si plus rien ne correspond. */
+function restorable(state, qs) {
+  if (!state || !state.order || !qs) return null;
+  var byId = {};
+  qs.forEach(function (q) { byId[q.id] = q; });
+  var qcm = [], list = [], kept = 0;
+  state.order.forEach(function (id, i) {
+    var q = byId[id];
+    if (!q) return;
+    var a = (state.answers || [])[i];
+    var same = !state.sigs || state.sigs[i] === sig(q);
+    qcm.push(q);
+    if (a && same && a.chosen >= 0 && a.chosen < q.choices.length) {
+      list[qcm.length - 1] = a;
+      kept++;
+    }
+  });
+  if (!kept) return null;
+  var next = -1;
+  for (var i = 0; i < qcm.length; i++) if (!list[i]) { next = i; break; }
+  return { qcm: qcm, answers: list, kept: kept, next: next };
+}
+
+function resumeAttempt(state, info) {
+  DATA = { qcm: info.qcm };
+  answers = info.answers;
+  partial = !!state.partial || info.qcm.length < currentSet().qcm.length;
+  reported = false;
+  idx = info.next >= 0 ? info.next : DATA.qcm.length;
+  timerStart = (SESSION && SESSION.timed) ? Date.now() - (state.seconds || 0) * 1000 : 0;
+  document.getElementById('shell').classList.remove('resume-only');
+  render();
+  window.scrollTo(0, 0);
+}
+
+function when(ts) {
+  if (!ts) return '';
+  var s = Math.max(0, Date.now() / 1000 - ts);
+  if (s < 60) return "à l'instant";
+  if (s < 3600) return 'il y a ' + Math.floor(s / 60) + ' min';
+  if (s < 86400) return 'il y a ' + Math.floor(s / 3600) + ' h';
+  var d = Math.floor(s / 86400);
+  return d === 1 ? 'hier' : 'il y a ' + d + ' jours';
+}
+
+/* Encart « Reprendre (question k/n) » / « Recommencer ». `onRestart` est
+   appele une fois l'effacement confirme. */
+function resumeBoxHtml(state, info) {
+  if (!info) {
+    return '<div class="resume-box stale" id="resumebox">Une tentative était en cours sur '
+      + 'cette série, mais la série a changé depuis : elle ne peut pas être reprise.'
+      + '<div class="actions"><button class="btn" id="restart">Recommencer</button></div></div>';
+  }
+  var n = info.qcm.length;
+  var correct = info.answers.filter(function (a) { return a && a.ok; }).length;
+  var k = info.next >= 0 ? info.next + 1 : n;
+  return '<div class="resume-box" id="resumebox"><b>Tentative en cours</b> : '
+    + info.kept + ' réponse' + (info.kept > 1 ? 's' : '') + ' sur ' + n
+    + ' &nbsp;·&nbsp; ' + correct + ' juste' + (correct > 1 ? 's' : '')
+    + (state.savedAt ? ' &nbsp;·&nbsp; ' + when(state.savedAt) : '')
+    + (info.kept < (state.answered || 0) ? '<br>La série a changé : seules les réponses aux '
+       + 'questions encore présentes sont conservées.' : '')
+    + '<div class="actions"><button class="btn primary" id="resume">'
+    + (info.next >= 0 ? 'Reprendre (question ' + k + '/' + n + ')' : 'Reprendre (voir le résultat)')
+    + '</button><button class="btn" id="restart">Recommencer</button></div></div>';
+}
+
+function wireResumeBox(state, info, onRestart) {
+  var resume = document.getElementById('resume');
+  if (resume) resume.addEventListener('click', function () { resumeAttempt(state, info); });
+  var restart = document.getElementById('restart');
+  if (restart) restart.addEventListener('click', function () {
+    // effacement confirme par un second clic
+    if (!restart.classList.contains('danger')) {
+      restart.classList.add('danger');
+      restart.textContent = 'Confirmer : effacer la tentative';
+      return;
+    }
+    clearProgress(state.setId || currentSet().id);
+    onRestart();
+  });
+}
+
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)); }
 function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
 
@@ -223,9 +369,15 @@ function renderMenu() {
   var h = '<div class="sets">';
   SETS.forEach(function (s, i) {
     h += '<button class="set-tab' + (i === setIndex ? ' on' : '') + '" data-set="' + i + '">'
-      + esc(s.title) + ' <span style="opacity:.65">' + s.qcm.length + '</span></button>';
+      + esc(s.title) + ' <span style="opacity:.65">' + s.qcm.length + '</span>'
+      + (PROGRESS[s.id] ? ' <span title="tentative en cours">· en cours</span>' : '')
+      + '</button>';
   });
   h += '<button class="set-tab add" id="newset">+ Nouvelle série</button></div>';
+
+  var pending = PROGRESS[set.id] || null;
+  var pendingInfo = pending ? restorable(pending, qs) : null;
+  if (pending) h += resumeBoxHtml(pending, pendingInfo);
 
   h += '<div class="menu-sum">' + qs.length + ' questions &nbsp;·&nbsp; '
     + counts.ok + ' réussies &nbsp;·&nbsp; ' + counts.ko + ' ratées &nbsp;·&nbsp; '
@@ -258,6 +410,7 @@ function renderMenu() {
   shell.innerHTML = h;
   typeset(shell);
   updateGo();
+  if (pending) wireResumeBox(pending, pendingInfo, function () { renderMenu(); });
 
   Array.prototype.forEach.call(shell.querySelectorAll('.qrow'), function (el) {
     el.addEventListener('click', function () {
@@ -291,13 +444,24 @@ function renderMenu() {
     this.textContent = 'Série demandée…';
     this.disabled = true;
   });
-  document.getElementById('go').addEventListener('click', startQuiz);
+  document.getElementById('go').addEventListener('click', function () {
+    // une nouvelle tentative remplace celle en cours : on le fait confirmer
+    var go = document.getElementById('go');
+    if (PROGRESS[set.id] && !go.classList.contains('danger')) {
+      go.classList.add('danger');
+      go.textContent = 'Confirmer : effacer la tentative en cours et commencer';
+      return;
+    }
+    if (PROGRESS[set.id]) clearProgress(set.id);
+    startQuiz();
+  });
 }
 
 function updateGo() {
   var go = document.getElementById('go');
   var count = document.getElementById('gocount');
   if (!go) return;
+  go.classList.remove('danger');
   go.disabled = selection.length === 0;
   go.textContent = selection.length === currentSet().qcm.length
     ? 'Faire la série entière' : 'Commencer (' + selection.length + ')';
@@ -306,6 +470,7 @@ function updateGo() {
 
 function startQuiz() {
   if (!selection.length) return;
+  reported = false;
   var qs = currentSet().qcm;
   selection.sort(function (a, b) { return a - b; });
   DATA = { qcm: selection.map(function (i) { return qs[i]; }) };
@@ -316,7 +481,12 @@ function startQuiz() {
 }
 
 function render() {
-  if (idx >= DATA.qcm.length) return renderResult();
+  if (idx >= DATA.qcm.length) {
+    // tentative reprise : une question sautee reste a faire avant le resultat
+    var gap = firstUnanswered();
+    if (gap < 0) return renderResult();
+    idx = gap;
+  }
   var q = DATA.qcm[idx];
   var correct = answers.filter(function (a) { return a && a.ok; }).length;
   var h = '';
@@ -344,12 +514,17 @@ function render() {
   if (isExo) h += '<button class="btn" id="reveal">Afficher les propositions</button>';
   h += '<button class="btn primary" id="go"' + (isExo ? ' hidden' : '') + ' disabled>Valider</button>';
   h += '<button class="btn ghost" id="ask">Demander à Claude</button>';
+  if (idx > 0) h += '<button class="btn ghost" id="prev">Question précédente</button>';
   if (!SESSION) h += '<button class="btn ghost" id="back">Retour à la liste</button>';
   h += '</div>';
   shell.innerHTML = h;
   typeset(shell);
 
   chosen = -1; validated = false;
+  var prevBtn = document.getElementById('prev');
+  if (prevBtn) prevBtn.addEventListener('click', function () {
+    idx = Math.max(0, idx - 1); render(); window.scrollTo(0, 0);
+  });
   Array.prototype.forEach.call(shell.querySelectorAll('.choice'), function (el) {
     el.addEventListener('click', function () {
       if (validated) return;
@@ -395,30 +570,50 @@ function render() {
         return LETTERS[i] + '. ' + d.innerText.trim();
       }).join('\n'), q.section || '');
   });
+  // question deja repondue (retour en arriere, tentative reprise) : correction visible
+  if (answers[idx]) showVerdict(q, answers[idx], true);
+}
+
+function showVerdict(q, a, revisit) {
+  validated = true;
+  chosen = a.chosen;
+  var ok = !!a.ok;
+  document.getElementById('choices').hidden = false;
+  var revealBtn = document.getElementById('reveal');
+  if (revealBtn) revealBtn.remove();
+  var scratch = document.getElementById('scratch');
+  if (scratch && revisit) scratch.remove();
+  Array.prototype.forEach.call(shell.querySelectorAll('.choice'), function (el) {
+    var i = parseInt(el.getAttribute('data-i'), 10);
+    el.classList.add('locked');
+    el.classList.remove('sel');
+    if (i === q.answer) el.classList.add('good');
+    else if (i === a.chosen) el.classList.add('bad');
+  });
+  var v = document.getElementById('verdict');
+  v.innerHTML = '<div class="verdict ' + (ok ? 'ok' : 'ko') + '">'
+    + '<div class="vtitle">' + (ok ? 'Correct' : 'Réponse : ' + LETTERS[q.answer]) + '</div>'
+    + q.explanation + '</div>';
+  typeset(v);
+  var go = document.getElementById('go');
+  go.hidden = false;
+  go.disabled = false;
+  var last = idx + 1 >= DATA.qcm.length;
+  var rest = answers.filter(function (x) { return x; }).length;
+  go.textContent = !last ? 'Question suivante'
+    : (rest >= DATA.qcm.length || reported ? 'Voir le résultat' : 'Question sans réponse');
 }
 
 function onGo() {
   var q = DATA.qcm[idx];
   if (!validated) {
-    validated = true;
-    var ok = chosen === q.answer;
-    answers[idx] = { id: q.id, chosen: chosen, ok: ok,
+    if (chosen < 0) return;
+    answers[idx] = { id: q.id, chosen: chosen, ok: chosen === q.answer,
                      difficulty: q.difficulty, kind: q.kind || 'direct',
                      courseId: q.course_id || null };
-    Array.prototype.forEach.call(shell.querySelectorAll('.choice'), function (el) {
-      var i = parseInt(el.getAttribute('data-i'), 10);
-      el.classList.add('locked');
-      el.classList.remove('sel');
-      if (i === q.answer) el.classList.add('good');
-      else if (i === chosen) el.classList.add('bad');
-    });
-    var v = document.getElementById('verdict');
-    v.innerHTML = '<div class="verdict ' + (ok ? 'ok' : 'ko') + '">'
-      + '<div class="vtitle">' + (ok ? 'Correct' : 'Réponse : ' + LETTERS[q.answer]) + '</div>'
-      + q.explanation + '</div>';
-    typeset(v);
-    var go = document.getElementById('go');
-    go.textContent = idx + 1 < DATA.qcm.length ? 'Question suivante' : 'Voir le résultat';
+    showVerdict(q, answers[idx]);
+    // ecriture immediate : quitter la page ne perd plus rien
+    if (!reported) saveProgress();
   } else {
     idx++;
     render();
@@ -469,20 +664,28 @@ function renderResult() {
   typeset(shell);
   clearInterval(timerId);
   var seconds = timerStart ? Math.round((Date.now() - timerStart) / 1000) : 0;
-  if (bridge) bridge.quizFinished(JSON.stringify({
-    total: total, correct: correct, answers: answers,
-    setId: currentSet().id, partial: partial,
-    session: SESSION ? SESSION.kind : null, seconds: seconds
-  }));
-  answers.forEach(function (a) {
-    if (!a) return;
-    var store = HISTORY[currentSet().id] = HISTORY[currentSet().id] || {};
-    var prev = store[a.id] || { tries: 0, okCount: 0 };
-    store[a.id] = { ok: a.ok, tries: prev.tries + 1,
-                    okCount: prev.okCount + (a.ok ? 1 : 0) };
-  });
+  // Chaque reponse ne compte qu'une fois : revenir sur une question depuis le
+  // resultat puis revenir ici ne renvoie pas la tentative.
+  if (!reported) {
+    reported = true;
+    delete PROGRESS[currentSet().id];   // effacee cote application a l'enregistrement
+    if (bridge) bridge.quizFinished(JSON.stringify({
+      total: total, correct: correct, answers: answers,
+      setId: currentSet().id, partial: partial,
+      session: SESSION ? SESSION.kind : null, seconds: seconds
+    }));
+    answers.forEach(function (a) {
+      if (!a) return;
+      var store = HISTORY[currentSet().id] = HISTORY[currentSet().id] || {};
+      var prev = store[a.id] || { tries: 0, okCount: 0 };
+      store[a.id] = { ok: a.ok, tries: prev.tries + 1,
+                      okCount: prev.okCount + (a.ok ? 1 : 0) };
+    });
+  }
   document.getElementById('again').addEventListener('click', function () {
-    idx = 0; answers = []; render(); window.scrollTo(0, 0);
+    idx = 0; answers = []; reported = false;
+    timerStart = (SESSION && SESSION.timed) ? Date.now() : 0;
+    render(); window.scrollTo(0, 0);
   });
   var menuBtn = document.getElementById('menu');
   if (menuBtn) menuBtn.addEventListener('click', function () {
@@ -528,7 +731,24 @@ window.showCourseScore = function (pct, correct, answered, total) {
 window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
 window.restartQuiz = function () { renderMenu(); window.scrollTo(0, 0); };
 selection = currentSet().qcm.map(function (_q, i) { return i; });
-if (SESSION && SESSION.autostart) {
+
+/* Seance (revisions, quiz du jour, defi...) laissee en plan : on propose de la
+   reprendre au lieu de repartir de zero. */
+function renderSessionResume(state) {
+  var info = restorable(state, currentSet().qcm);
+  shell.classList.add('resume-only');
+  shell.innerHTML = resumeBoxHtml(state, info);
+  wireResumeBox(state, info, function () {
+    shell.classList.remove('resume-only');
+    timerStart = SESSION.timed ? Date.now() : 0;
+    startQuiz();
+    window.scrollTo(0, 0);
+  });
+}
+
+if (SESSION && SESSION.autostart && PROGRESS[currentSet().id]) {
+  renderSessionResume(PROGRESS[currentSet().id]);
+} else if (SESSION && SESSION.autostart) {
   timerStart = SESSION.timed ? Date.now() : 0;
   startQuiz();
 } else {

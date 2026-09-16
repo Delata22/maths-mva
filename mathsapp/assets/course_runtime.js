@@ -239,6 +239,171 @@
     return true;
   };
 
+  // ---------------------------------------------------- position de lecture
+  // Section visible en haut de l'ecran (ancre et titre) et decalage relatif
+  // dans cette section : un defilement en pixels ne survit ni a un
+  // redimensionnement, ni au rendu des formules, ni au zoom.
+  var READ_TOP = 80;
+  var reading = null, saveTimer = null;
+
+  function normText(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+  function readingHeads() {
+    return Array.prototype.slice.call(document.querySelectorAll('article h2, article h3'));
+  }
+  function absTop(el) { return el.getBoundingClientRect().top + window.scrollY; }
+  function pageHeight() { return document.documentElement.scrollHeight; }
+
+  function currentPosition() {
+    var heads = readingHeads();
+    if (!heads.length) return null;
+    var y = window.scrollY + READ_TOP, at = 0;
+    for (var i = 0; i < heads.length; i++) {
+      if (absTop(heads[i]) <= y) at = i; else break;
+    }
+    var h = heads[at], start = absTop(h);
+    var end = at + 1 < heads.length ? absTop(heads[at + 1]) : pageHeight();
+    var max = pageHeight() - window.innerHeight;
+    return {
+      course: reading ? reading.course : '',
+      sectionId: h.id || '', title: h.textContent.trim().slice(0, 300), index: at,
+      offset: Math.max(0, Math.min(1, end > start ? (y - start) / (end - start) : 0)),
+      fraction: max > 0 ? Math.max(0, Math.min(1, window.scrollY / max)) : 0
+    };
+  }
+
+  function saveReading() {
+    saveTimer = null;
+    if (!reading || !bridge || !bridge.saveReadingPosition) return;
+    var pos = currentPosition();
+    if (pos) bridge.saveReadingPosition(JSON.stringify(pos));
+  }
+
+  // Section enregistree : meme ancre et meme titre, sinon meme titre (cours
+  // regenere), sinon rien et l'on reste au debut.
+  function findHeading(pos) {
+    if (!pos) return null;
+    var heads = readingHeads(), want = normText(pos.section_title || pos.title);
+    if (!want) return null;
+    var id = pos.section_id || pos.sectionId;
+    var byId = id ? document.getElementById(id) : null;
+    if (byId && heads.indexOf(byId) >= 0 && normText(byId.textContent) === want) return byId;
+    var same = heads.filter(function (h) { return normText(h.textContent) === want; });
+    if (!same.length) return null;
+    var index = pos.section_index != null ? pos.section_index : (pos.index || 0);
+    same.sort(function (a, b) {
+      return Math.abs(heads.indexOf(a) - index) - Math.abs(heads.indexOf(b) - index);
+    });
+    return same[0];
+  }
+
+  function goToPosition(pos) {
+    var h = findHeading(pos);
+    if (!h) return false;
+    var heads = readingHeads(), i = heads.indexOf(h), start = absTop(h);
+    var end = i + 1 < heads.length ? absTop(heads[i + 1]) : pageHeight();
+    var offset = pos.section_offset != null ? pos.section_offset : (pos.offset || 0);
+    window.scrollTo({ top: Math.max(0, start + offset * (end - start) - READ_TOP),
+                      left: 0, behavior: 'instant' });
+    return true;
+  }
+
+  // Apres les formules, les polices et les images : sinon la section bouge encore.
+  function whenRendered(fn) {
+    var done = false, pending = 1;
+    function finish() { if (!done) { done = true; setTimeout(fn, 60); } }
+    function one() { if (--pending <= 0) finish(); }
+    Array.prototype.forEach.call(document.images, function (im) {
+      if (im.complete) return;
+      pending++;
+      im.addEventListener('load', one, { once: true });
+      im.addEventListener('error', one, { once: true });
+    });
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(one, one);
+    setTimeout(finish, 3000);
+  }
+
+  function removeBanner() {
+    var old = document.getElementById('resume-banner');
+    if (old) old.remove();
+  }
+
+  function resumeAt(pos) {
+    removeBanner();
+    whenRendered(function () {
+      if (!goToPosition(pos)) return;
+      // les figures se dessinent apres coup : on corrige une fois
+      setTimeout(function () { goToPosition(pos); }, 350);
+    });
+  }
+
+  function showResumeBanner(pos, heading) {
+    removeBanner();
+    var bar = document.createElement('div');
+    bar.id = 'resume-banner';
+    var go = document.createElement('button');
+    go.className = 'resume-go';
+    go.title = 'Revenir où vous en étiez';
+    go.innerHTML = '<b>Reprendre à :</b> ';
+    var name = document.createElement('span');
+    name.innerHTML = heading.innerHTML;   // formules deja rendues
+    go.appendChild(name);
+    go.addEventListener('click', function () { resumeAt(pos); });
+    var close = document.createElement('button');
+    close.className = 'resume-close';
+    close.title = 'Ignorer';
+    close.textContent = '×';
+    close.addEventListener('click', removeBanner);
+    bar.appendChild(go);
+    bar.appendChild(close);
+    document.body.appendChild(bar);
+    // disparait au premier defilement manuel
+    var startY = window.scrollY;
+    function onScroll() {
+      if (!document.getElementById('resume-banner')) {
+        window.removeEventListener('scroll', onScroll);
+      } else if (Math.abs(window.scrollY - startY) > 30) {
+        window.removeEventListener('scroll', onScroll);
+        removeBanner();
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  /* Appele par l'application une fois la page chargee : suit la lecture du
+     cours `course` et propose de reprendre a `saved` (ou y va si `autoResume`). */
+  window.initReading = function (course, saved, autoResume) {
+    var first = !reading;
+    reading = { course: course };
+    if (first) {
+      window.addEventListener('scroll', function () {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveReading, 1000);
+      }, { passive: true });
+      window.addEventListener('pagehide', window.readingFlush);
+    }
+    removeBanner();
+    var heading = findHeading(saved);
+    if (!heading) return false;
+    if (autoResume) resumeAt(saved);
+    else showResumeBanner(saved, heading);
+    return true;
+  };
+
+  window.resumeReading = function (saved) {
+    if (!findHeading(saved)) return false;
+    resumeAt(saved);
+    return true;
+  };
+
+  window.readingFlush = function () {
+    if (saveTimer) { clearTimeout(saveTimer); saveReading(); }
+  };
+
+  window.readingPosition = function () { return currentPosition(); };
+
   window.setTheme = function (name) {
     document.documentElement.setAttribute('data-theme', name);
     window.dispatchEvent(new Event('mviz:theme'));

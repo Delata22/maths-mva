@@ -163,6 +163,19 @@ Une session portant sur une selection met a jour le suivi de chaque question,
 mais ne compte pas comme un score du cours : refaire trois questions ratees ne
 doit pas faire chuter la moyenne.
 
+**Rien n'est perdu en cours de série.** Chaque réponse validée écrit aussitôt
+l'état de la tentative dans `progress.db` : ordre des questions et des
+propositions, réponses, corrections, score partiel. Changer de page, fermer
+l'application ou un plantage ne coûtent donc rien : à la réouverture de la
+série (QCM du cours, révisions, quiz du jour, rappel, défi), l'application
+propose **Reprendre (question k/n)** ou **Recommencer**. Reprendre restaure les
+réponses et leurs corrections (« Question précédente » pour les revoir) et
+place sur la première question sans réponse. Recommencer efface la tentative
+après un second clic de confirmation. Les réponses ne comptent pour le score et
+les révisions espacées qu'une fois, à la fin de la tentative, reprise ou non.
+Si la série a été régénérée, seules les réponses aux questions inchangées sont
+gardées ; s'il n'en reste aucune, seul « Recommencer » est proposé.
+
 Le bouton **+ Nouvelle serie** demande une serie supplementaire : le modele
 recoit les questions deja posees et doit couvrir en priorite ce qu'elles
 laissent de cote. Les series s'empilent, chacune avec son propre suivi.
@@ -247,6 +260,21 @@ chaleur, curseurs et animations. Les couleurs suivent le theme clair/sombre.
 | **Bibliotheque** | Les 142 cours, filtrables par domaine, niveau, statut et parcours, avec le score de QCM |
 | **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles |
 | **Graphe** | Le cursus comme graphe : ce qui est maitrise, ce qui est accessible, ce qui est verrouille |
+
+### Reprendre la lecture
+
+La page d'un cours retient où vous en êtes : la section en haut de l'écran et
+la part de cette section déjà lue, plutôt qu'un défilement en pixels qui
+changerait avec la taille de la fenêtre, le rendu des formules ou le zoom.
+L'enregistrement se fait une seconde après l'arrêt du défilement et en quittant
+la page, dans `progress.db` (une position par cours).
+
+À la réouverture, un bandeau discret propose **Reprendre à : <section>**. Rien
+ne défile sans clic, et le bandeau disparaît dès qu'on fait défiler soi-même.
+L'accueil affiche une carte **Reprendre la lecture** pour le dernier cours
+consulté : titre, section, part lue et ancienneté. Pas de reprise proposée au
+tout début ni au-delà de 95 % du cours. Si le cours a été régénéré, la section
+est retrouvée par son titre ; si elle n'existe plus, le cours s'ouvre au début.
 
 ## Tenir le rythme
 
@@ -347,7 +375,7 @@ reconstruire le suivi par question si la base est restauree.
 | `Ctrl+F` | Rechercher un cours |
 | `Ctrl+N` | Etendre le syllabus |
 | `Alt+↑` / `Alt+↓` | Puissance / indice, dans l'editeur de demonstrations |
-| `Ctrl+G` | Afficher la file de generation |
+| `Ctrl+G` | Afficher ou masquer la file de génération |
 
 ### Le chat
 
@@ -545,6 +573,14 @@ La file de generation (`Ctrl+G`) detaille la meme chose par cours : etape en
 cours, nombre de caracteres deja recus, chronometre, et age du dernier signe de
 vie. Cet affichage se met a jour toutes les deux secondes meme quand rien
 n'arrive : c'est ce qui permet de distinguer *lent* de *bloque*.
+
+Le bouton **Masquer** de la file (ou `Ctrl+G`) la replie en une pastille dans
+l'en-tête, avec le nombre de générations en cours ; un clic la rouvre. Le choix
+est conservé au redémarrage, et rien n'est mis en pause. Tant que la file est
+masquée, elle ne s'ouvre plus d'elle-même, l'indicateur de la barre de statut
+et les bandeaux de fin de génération se taisent : un échec fait seulement
+passer la pastille en alerte (▲ rouge), la fin de tout le travail l'affiche en
+✓ discret, une file vide en ○. La Bibliothèque garde l'état de chaque cours.
 
 Sous le capot, chaque appel est surveille : au-dela de quatre minutes de
 silence complet (reglable dans les preferences), le processus et toute sa

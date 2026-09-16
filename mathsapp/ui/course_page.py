@@ -245,8 +245,10 @@ class CoursePage(QWidget):
 
         self.course_view = WebView(with_bridge=True)
         self._pending_section = ""
+        self._pending_resume = False
         self._course_loading = False
         self.course_view.loadFinished.connect(self._on_course_loaded)
+        self.course_view.bridge.reading_position_changed.connect(self._on_reading_position)
         self.course_view.bridge.ask_requested.connect(self._forward_ask)
         self.course_view.bridge.proof_help_requested.connect(self._forward_proof_help)
         self.course_view.bridge.course_open_requested.connect(self.open_course.emit)
@@ -270,6 +272,8 @@ class CoursePage(QWidget):
 
         self.quiz_view = WebView(with_bridge=True)
         self.quiz_view.bridge.quiz_finished.connect(self._on_quiz_finished)
+        self.quiz_view.bridge.quiz_progress_saved.connect(self._on_quiz_progress)
+        self.quiz_view.bridge.quiz_progress_cleared.connect(self._on_quiz_progress_cleared)
         self.quiz_view.bridge.ask_requested.connect(self._forward_ask)
         self.quiz_view.bridge.quiz_set_requested.connect(
             lambda: self.quiz_set_requested.emit(self.course.id) if self.course else None)
@@ -367,6 +371,7 @@ class CoursePage(QWidget):
 
     def _on_course_loaded(self, _ok: bool) -> None:
         self._course_loading = False
+        self._init_reading()
         if self._pending_section:
             from PySide6.QtCore import QTimer
             QTimer.singleShot(450, self._apply_pending_section)
@@ -377,6 +382,58 @@ class CoursePage(QWidget):
         if title:
             self.course_view.run_js("window.scrollToSection && window.scrollToSection(%s);"
                                     % _json.dumps(title))
+
+    # ---------------------------------------------------- position de lecture
+    def _init_reading(self) -> None:
+        """Suit la lecture, et propose « Reprendre à : ... » s'il y a lieu."""
+        if self.course is None:
+            return
+        auto, self._pending_resume = self._pending_resume, False
+        position = store.reading_position(self.course.id)
+        # un lien vers une section precise l'emporte sur la reprise
+        if self._pending_section or not store.resumable(position):
+            position = None
+        self.course_view.run_js(
+            "window.initReading && window.initReading(%s, %s, %s);"
+            % (json.dumps(self.course.id), json.dumps(position),
+               "true" if auto and position else "false"))
+
+    def resume_reading(self) -> None:
+        """Carte « Reprendre » de l'accueil : va directement a la position."""
+        if self.course is None:
+            return
+        position = store.reading_position(self.course.id)
+        if not store.resumable(position):
+            return
+        if TAB_COURSE in self._loaded_tabs and not self._course_loading:
+            self.tabs.setCurrentIndex(TAB_COURSE)
+            self.course_view.run_js("window.resumeReading && window.resumeReading(%s);"
+                                    % json.dumps(position))
+        else:
+            self._pending_resume = True
+            self.tabs.setCurrentIndex(TAB_COURSE)
+
+    def _on_reading_position(self, payload: str) -> None:
+        try:
+            data = json.loads(payload)
+            cid = str(data.get("course") or "")
+            if cid not in self.syl.courses:
+                return
+            store.save_reading_position(
+                cid, str(data.get("sectionId") or ""), str(data.get("title") or "")[:300],
+                int(data.get("index") or 0), float(data.get("offset") or 0),
+                float(data.get("fraction") or 0))
+        except (ValueError, TypeError, AttributeError):
+            return
+
+    def flush_reading(self) -> None:
+        """Enregistre tout de suite la position (sortie de la page)."""
+        if TAB_COURSE in self._loaded_tabs:
+            self.course_view.run_js("window.readingFlush && window.readingFlush();")
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self.flush_reading()
+        super().hideEvent(event)
 
     def show_exercise(self, number: str) -> None:
         """Lien « correction » d'un exercice dans le cours : onglet Exercices, au bon endroit."""
@@ -408,6 +465,8 @@ class CoursePage(QWidget):
         if self.course is None:
             return
         if not same:
+            self.flush_reading()
+            self._pending_resume = False
             self._loaded_tabs.clear()
             self.notes.blockSignals(True)
             self.notes.setPlainText(store.get_notes(course_id))
@@ -523,6 +582,8 @@ class CoursePage(QWidget):
                    .replace("__ASSETS__", content.assets_url())
                    .replace("__SETS__", json.dumps(content.protect_math_data(sets), ensure_ascii=False))
                    .replace("__HISTORY__", json.dumps(history, ensure_ascii=False)))
+        page = content.with_quiz_progress(
+            page, store.course_quiz_progress(self.course.id), self.course.id)
         path = _page_path("quiz_%s.html" % self.course.id)
         path.write_text(page, encoding="utf-8")
         self.quiz_view.load_file(path)
@@ -645,16 +706,37 @@ class CoursePage(QWidget):
             data = json.loads(payload)
         except json.JSONDecodeError:
             return
+        set_id = str(data.get("setId") or "1")
         store.record_attempt(self.course.id, int(data.get("total", 0)),
                              int(data.get("correct", 0)), data,
-                             set_id=str(data.get("setId") or "1"),
+                             set_id=set_id,
                              partial=bool(data.get("partial")))
+        # la tentative est terminee : plus rien a reprendre sur cette serie
+        store.clear_quiz_progress(store.course_progress_key(self.course.id, set_id))
         self.refresh()
         st = self.status
         if st is not None and st.score_pct is not None:
             self.quiz_view.run_js(
                 "window.showCourseScore && window.showCourseScore(%d, %d, %d, %d);"
                 % (st.score_pct, st.correct, st.answered, st.questions_total))
+
+    def _on_quiz_progress(self, payload: str) -> None:
+        """Chaque reponse validee : l'etat de la tentative est ecrit aussitot."""
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(data, dict):
+            return
+        cid = str(data.get("courseId") or (self.course.id if self.course else ""))
+        if cid not in self.syl.courses:
+            return
+        set_id = str(data.get("setId") or "1")
+        store.save_quiz_progress(store.course_progress_key(cid, set_id), data, cid, set_id)
+
+    def _on_quiz_progress_cleared(self, set_id: str) -> None:
+        if self.course:
+            store.clear_quiz_progress(store.course_progress_key(self.course.id, set_id or "1"))
 
     def _on_proof_status(self, proof_id: str, value: str) -> None:
         if not self.course:

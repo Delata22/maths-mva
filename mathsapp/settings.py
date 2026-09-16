@@ -19,6 +19,7 @@ DEFAULTS = {
     "goal/bricks": 1,
     "goal/review_batch": 20,
     "ui/font_scale": 100,
+    "ui/queue_hidden": 0,          # 1 : file de generation masquee, pastille seule
     "claude/binary": "claude",
     "claude/timeout": 1800,
     "claude/retries": 3,

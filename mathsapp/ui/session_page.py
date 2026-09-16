@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from .. import content
+from .. import content, store
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Syllabus
 from . import theme
@@ -69,8 +69,19 @@ class SessionPage(QWidget):
 
         self.view = WebView(with_bridge=True)
         self.view.bridge.quiz_finished.connect(self._on_finished)
+        self.view.bridge.quiz_progress_saved.connect(self._on_progress)
+        self.view.bridge.quiz_progress_cleared.connect(
+            lambda _set_id: store.clear_quiz_progress(self._progress_key))
         self.view.bridge.ask_requested.connect(lambda *_: None)
         root.addWidget(self.view, 1)
+        self._progress_key = ""
+
+    @staticmethod
+    def progress_key(kind: str, day: str = "", course_id: str = "") -> str:
+        """Une tentative enregistree par seance : par jour pour le quiz du jour,
+        par jour et par cours pour un rappel."""
+        key = "session:%s:%s" % (kind, day or "")
+        return key + (":%s" % course_id if kind == "refresher" and course_id else "")
 
     # ------------------------------------------------------------- session
     def start(self, kind: str, questions: List[dict],
@@ -81,7 +92,11 @@ class SessionPage(QWidget):
         self.title.setText(KIND_TITLE.get(kind, "Séance"))
         self.hint.setText(KIND_HINT.get(kind, ""))
 
-        set_id = "%s:%s" % (kind, questions[0].get("day", "")) if questions else kind
+        day = questions[0].get("day", "") if questions else ""
+        set_id = "%s:%s" % (kind, day) if questions else kind
+        self._progress_key = self.progress_key(
+            kind, day, questions[0].get("course_id", "") if questions else "")
+        saved = store.quiz_progress(self._progress_key)
         sets = [{"id": set_id, "title": KIND_TITLE.get(kind, "Séance"),
                  "qcm": questions}]
         tpl = (ASSETS_DIR / "quiz.html").read_text(encoding="utf-8")
@@ -96,13 +111,27 @@ class SessionPage(QWidget):
                  % json.dumps({"kind": kind, "timed": bool(timed),
                                "autostart": True}, ensure_ascii=False))
         page = page.replace("</head>", extra + "</head>", 1)
+        page = content.with_quiz_progress(page, {set_id: saved} if saved else {}, None)
         d = library_dir() / "_views"
         d.mkdir(parents=True, exist_ok=True)
         path = d / ("session_%s.html" % kind)
         path.write_text(page, encoding="utf-8")
         self.view.load_file(path)
 
+    def _on_progress(self, payload: str) -> None:
+        """Chaque reponse validee : l'etat de la seance est ecrit aussitot."""
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            return
+        if isinstance(data, dict) and self._progress_key:
+            store.save_quiz_progress(self._progress_key, data,
+                                     set_id=str(data.get("setId") or ""))
+
     def _on_finished(self, payload: str) -> None:
+        # seance terminee : elle ne se propose plus a la reprise
+        if self._progress_key:
+            store.clear_quiz_progress(self._progress_key)
         self.finished.emit(self.kind, payload)
 
     def apply_theme(self) -> None:

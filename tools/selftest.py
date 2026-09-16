@@ -1103,6 +1103,185 @@ def test_bridge() -> None:
     view.deleteLater()
 
 
+def test_reading_position() -> None:
+    """Reprendre la lecture : section et decalage relatif, pas des pixels."""
+    import json
+    from mathsapp import content, store
+    from mathsapp.paths import library_dir
+    from mathsapp.ui.dashboard import ago
+    from mathsapp.ui.webview import WebView
+
+    fake = "_selftest_lecture"
+    try:
+        store.save_reading_position(fake, "s-1", "Deuxième section", 1, 0.4, 0.5)
+        pos = store.reading_position(fake)
+        check("position de lecture enregistree",
+              pos and pos["section_title"] == "Deuxième section"
+              and abs(pos["section_offset"] - 0.4) < 1e-9, str(pos))
+        store.save_reading_position(fake, "s-1", "Deuxième section", 1, 0.9, 0.97)
+        check("une seule position par cours",
+              store.conn().execute("SELECT COUNT(*) n FROM reading_position WHERE course_id=?",
+                                   (fake,)).fetchone()["n"] == 1)
+        check("fin de cours : pas de reprise", not store.resumable(store.reading_position(fake)))
+        check("tout debut : pas de reprise",
+              not store.resumable({"section_title": "Intro", "section_index": 0,
+                                   "fraction": 0.0}))
+        check("milieu du cours : reprise proposee", store.resumable(pos))
+    finally:
+        store.clear_reading_position(fake)
+    check("anciennete lisible", ago(1000.0, now=1000.0 + 7200) == "il y a 2 h"
+          and ago(0.0, now=86400 * 1.5) == "hier")
+
+    view = WebView(with_bridge=True)
+    view.resize(900, 500)
+    view.show()
+    got: list = []
+    view.bridge.reading_position_changed.connect(got.append)
+    filler = "".join("<p>Paragraphe %d, avec $x_%d$.</p>" % (i, i) for i in range(40))
+    body = ("<h2>Première section</h2>%s<h2>Deuxième section</h2>%s"
+            "<h2>Troisième section</h2>%s" % (filler, filler, filler))
+    d = library_dir() / "_views"
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / "selftest_reading.html"
+    path.write_text(content.build_page(body, "Lecture", "light"), encoding="utf-8")
+    loaded: dict = {}
+    view.loadFinished.connect(lambda ok: loaded.update(ok=ok))
+    view.load_file(path)
+    wait_until(lambda: "ok" in loaded)
+    wait(1200)
+
+    def js(code: str):
+        box: dict = {}
+        view.page().runJavaScript(code, lambda r: box.update(r=r))
+        wait_until(lambda: "r" in box, 5000)
+        return box.get("r")
+
+    saved = {"section_id": "ancienne-ancre", "section_title": "Deuxième section",
+             "section_index": 1, "section_offset": 0.5, "fraction": 0.5}
+    shown = js("window.initReading(%s, %s, false)" % (json.dumps(fake), json.dumps(saved)))
+    check("bandeau « Reprendre à » propose (section retrouvee par son titre)",
+          shown is True and js("!!document.getElementById('resume-banner')") is True)
+    check("pas de defilement sans clic", js("window.scrollY") == 0)
+    js("document.querySelector('#resume-banner .resume-go').click(); true")
+    wait(1200)
+    # objet serialise en JSON : runJavaScript ne convertit pas fiablement un objet JS
+    here = json.loads(js("JSON.stringify(window.readingPosition())") or "null") or {}
+    check("reprise sur la bonne section", here.get("title") == "Deuxième section"
+          and 0.3 < here.get("offset", 0) < 0.7, str(here))
+    check("bandeau retire apres usage", js("!!document.getElementById('resume-banner')") is False)
+    check("sauvegarde apres defilement (anti-rebond)",
+          wait_until(lambda: bool(got), 4000)
+          and json.loads(got[-1]).get("course") == fake, str(got[-1:]))
+    gone = dict(saved, section_title="Section disparue")
+    check("section disparue : rien a reprendre, sans erreur",
+          js("window.initReading(%s, %s, false)" % (json.dumps(fake), json.dumps(gone))) is False
+          and js("!!document.getElementById('resume-banner')") is False)
+    view.deleteLater()
+
+
+def test_quiz_progress() -> None:
+    """QCM : la tentative est ecrite a chaque reponse et se reprend a l'identique."""
+    import json
+    from mathsapp import content, store
+    from mathsapp.paths import ASSETS_DIR, library_dir
+    from mathsapp.ui.session_page import SessionPage
+    from mathsapp.ui.webview import WebView
+
+    key = store.course_progress_key("_selftest_qcm", "1")
+    try:
+        store.save_quiz_progress(key, {"setId": "1", "answered": 1}, "_selftest_qcm", "1")
+        store.save_quiz_progress(key, {"setId": "1", "answered": 2}, "_selftest_qcm", "1")
+        check("tentative en cours : un seul etat par serie",
+              store.course_quiz_progress("_selftest_qcm") == {"1": {"setId": "1", "answered": 2}})
+    finally:
+        store.clear_quiz_progress(key)
+    check("tentative effacee", store.quiz_progress(key) is None)
+    check("cle de seance : un rappel par cours",
+          SessionPage.progress_key("refresher", "2026-01-01", "c1")
+          != SessionPage.progress_key("refresher", "2026-01-01", "c2"))
+
+    def question(i: int, text: str = "") -> dict:
+        return {"id": "q%d" % i, "question": "<p>%s Question %d ?</p>" % (text, i),
+                "choices": ["a", "b", "c", "d"], "answer": 1, "difficulty": 1,
+                "explanation": "<p>Parce que.</p>"}
+
+    def page(qcm: list, progress: dict) -> pathlib.Path:
+        sets = [{"id": "1", "title": "Série 1", "qcm": qcm}]
+        tpl = (ASSETS_DIR / "quiz.html").read_text(encoding="utf-8")
+        html = (tpl.replace("__THEME__", "light").replace("__ASSETS__", content.assets_url())
+                   .replace("__SETS__", json.dumps(sets)).replace("__HISTORY__", "{}"))
+        html = content.with_quiz_progress(html, progress, "_selftest_qcm")
+        d = library_dir() / "_views"
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / "selftest_quiz.html"
+        path.write_text(html, encoding="utf-8")
+        return path
+
+    view = WebView(with_bridge=True)
+    view.resize(900, 700)
+    view.show()
+    saved: list = []
+    finished: list = []
+    view.bridge.quiz_progress_saved.connect(saved.append)
+    view.bridge.quiz_finished.connect(finished.append)
+
+    def load(path) -> None:
+        box: dict = {}
+        view.loadFinished.connect(lambda ok: box.update(ok=ok))
+        view.load_file(path)
+        wait_until(lambda: "ok" in box)
+        wait(900)
+
+    def js(code: str):
+        box: dict = {}
+        view.page().runJavaScript(code, lambda r: box.update(r=r))
+        wait_until(lambda: "r" in box, 5000)
+        return box.get("r")
+
+    qcm = [question(1), question(2), question(3)]
+    load(page(qcm, {}))
+    js("document.getElementById('go').click(); true")
+    js("document.querySelector('.choice[data-i=\"1\"]').click();"
+       "document.getElementById('go').click(); true")
+    ok = wait_until(lambda: bool(saved), 4000)
+    state = json.loads(saved[-1]) if saved else {}
+    check("reponse validee : etat ecrit aussitot", ok and state.get("answered") == 1
+          and state.get("order") == ["q1", "q2", "q3"]
+          and state.get("answers", [{}])[0].get("chosen") == 1
+          and state.get("courseId") == "_selftest_qcm", str(state)[:200])
+
+    load(page(qcm, {"1": state}))
+    label = js("(document.getElementById('resume')||{}).textContent")
+    check("reouverture : « Reprendre (question 2/3) » propose",
+          label == "Reprendre (question 2/3)", str(label))
+    js("document.getElementById('resume').click(); true")
+    check("reprise sur la premiere question sans reponse",
+          "Question 2 / 3" in (js("document.querySelector('.qhead').textContent") or ""))
+    js("document.getElementById('prev').click(); true")
+    check("reprise : reponse et correction precedentes visibles",
+          js("!!document.querySelector('.choice.good') && !!document.querySelector('.verdict')")
+          is True)
+    js("document.getElementById('go').click(); true")
+    for _ in range(2):
+        js("document.querySelector('.choice[data-i=\"0\"]').click();"
+           "document.getElementById('go').click(); document.getElementById('go').click(); true")
+    wait_until(lambda: bool(finished), 4000)
+    js("var j=document.querySelector('[data-jump]'); if (j) j.click(); true")
+    js("var g=document.getElementById('go'); if (g) g.click(); true")
+    js("var g=document.getElementById('go'); if (g) g.click(); true")
+    wait(600)
+    data = json.loads(finished[0]) if finished else {}
+    check("tentative reprise terminee normalement, comptee une seule fois",
+          len(finished) == 1 and data.get("total") == 3 and data.get("correct") == 1,
+          "%d fin(s), %s" % (len(finished), str(data)[:120]))
+
+    changed = [question(1, "Nouvelle"), question(2), question(3)]
+    load(page(changed, {"1": state}))
+    check("serie regeneree : pas de reprise, recommencer propose sans erreur",
+          js("!document.getElementById('resume') && !!document.getElementById('restart')") is True)
+    view.deleteLater()
+
+
 def test_proof_editor() -> None:
     """La page des demonstrations doit offrir un editeur utilisable."""
     import json
@@ -1388,6 +1567,43 @@ def test_views() -> None:
     window.chat_dock.setVisible(False)
     window.open_course(first)
 
+    # file de generation masquee : pastille, alerte discrete, choix persistant
+    from mathsapp import settings as settings_mod
+    before_hidden = settings_mod.get("ui/queue_hidden")
+    try:
+        window.set_queue_hidden(False)
+        QApplication.instance().processEvents()
+        check("file affichee : bouton Masquer present",
+              window.queue_dock.isVisible() and window.queue_panel.btn_hide.text() == "Masquer")
+        window.queue_panel.btn_hide.click()
+        QApplication.instance().processEvents()
+        check("file masquee : panneau ferme, pastille visible",
+              not window.queue_dock.isVisible() and not window.queue_badge.isHidden()
+              and window.btn_queue.isHidden())
+        check("file masquee : choix enregistre", settings_mod.get("ui/queue_hidden") == 1)
+        window._reveal_queue()
+        check("file masquee : pas de reouverture automatique", not window.queue_dock.isVisible())
+        window.notice.hide()
+        window._on_job_done(first, "sheet", False, "échec simulé")
+        QApplication.instance().processEvents()
+        check("echec pendant que la file est masquee : pastille en alerte, rien ne s'ouvre",
+              window.queue_badge_state() == "alert" and not window.queue_dock.isVisible()
+              and window.notice.isHidden())
+        window.toggle_queue()
+        QApplication.instance().processEvents()
+        check("raccourci : la file se rouvre et l'alerte est levee",
+              window.queue_dock.isVisible() and window.queue_badge_state() == "hidden-off"
+              and settings_mod.get("ui/queue_hidden") == 0)
+        window.toggle_queue()
+        check("raccourci : la file se masque de nouveau",
+              not window.queue_dock.isVisible()
+              and window.queue_badge_state() in ("empty", "running", "done"))
+    finally:
+        window.set_queue_hidden(bool(before_hidden))
+        settings_mod.put("ui/queue_hidden", before_hidden)
+        window.queue_dock.setVisible(False)
+        window.notice.hide()
+
     from mathsapp.ui.course_page import TAB_EXERCISES
     check("cours ordinaire : pas d'onglet Exercices du cours",
           not window.course_page.tabs.isTabVisible(TAB_EXERCISES))
@@ -1493,6 +1709,10 @@ def main() -> int:
     test_sheet()
     print("\n--- pont javascript ---")
     test_bridge()
+    print("\n--- reprendre la lecture ---")
+    test_reading_position()
+    print("\n--- sauvegarde des QCM a chaque reponse ---")
+    test_quiz_progress()
     print("\n--- editeur de demonstration ---")
     test_proof_editor()
     print("\n--- reprise apres interruption ---")

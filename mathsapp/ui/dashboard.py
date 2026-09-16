@@ -9,11 +9,25 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, review as review_mod, status as st_mod
+from .. import content, gamify, review as review_mod, status as st_mod, store
 from ..status import MASTERED, PARTIAL, Status
 from ..syllabus import Syllabus
 from . import theme
 from .widgets import Heatmap, Ring
+
+
+def ago(timestamp: float, now: float = None) -> str:
+    """Ancienneté lisible : « il y a 5 min », « hier »…"""
+    import time
+    seconds = max(0.0, (time.time() if now is None else now) - float(timestamp or 0))
+    if seconds < 60:
+        return "à l'instant"
+    if seconds < 3600:
+        return "il y a %d min" % (seconds // 60)
+    if seconds < 86400:
+        return "il y a %d h" % (seconds // 3600)
+    days = int(seconds // 86400)
+    return "hier" if days == 1 else "il y a %d jours" % days
 
 
 def _bar(value: int, total: int, color: str) -> QProgressBar:
@@ -43,6 +57,7 @@ class Dashboard(QWidget):
     generate_requested = Signal(list)
     show_graph = Signal(str)
     session_requested = Signal(str)      # review / daily / challenge
+    resume_requested = Signal(str)       # cours a rouvrir a la position de lecture
 
     def __init__(self, syllabus: Syllabus, parent=None):
         super().__init__(parent)
@@ -95,6 +110,7 @@ class Dashboard(QWidget):
         self.root.addWidget(_bar(mastered, total, pal["ok"]))
         self.root.addSpacing(6)
 
+        self._resume(statuses, pal)
         self._today(statuses, pal)
         self._progression(statuses, pal)
         self._milestones(statuses, pal)
@@ -125,6 +141,48 @@ class Dashboard(QWidget):
         host.setLayout(row)
         self.root.addSpacing(10)
         self.root.addWidget(host)
+
+    # --------------------------------------------------------------- reprendre
+    def _resume(self, statuses: Dict[str, Status], pal: dict) -> None:
+        """Le dernier cours consulté, là où la lecture s'est arrêtée."""
+        position = store.last_reading()
+        if not store.resumable(position):
+            return
+        cid = position["course_id"]
+        if cid not in self.syl.courses or not statuses[cid].generated:
+            return
+        card = Card()
+        row = QHBoxLayout()
+        row.setSpacing(14)
+        text = QVBoxLayout()
+        text.setSpacing(2)
+        name = QLabel(self.syl.title(cid))
+        name.setObjectName("H2")
+        name.setWordWrap(True)
+        text.addWidget(name)
+        section = position["section_title"]
+        if len(section) > 90:
+            section = section[:89] + "…"
+        detail = QLabel("Section : %s  ·  %d %% du cours  ·  %s"
+                        % (section, int(round(100 * float(position["fraction"] or 0))),
+                           ago(position["updated_at"])))
+        detail.setObjectName("Muted")
+        detail.setTextFormat(Qt.TextFormat.PlainText)
+        detail.setWordWrap(True)
+        text.addWidget(detail)
+        host = QWidget()
+        host.setLayout(text)
+        row.addWidget(host, 1)
+        btn = QPushButton("Reprendre")
+        btn.setProperty("primary", True)
+        btn.setToolTip("Rouvrir le cours à la section où vous vous étiez arrêté")
+        btn.clicked.connect(lambda _=False, c=cid: self.resume_requested.emit(c))
+        row.addWidget(btn)
+        holder = QWidget()
+        holder.setLayout(row)
+        card.lay.addWidget(holder)
+        self._section_title("Reprendre la lecture")
+        self.root.addWidget(card)
 
     # ------------------------------------------------------------ aujourd'hui
     def _today(self, statuses: Dict[str, Status], pal: dict) -> None:

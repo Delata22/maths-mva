@@ -108,6 +108,29 @@ CREATE TABLE IF NOT EXISTS chat_message (
     created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_msg_thread ON chat_message(thread_id);
+
+-- Position de lecture : une par cours. Section (ancre et titre) et decalage
+-- relatif dans la section, plutot qu'un defilement en pixels qui varie avec la
+-- largeur de la fenetre, le rendu des formules ou le zoom.
+CREATE TABLE IF NOT EXISTS reading_position (
+    course_id     TEXT PRIMARY KEY,
+    section_id    TEXT NOT NULL DEFAULT '',
+    section_title TEXT NOT NULL DEFAULT '',
+    section_index INTEGER NOT NULL DEFAULT 0,
+    section_offset REAL NOT NULL DEFAULT 0,
+    fraction     REAL NOT NULL DEFAULT 0,
+    updated_at    REAL NOT NULL
+);
+
+-- Tentative de QCM en cours : un etat par serie, ecrit a chaque reponse.
+CREATE TABLE IF NOT EXISTS quiz_progress (
+    key        TEXT PRIMARY KEY,
+    course_id  TEXT NOT NULL DEFAULT '',
+    set_id     TEXT NOT NULL DEFAULT '',
+    state      TEXT NOT NULL DEFAULT '{}',
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_quiz_progress_course ON quiz_progress(course_id);
 """
 
 
@@ -177,6 +200,61 @@ def get_notes(course_id: str) -> str:
     return (row["notes"] if row else "") or ""
 
 
+# --------------------------------------------------------- position de lecture
+# Au-dela de cette part du cours, la lecture est consideree comme terminee.
+READING_DONE = 0.95
+# En deca, on est encore au tout debut : rien a reprendre.
+READING_START = 0.03
+
+
+def save_reading_position(course_id: str, section_id: str, section_title: str,
+                          section_index: int, offset: float, fraction: float) -> None:
+    c = conn()
+    c.execute(
+        """INSERT INTO reading_position
+             (course_id, section_id, section_title, section_index, section_offset,
+              fraction, updated_at)
+           VALUES (?,?,?,?,?,?,?)
+           ON CONFLICT(course_id) DO UPDATE SET
+             section_id=excluded.section_id, section_title=excluded.section_title,
+             section_index=excluded.section_index, section_offset=excluded.section_offset,
+             fraction=excluded.fraction, updated_at=excluded.updated_at""",
+        (course_id, section_id or "", section_title or "", int(section_index or 0),
+         max(0.0, min(1.0, float(offset or 0))), max(0.0, min(1.0, float(fraction or 0))),
+         time.time()),
+    )
+    c.commit()
+
+
+def reading_position(course_id: str) -> Optional[dict]:
+    row = conn().execute("SELECT * FROM reading_position WHERE course_id=?",
+                         (course_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def resumable(position: Optional[dict]) -> bool:
+    """Une position vaut un « Reprendre » : ni tout debut, ni fin du cours."""
+    if not position or not position.get("section_title"):
+        return False
+    fraction = float(position.get("fraction") or 0)
+    if fraction >= READING_DONE:
+        return False
+    return fraction >= READING_START or int(position.get("section_index") or 0) > 0
+
+
+def last_reading() -> Optional[dict]:
+    """La position du dernier cours consulte."""
+    row = conn().execute(
+        "SELECT * FROM reading_position ORDER BY updated_at DESC LIMIT 1").fetchone()
+    return dict(row) if row else None
+
+
+def clear_reading_position(course_id: str) -> None:
+    c = conn()
+    c.execute("DELETE FROM reading_position WHERE course_id=?", (course_id,))
+    c.commit()
+
+
 # ---------------------------------------------------------------------- QCM
 def record_attempt(course_id: str, total: int, correct: int, detail: dict,
                    set_id: str = "1", partial: bool = False) -> int:
@@ -227,6 +305,56 @@ def record_attempt(course_id: str, total: int, correct: int, detail: dict,
         )
     c.commit()
     return int(cur.lastrowid) if cur is not None else 0
+
+
+# Tentative en cours : ecrite a chaque reponse validee, effacee a la fin. Les
+# reponses ne comptent (maitrise, revisions espacees) qu'une fois, a la fin de
+# la tentative, reprise ou non : l'etat enregistre n'est qu'un brouillon.
+def course_progress_key(course_id: str, set_id: str) -> str:
+    return "course:%s:%s" % (course_id, set_id)
+
+
+def save_quiz_progress(key: str, state: dict, course_id: str = "", set_id: str = "") -> None:
+    c = conn()
+    c.execute(
+        """INSERT INTO quiz_progress (key, course_id, set_id, state, updated_at)
+           VALUES (?,?,?,?,?)
+           ON CONFLICT(key) DO UPDATE SET
+             course_id=excluded.course_id, set_id=excluded.set_id,
+             state=excluded.state, updated_at=excluded.updated_at""",
+        (key, course_id or "", str(set_id or ""), json.dumps(state, ensure_ascii=False),
+         time.time()),
+    )
+    c.commit()
+
+
+def quiz_progress(key: str) -> Optional[dict]:
+    row = conn().execute("SELECT state FROM quiz_progress WHERE key=?", (key,)).fetchone()
+    if not row:
+        return None
+    try:
+        state = json.loads(row["state"] or "{}")
+    except json.JSONDecodeError:
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def course_quiz_progress(course_id: str) -> Dict[str, dict]:
+    """{set_id: etat} des tentatives en cours sur les series d'un cours."""
+    out: Dict[str, dict] = {}
+    for r in conn().execute(
+            "SELECT key, set_id FROM quiz_progress WHERE course_id=? AND key LIKE 'course:%'",
+            (course_id,)):
+        state = quiz_progress(r["key"])
+        if state:
+            out[r["set_id"]] = state
+    return out
+
+
+def clear_quiz_progress(key: str) -> None:
+    c = conn()
+    c.execute("DELETE FROM quiz_progress WHERE key=?", (key,))
+    c.commit()
 
 
 def backfill_question_results() -> int:

@@ -21,6 +21,9 @@ class Bridge(QObject):
     action_requested = Signal(str)                # assistant : identifiant d'action
     course_section_requested = Signal(str, str)   # cours, titre de section
     exercise_requested = Signal(str)              # cours importe : numero d'exercice
+    reading_position_changed = Signal(str)        # position de lecture, JSON
+    quiz_progress_saved = Signal(str)             # tentative de QCM en cours, JSON
+    quiz_progress_cleared = Signal(str)           # serie dont la tentative est effacee
 
     @Slot(str, str)
     def askAbout(self, text: str, heading: str) -> None:  # noqa: N802 (appele par JS)
@@ -33,6 +36,14 @@ class Bridge(QObject):
     @Slot(str)
     def quizFinished(self, payload: str) -> None:  # noqa: N802
         self.quiz_finished.emit(payload)
+
+    @Slot(str)
+    def saveQuizProgress(self, payload: str) -> None:  # noqa: N802
+        self.quiz_progress_saved.emit(payload)
+
+    @Slot(str)
+    def clearQuizProgress(self, set_id: str) -> None:  # noqa: N802
+        self.quiz_progress_cleared.emit(set_id)
 
     @Slot()
     def newQuizSet(self) -> None:  # noqa: N802
@@ -49,6 +60,10 @@ class Bridge(QObject):
     @Slot(str)
     def openExercise(self, number: str) -> None:  # noqa: N802
         self.exercise_requested.emit(number)
+
+    @Slot(str)
+    def saveReadingPosition(self, payload: str) -> None:  # noqa: N802
+        self.reading_position_changed.emit(payload)
 
     @Slot(str)
     def runAction(self, action_id: str) -> None:  # noqa: N802

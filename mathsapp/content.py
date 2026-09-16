@@ -294,6 +294,15 @@ def build_page(body: str, title: str, theme: str = "light", extra_css: str = "")
             .replace("__BODY__", protect_math(body)))
 
 
+def with_quiz_progress(page: str, progress: dict, course_id: Optional[str]) -> str:
+    """Page de QCM : y joint les tentatives en cours ({set_id: etat}), lues
+    par quiz.html avant son script principal."""
+    data = json.dumps(progress or {}, ensure_ascii=False).replace("</", "<\\/")
+    script = ("<script>window.QUIZ_PROGRESS = %s; window.QUIZ_COURSE = %s;</script>\n"
+              % (data, json.dumps(course_id)))
+    return page.replace("</head>", script + "</head>", 1)
+
+
 def render_course_page(course_id: str, title: str, theme: str = "light") -> pathlib.Path:
     """Ecrit la page complete du cours et retourne son chemin."""
     from .questions import link_courses

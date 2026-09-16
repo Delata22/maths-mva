@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from .. import content, gamify, review as review_mod, settings, status as st_mod, store
 from ..generation.claude_cli import ClaudeError, check_available
-from ..generation.queue import GenerationQueue
+from ..generation.queue import DONE, ERROR, GenerationQueue
 from ..syllabus import Syllabus, load as load_syllabus, reload as reload_syllabus
 from . import theme
 from .chat_panel import ChatPanel
@@ -180,7 +180,19 @@ class MainWindow(QMainWindow):
         self.btn_queue.setText("Générations")
         self.btn_queue.setCheckable(True)
         self.btn_queue.setAutoRaise(True)
+        self.btn_queue.setToolTip("File de génération  (Ctrl+G)")
         lay.addWidget(self.btn_queue)
+
+        # File masquee : une pastille avec le nombre de generations en cours.
+        self._queue_hidden = bool(settings.get("ui/queue_hidden"))
+        self._queue_alert = False      # echec survenu pendant que la file etait masquee
+        self.queue_badge = QToolButton()
+        self.queue_badge.setObjectName("QueueBadge")
+        self.queue_badge.setAutoRaise(True)
+        self.queue_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.queue_badge.clicked.connect(lambda: self.set_queue_hidden(False))
+        self.queue_badge.setVisible(False)
+        lay.addWidget(self.queue_badge)
 
         self.btn_syllabus = QToolButton()
         self.btn_syllabus.setText("Syllabus")
@@ -248,9 +260,12 @@ class MainWindow(QMainWindow):
         self.btn_chat.toggled.connect(self.chat_dock.setVisible)
         self.chat_dock.visibilityChanged.connect(
             lambda v: self.btn_chat.setChecked(v))
-        self.btn_queue.toggled.connect(self.queue_dock.setVisible)
+        self.btn_queue.toggled.connect(
+            lambda on: self.set_queue_hidden(False) if on else self.queue_dock.setVisible(False))
         self.queue_dock.visibilityChanged.connect(
             lambda v: self.btn_queue.setChecked(v))
+        self.queue_panel.hide_requested.connect(lambda: self.set_queue_hidden(True))
+        self._sync_queue_badge()
 
     def _wire(self) -> None:
         self.library.set_queue_lookup(self._queue_label)
@@ -284,6 +299,7 @@ class MainWindow(QMainWindow):
         self.dashboard.generate_requested.connect(self.enqueue)
         self.dashboard.show_graph.connect(self.show_track)
         self.dashboard.session_requested.connect(self.start_session)
+        self.dashboard.resume_requested.connect(self.resume_course)
         self.session.finished.connect(self._on_session_finished)
         self.session.leave.connect(self.go_home)
         self.td_page.course_opened.connect(self.open_course)
@@ -315,8 +331,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+6"), self, lambda: self.go(PAGE_QUESTIONS))
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("Ctrl+N"), self, self.open_syllabus_dialog)
-        QShortcut(QKeySequence("Ctrl+G"), self, lambda: self.queue_dock.setVisible(
-            not self.queue_dock.isVisible()))
+        QShortcut(QKeySequence("Ctrl+G"), self, self.toggle_queue)
 
     # ------------------------------------------------------------- navigation
     def go(self, page: int) -> None:
@@ -346,6 +361,13 @@ class MainWindow(QMainWindow):
         self.course_page.set_generation_progress(
             job is not None, job.progress if job else 0.0, job.label if job else "")
 
+    def resume_course(self, course_id: str) -> None:
+        """Carte « Reprendre » : le cours, à la position de lecture enregistrée."""
+        if course_id not in self.syl.courses:
+            return
+        self.open_course(course_id)
+        self.course_page.resume_reading()
+
     # ------------------------------------------------------------- seances
     def start_session(self, kind: str) -> None:
         if kind.startswith("refresher:"):
@@ -359,7 +381,7 @@ class MainWindow(QMainWindow):
                 if self.queue.enqueue(day, "Quiz du %s" % day, "daily") is None:
                     self.statusBar().showMessage("Quiz du jour déjà en préparation", 6000)
                 else:
-                    self.queue_dock.setVisible(True)
+                    self._reveal_queue()
                     self.statusBar().showMessage(
                         "Quiz du jour en préparation — deux minutes environ", 10000)
                 return
@@ -367,7 +389,7 @@ class MainWindow(QMainWindow):
             self.session.start("daily", questions)
         elif kind == "review":
             batch = int(settings.get("goal/review_batch") or 20)
-            questions = [
+            questions = self._saved_session_questions(kind) or [
                 dict(q, course_id=q.get("course_id") or item.course_id,
                      set_id=item.set_id)
                 for item, q in review_mod.due_resolved(limit=batch)]
@@ -376,6 +398,12 @@ class MainWindow(QMainWindow):
                 return
             self.session.start("review", questions)
         else:
+            saved = self._saved_session_questions("challenge")
+            if saved:
+                # defi laisse en plan : memes questions, meme ordre
+                self.session.start("challenge", saved, timed=True)
+                self.go(PAGE_SESSION)
+                return
             index = content.question_index()
             pool = [(key, q) for key, q in index.items() if key[1] != "daily"]
             history = {}
@@ -399,6 +427,24 @@ class MainWindow(QMainWindow):
             self.session.start("challenge", questions, timed=True)
         self.go(PAGE_SESSION)
 
+    def _saved_session_questions(self, kind: str) -> Optional[List[dict]]:
+        """Révisions ou défi laissés en plan : leurs questions, dans l'ordre
+        enregistré. Celles qui n'existent plus sont écartées ; None s'il n'en
+        reste aucune (la page propose alors de recommencer)."""
+        state = store.quiz_progress(SessionPage.progress_key(kind))
+        if not state:
+            return None
+        index = content.question_index()
+        out = []
+        for ref in state.get("refs") or []:
+            if not isinstance(ref, dict):
+                continue
+            key = (ref.get("courseId") or "", ref.get("setId") or "", str(ref.get("id") or ""))
+            question = index.get(key)
+            if question is not None:
+                out.append(dict(question, course_id=key[0], set_id=key[1]))
+        return out or None
+
     def start_refresher(self, course_id: str) -> None:
         """Rappel ciblé de cinq questions : le lance s'il est prêt, sinon le prépare."""
         day = gamify.today()
@@ -408,7 +454,7 @@ class MainWindow(QMainWindow):
             if self.queue.enqueue(course_id, "Rappel — %s" % title, "refresher") is None:
                 self.statusBar().showMessage("Rappel déjà en préparation", 6000)
             else:
-                self.queue_dock.setVisible(True)
+                self._reveal_queue()
                 self.statusBar().showMessage(
                     "Rappel sur « %s » en préparation — une minute environ" % title, 10000)
             return
@@ -534,13 +580,13 @@ class MainWindow(QMainWindow):
                 return
         added = self.queue.enqueue_many(items)
         if added:
-            self.queue_dock.setVisible(True)
+            self._reveal_queue()
             self.statusBar().showMessage(
                 "%d génération%s ajoutée%s à la file"
                 % (added, "s" if added > 1 else "", "s" if added > 1 else ""), 5000)
         else:
             # sans ce retour, un second clic ne produisait rien du tout
-            self.queue_dock.setVisible(True)
+            self._reveal_queue()
             self.statusBar().showMessage(
                 "Déjà dans la file : %s"
                 % ", ".join(t for _c, t in items[:3]), 6000)
@@ -557,7 +603,7 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.queue.enqueue(course_id, self.syl.title(course_id), "regenerate")
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
 
     def resume_all(self) -> None:
         """Reprend toutes les generations interrompues."""
@@ -568,13 +614,13 @@ class MainWindow(QMainWindow):
 
     def enqueue_exercises(self, course_id: str) -> None:
         self.queue.enqueue(course_id, self.syl.title(course_id), "exercises")
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
 
     def enqueue_quiz_set(self, course_id: str) -> None:
         if self.queue.enqueue(course_id, self.syl.title(course_id), "quiz") is None:
             self.statusBar().showMessage("Série déjà en production", 5000)
             return
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
         self.statusBar().showMessage(
             "Nouvelle série de questions pour « %s » — environ deux minutes"
             % self.syl.title(course_id), 8000)
@@ -600,14 +646,14 @@ class MainWindow(QMainWindow):
         if self.queue.enqueue(td_id, "TD — %s" % td_mod.title(td_id), "td") is None:
             self.statusBar().showMessage("Correction déjà en cours pour ce TD", 6000)
             return
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
         self.statusBar().showMessage("Correction du TD lancée en arrière-plan", 8000)
 
     def enqueue_sheet(self, course_id: str) -> None:
         if self.queue.enqueue(course_id, self.syl.title(course_id), "sheet") is None:
             self.statusBar().showMessage("Fiche déjà en cours de production", 5000)
             return
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
         self.statusBar().showMessage(
             "Fiche de « %s » en production" % self.syl.title(course_id), 6000)
 
@@ -627,7 +673,7 @@ class MainWindow(QMainWindow):
                 return
         for cid in todo:
             self.queue.enqueue(cid, self.syl.title(cid), "sheet")
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
 
     def export_sheet_pdf(self, course_id: str) -> None:
         """Enregistre la fiche en PDF a l'endroit choisi par l'utilisateur."""
@@ -672,6 +718,77 @@ class MainWindow(QMainWindow):
             if self.course_page.course and self.course_page.course.id == course_id:
                 self.course_page.refresh()
 
+    # ------------------------------------------------------- file masquee
+    def _reveal_queue(self) -> None:
+        """Ouverture automatique de la file, sauf si l'utilisateur l'a masquée."""
+        if not self._queue_hidden:
+            self.queue_dock.setVisible(True)
+
+    def set_queue_hidden(self, hidden: bool) -> None:
+        """Masque la file (pastille seule) ou la rouvre. Rien n'est mis en pause."""
+        if hidden == self._queue_hidden and hidden != self.queue_dock.isVisible():
+            self._sync_queue_badge()
+            return
+        self._queue_hidden = hidden
+        settings.put("ui/queue_hidden", 1 if hidden else 0)
+        if hidden:
+            self.queue_dock.setVisible(False)
+        else:
+            self._queue_alert = False
+            self.queue_dock.show()
+            self.queue_dock.raise_()
+        self._sync_queue_badge()
+        if hasattr(self, "liveness"):
+            self._update_liveness()
+
+    def toggle_queue(self) -> None:
+        """Ctrl+G : masquer la file si elle est affichée, la rouvrir sinon."""
+        self.set_queue_hidden(self.queue_dock.isVisible())
+
+    def queue_badge_state(self) -> str:
+        """« hidden-off » (file affichée), « empty », « running », « alert » ou « done »."""
+        if not self._queue_hidden:
+            return "hidden-off"
+        if self._queue_alert:
+            return "alert"
+        if self.queue.active_count():
+            return "running"
+        if any(j.state == DONE for j in self.queue.jobs):
+            return "done"
+        return "empty"
+
+    def _sync_queue_badge(self) -> None:
+        from .queue_panel import _age
+        state = self.queue_badge_state()
+        self.btn_queue.setVisible(state == "hidden-off")
+        self.queue_badge.setVisible(state != "hidden-off")
+        if state == "hidden-off":
+            return
+        pal = theme.palette()
+        active = self.queue.active_count()
+        failed = sum(1 for j in self.queue.jobs if j.state == ERROR)
+        if state == "alert":
+            text, color = ("▲ %d" % active if active else "▲"), pal["err"]
+            tip = ("Une génération a échoué pendant que la file était masquée "
+                   "(%d échec%s). Cliquer pour ouvrir la file."
+                   % (failed, "s" if failed > 1 else "")) if failed else \
+                  "Une génération a échoué. Cliquer pour ouvrir la file."
+        elif state == "running":
+            health, silence, _job = self.queue.health()
+            text, color = "● %d" % active, pal["accent"]
+            tip = ("%d génération%s en cours ou en attente, dernier signe de vie il y a %s."
+                   % (active, "s" if active > 1 else "", _age(silence)))
+        elif state == "done":
+            text, color = "✓", pal["muted"]
+            tip = "Générations terminées."
+        else:
+            text, color = "○", pal["muted"]
+            tip = "File de génération vide."
+        self.queue_badge.setText(text)
+        self.queue_badge.setStyleSheet(
+            "QToolButton#QueueBadge{color:%s;font-weight:600;padding:2px 8px;}" % color)
+        self.queue_badge.setToolTip("%s\nFile masquée : cliquer ou Ctrl+G pour l'afficher." % tip)
+
     def _queue_label(self, course_id: str) -> Optional[str]:
         job = self.queue.job_for(course_id)
         if job is None:
@@ -686,8 +803,13 @@ class MainWindow(QMainWindow):
         """Indicateur permanent : ce qui tourne, et depuis quand c'est muet."""
         from .queue_panel import _age
         pal = theme.palette()
+        self._sync_queue_badge()
         running = self.queue.running_jobs()
         waiting = self.queue.active_count() - len(running)
+        if self._queue_hidden:
+            # file masquee : la pastille suffit, ni indicateur ni bandeau
+            self.liveness.setText("")
+            return
         if not running:
             self.liveness.setText("")
             self._silence_warned = False
@@ -711,7 +833,7 @@ class MainWindow(QMainWindow):
                 "« %s » n'a plus donné signe de vie depuis %s. L'appel sera "
                 "interrompu et relancé automatiquement s'il reste muet."
                 % (job.title, _age(silence)),
-                "Ouvrir la file", lambda: self.queue_dock.setVisible(True))
+                "Ouvrir la file", lambda: self.set_queue_hidden(False))
         elif health != "muet":
             self._silence_warned = False
 
@@ -743,10 +865,10 @@ class MainWindow(QMainWindow):
             title = title.get("title") or course_id
             self.reload_syllabus()
             cid = course_import.course_of(course_id)
-            if ok and cid:
+            if ok and cid and not self._queue_hidden:
                 self.notice.show_message("Cours importé : « %s »" % title, "Ouvrir",
                                          lambda c=cid: self.open_course(c))
-        if _kind == "refresher" and ok:
+        if _kind == "refresher" and ok and not self._queue_hidden:
             self.notice.show_message(
                 "Rappel prêt : cinq questions sur « %s »" % self.syl.title(course_id),
                 "Commencer", lambda c=course_id: self.start_refresher(c))
@@ -755,12 +877,16 @@ class MainWindow(QMainWindow):
             title = "TD « %s »" % td_mod.title(course_id)
         else:
             title = self.syl.title(course_id)
-        if not ok and message != "Annulé":
+        if not ok and message != "Annulé" and self._queue_hidden:
+            # file masquee : la pastille passe en alerte, rien ne s'ouvre
+            self._queue_alert = True
+            self._sync_queue_badge()
+        elif not ok and message != "Annulé":
             self.notice.show_message(
                 "La génération de « %s » a échoué : %s"
-                % (title, message.splitlines()[0]),
+                % (title, (message.splitlines() or [""])[0]),
                 "Relancer", lambda c=course_id, k=_kind: self.queue.retry(c, k))
-            self.queue_dock.setVisible(True)
+            self._reveal_queue()
         self.statusBar().showMessage(
             "%s : %s" % (title, message if ok else "échec — %s" % message), 12000)
         if self.stack.currentIndex() == PAGE_LIBRARY:
@@ -914,7 +1040,7 @@ class MainWindow(QMainWindow):
         if self.queue.enqueue(doc, "Import — %s" % pathlib.Path(path).stem, "import") is None:
             self.statusBar().showMessage("Import déjà en cours", 6000)
             return
-        self.queue_dock.setVisible(True)
+        self._reveal_queue()
         self.statusBar().showMessage("Import du cours lancé en arrière-plan", 8000)
 
     def open_course_at(self, course_id: str, section: str = "") -> None:
@@ -974,7 +1100,7 @@ class MainWindow(QMainWindow):
             elif kind == "regenerate_course":
                 self.queue.enqueue(action["course"], self.syl.title(action["course"]),
                                    "regenerate")
-                self.queue_dock.setVisible(True)
+                self._reveal_queue()
                 done("ajouté à la file")
             elif kind == "new_quiz_set":
                 self.enqueue_quiz_set(action["course"])
@@ -1195,6 +1321,7 @@ class MainWindow(QMainWindow):
             self.status_info.setText("claude %s" % version.split()[0])
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        self.course_page.flush_reading()
         self.queue.cancel_all()
         self.chat.stop()
         for window in list(self._proof_windows):
