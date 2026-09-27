@@ -70,6 +70,29 @@ class Result:
     raw: dict = field(default_factory=dict)
 
 
+def backend() -> str:
+    """Moteur de generation : `claude` ou `codex`.
+
+    En mode `auto` (defaut), c'est le CLI installe sur la machine : claude s'il
+    est la, sinon codex. L'application marche ainsi sans reglage chez quelqu'un
+    qui n'a que l'un des deux.
+    """
+    name = str(settings.get("gen/backend") or "auto").strip().lower()
+    if name in ("claude", "codex"):
+        return name
+    if shutil.which(str(settings.get("claude/binary") or "claude")) or \
+            os.path.exists(os.path.expanduser("~/.local/bin/claude")):
+        return "claude"
+    if shutil.which(str(settings.get("codex/binary") or "codex")):
+        return "codex"
+    return "claude"
+
+
+def uses_tools() -> bool:
+    """Le moteur sait-il lire un PDF lui-meme ? Sinon on lui donne le texte."""
+    return backend() == "claude"
+
+
 def binary(override: Optional[str] = None) -> str:
     exe = override or settings.get("claude/binary") or "claude"
     found = shutil.which(exe)
@@ -85,7 +108,10 @@ def binary(override: Optional[str] = None) -> str:
 
 
 def check_available(override: Optional[str] = None) -> str:
-    """Retourne la version du CLI, ou leve ClaudeError."""
+    """Retourne la version du CLI du moteur courant, ou leve ClaudeError."""
+    if backend() == "codex":
+        from . import codex_cli
+        return codex_cli.check_available(override)
     try:
         out = subprocess.run([binary(override), "--version"],
                              capture_output=True, text=True, timeout=30)
@@ -131,11 +157,20 @@ def _kill_tree(proc: subprocess.Popen) -> None:
             pass
 
 
+def kill_tree(proc: subprocess.Popen) -> None:
+    """Meme chose, sous un nom utilisable par les autres moteurs."""
+    _kill_tree(proc)
+
+
 def _neutral_cwd() -> str:
     """Repertoire de travail neutre : pas de CLAUDE.md ni de settings de projet."""
     d = os.path.join(tempfile.gettempdir(), "mathsapp-claude-cwd")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def neutral_cwd() -> str:
+    return _neutral_cwd()
 
 
 # --------------------------------------------------------------- appel simple
@@ -199,6 +234,10 @@ def _run_once(prompt: str, model: str, system: Optional[str] = None,
     aux preferences : ces dernieres sont partagees avec l'application, et les
     modifier depuis un test interromprait une generation en cours.
     """
+    if backend() == "codex":
+        from . import codex_cli
+        return codex_cli.run_once(prompt, model, system, json_schema, timeout, cancel,
+                                  on_progress, exe, stall_timeout, tools, add_dirs, cwd)
     timeout = int(timeout or settings.get("claude/timeout") or 1800)
     cmd = _base_cmd(model, system, persist=False, exe=exe, tools=tools, add_dirs=add_dirs)
     cmd += ["--output-format", "stream-json", "--include-partial-messages", "--verbose"]
@@ -347,12 +386,18 @@ def chat_stream(prompt: str, model: str, system: Optional[str],
                 session_id: Optional[str],
                 on_delta: Callable[[str], None],
                 cancel: Optional[Callable[[], bool]] = None,
-                timeout: int = 900) -> Result:
+                timeout: int = 900,
+                history: Iterable[dict] = ()) -> Result:
     """Un tour de conversation en streaming.
 
     Si `session_id` est fourni, la conversation precedente est reprise (le
     contexte est conserve cote CLI). Sinon un nouvel identifiant est cree.
+    `history` ne sert qu'aux moteurs sans sessions, comme codex.
     """
+    if backend() == "codex":
+        from . import codex_cli
+        return codex_cli.chat_stream(prompt, model, system, session_id, on_delta,
+                                     cancel, timeout, history)
     new_session = session_id or str(uuid.uuid4())
     cmd = _base_cmd(model, system, persist=True)
     if session_id:

@@ -238,7 +238,9 @@ class ChatPanel(QWidget):
         self.session.queue_provider = self.queue_provider or self.session.queue_provider
         system = self.session.system
         self.worker = ChatWorker(self.session.turn_prompt(prompt), self.session.model, system,
-                                 self.session.session_id, self)
+                                 self.session.session_id, self,
+                                 history=[{"role": m["role"], "content": m["content"]}
+                                          for m in self.session.history()])
         self.worker.delta.connect(self._on_delta)
         self.worker.finished_ok.connect(self._on_done)
         self.worker.failed.connect(self._on_failed)

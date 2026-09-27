@@ -245,7 +245,7 @@ Repondez uniquement par l'objet JSON."""
 # ------------------------------------------------------------------ section
 def section_prompt(syl: Syllabus, course: Course, plan: dict, index: int,
                    written_titles: List[str], covered: str = "",
-                   upcoming: str = "") -> str:
+                   upcoming: str = "", source_text: str = "") -> str:
     section = plan["sections"][index]
     total = len(plan["sections"])
     others = "\n".join(
@@ -308,7 +308,7 @@ Figures prevues :
 {figures}
 Demonstrations attendues dans cette section :
 {proofs}
-{intro}{_source_block(plan, index)}
+{intro}{_source_block(plan, index, source_text)}
 Commencez par <h2>{section['title']}</h2>. Utilisez des <h3> pour structurer.
 Ne redigez que cette section. Pas de preambule, pas de conclusion generale du
 cours (sauf si c'est la derniere section). Sortie : HTML brut, rien d'autre."""
@@ -1121,12 +1121,21 @@ TD_SCHEMA = {
 }
 
 
-def td_structure_prompt(syl: Syllabus, pdf_path: str) -> str:
-    """Lire un sujet de TD en PDF et le découper, formules comprises."""
-    return f"""Lisez le sujet de TD situé dans le fichier suivant, avec l'outil Read,
-page par page et en entier :
+def td_structure_prompt(syl: Syllabus, pdf_path: str, document_text: str = "") -> str:
+    """Lire un sujet de TD en PDF et le découper, formules comprises.
 
-    {pdf_path}
+    `document_text` : texte déjà extrait, pour un moteur qui ne lit pas les PDF.
+    """
+    if document_text:
+        access = (f"Voici le texte du sujet de TD, extrait automatiquement du PDF\n"
+                  f"« {pdf_path} ». Travaillez uniquement à partir de ce texte, "
+                  f"n'ouvrez aucun fichier.\nL'extraction abîme souvent les formules : "
+                  f"rétablissez-les en LaTeX d'après\nle contexte mathématique.\n\n"
+                  f"--- début du document ---\n{document_text}\n--- fin du document ---")
+    else:
+        access = (f"Lisez le sujet de TD situé dans le fichier suivant, avec l'outil Read,\n"
+                  f"page par page et en entier :\n\n    {pdf_path}")
+    return f"""{access}
 
 Vous devez en produire une transcription STRUCTURÉE et FIDÈLE.
 
@@ -1513,17 +1522,27 @@ COURSE_IMPORT_SCHEMA = {
 }
 
 
-def course_import_prompt(syl: Syllabus, pdf_path: str) -> str:
+def course_import_prompt(syl: Syllabus, pdf_path: str, document_text: str = "") -> str:
+    if document_text:
+        access = (f"LE DOCUMENT : texte extrait automatiquement du PDF « {pdf_path} ».\n"
+                  f"Travaillez uniquement à partir de ce texte, n'ouvrez aucun fichier. "
+                  f"L'extraction\nabîme souvent les formules : rétablissez-les en LaTeX. "
+                  f"Les numéros de page sont\nceux du PDF ; les transparents répètent "
+                  f"souvent la même page en ajoutant un\nélément : ne comptez chaque "
+                  f"contenu qu'une fois.\n\n--- début du document ---\n{document_text}\n"
+                  f"--- fin du document ---")
+    else:
+        access = (f"LE DOCUMENT : {pdf_path}\n"
+                  f"Lisez-le EN ENTIER avec l'outil Read, par tranches de 20 pages au plus\n"
+                  f"(paramètre pages). Les transparents Beamer répètent souvent la même page "
+                  f"en\najoutant un élément à chaque fois : ne comptez chaque contenu "
+                  f"qu'une fois, mais\nnotez les pages où il se trouve.")
     return f"""Vous préparez l'import d'un cours magistral dans « Maths MVA », une
 application qui prépare au master MVA. Le cours sera réécrit section par
 section, fidèlement mais avec plus d'intuition, et ses exercices seront corrigés.
 Votre travail ici : lire le document et en établir le plan détaillé.
 
-LE DOCUMENT : {pdf_path}
-Lisez-le EN ENTIER avec l'outil Read, par tranches de 20 pages au plus
-(paramètre pages). Les transparents Beamer répètent souvent la même page en
-ajoutant un élément à chaque fois : ne comptez chaque contenu qu'une fois, mais
-notez les pages où il se trouve.
+{access}
 
 À PRODUIRE :
 - title : titre français précis du cours (par exemple « Rappels d'optimisation —
@@ -1557,7 +1576,7 @@ CATALOGUE DES COURS EXISTANTS (identifiant, niveau, titre) :
 {catalogue(syl, max_per_domain=400)}"""
 
 
-def _source_block(plan: dict, index: int) -> str:
+def _source_block(plan: dict, index: int, source_text: str = "") -> str:
     """Consignes propres à un cours importé : relire les pages, garder les exercices."""
     source = plan.get("source")
     if not source:
@@ -1573,13 +1592,22 @@ def _source_block(plan: dict, index: int) -> str:
                           for e in section.get("exercises") or []) or "  (aucun dans ces pages)"
     related = "\n".join("  - %s : %s" % (r["id"], r["title"])
                         for r in source.get("related") or []) or "  (aucun)"
+    if source_text:
+        access = ("Votre section correspond aux pages %s du document, dont voici le texte\n"
+                  "extrait automatiquement. Travaillez à partir de ce texte, n'ouvrez aucun\n"
+                  "fichier. L'extraction abîme souvent les formules : rétablissez-les en LaTeX\n"
+                  "d'après le contexte. Votre réponse ne contient que le HTML de la section.\n\n"
+                  "--- pages %s ---\n%s\n--- fin ---" % (pages, pages, source_text))
+    else:
+        access = ("Le PDF se lit avec l'outil Read : %s\n"
+                  "Votre section correspond aux pages %s. Lisez ces pages AVANT d'écrire\n"
+                  "(outil Read, paramètre pages), et au besoin une page avant ou après pour le\n"
+                  "contexte. Votre réponse finale ne contient que le HTML de la section."
+                  % (source.get("pdf", ""), pages))
     return f"""
 
 SOURCE : ce cours réécrit un cours magistral du master MVA (« {origin} »).
-Le PDF se lit avec l'outil Read : {source.get("pdf", "")}
-Votre section correspond aux pages {pages}. Lisez ces pages AVANT d'écrire
-(outil Read, paramètre pages), et au besoin une page avant ou après pour le
-contexte. Votre réponse finale ne contient que le HTML de la section.
+{access}
 
 FIDÉLITÉ : tout ce que contiennent ces pages figure dans votre section :
 définitions, notations (gardez exactement celles du document), énoncés avec leurs

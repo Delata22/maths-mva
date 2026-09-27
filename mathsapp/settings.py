@@ -20,7 +20,12 @@ DEFAULTS = {
     "goal/review_batch": 20,
     "ui/font_scale": 100,
     "ui/queue_hidden": 0,          # 1 : file de generation masquee, pastille seule
+    "gen/backend": "auto",          # auto | claude | codex
     "claude/binary": "claude",
+    "codex/binary": "codex",
+    "codex/model_strong": "",       # vide : le modele par defaut de codex
+    "codex/model_fast": "",
+    "codex/sandbox": "read-only",
     "claude/timeout": 1800,
     "claude/retries": 3,
     "claude/stall_timeout": 240,

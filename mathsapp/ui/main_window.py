@@ -1169,6 +1169,12 @@ class MainWindow(QMainWindow):
         if getattr(self, "_code_worker", None) is not None:
             self.chat.set_action_state(aid, "", "une modification est déjà en cours")
             return
+        from ..generation import claude_cli as cc
+        if cc.backend() != "claude":
+            # l'edition du code s'appuie sur les outils d'edition du CLI claude
+            self.chat.set_action_state(
+                aid, "failed", "réservé au moteur claude (Préférences > Génération)")
+            return
         answer = QMessageBox.question(
             self, "Modifier l'application",
             "Claude va modifier le code de l'application :\n\n%s\n\n"

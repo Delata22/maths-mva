@@ -192,16 +192,17 @@ def generate_sections(syl: Syllabus, course_id: str, plan: dict, model: str,
                         0.10 + 0.72 * done_count / max(1, n))
 
         covered, upcoming = context_for(index)
+        access, source_text = source_access(plan, index)
         res = cc.run(
             prompts.section_prompt(syl, course, plan, index, titles[:index],
-                                   covered, upcoming),
+                                   covered, upcoming, source_text),
             model=model,
             system=("Vous redigez des cours de mathematiques en HTML. Vous ne "
                     "produisez que le fragment HTML demande, sans commentaire."),
             cancel=cancel,
             on_progress=progress,
             on_notice=notice,
-            **source_tools(plan),
+            **access,
         )
         body = content.clean_html(res.text)
         with lock:
@@ -723,14 +724,20 @@ def structure_td(td_id: str, model: Optional[str] = None,
     model = model or str(settings.get("model/exercises"))
     folder = str(td_mod.td_dir(td_id))
     on_progress("Lecture du sujet", 0.03)
+    access, document = {}, ""
+    if cc.uses_tools():
+        access = {"tools": "Read", "add_dirs": [folder], "cwd": folder}
+    else:
+        from .. import pdf_text
+        document = pdf_text.extract(src)
     raw, res = cc.run_json(
-        prompts.td_structure_prompt(syl, str(src)),
+        prompts.td_structure_prompt(syl, str(src), document),
         model=model,
         system=("Vous transcrivez fidèlement des sujets de mathématiques. "
                 "Vous répondez uniquement en JSON valide."),
         schema=prompts.TD_SCHEMA,
         cancel=cancel,
-        tools="Read", add_dirs=[folder], cwd=folder,
+        **access,
         on_progress=lambda n: on_progress("Lecture du sujet", min(0.14, 0.03 + n / 60000.0)),
         on_notice=lambda msg: on_progress("Lecture du sujet — %s" % msg, 0.03),
     )
@@ -950,6 +957,23 @@ def generate_refresher(course_id: str, day: Optional[str] = None,
 # ---------------------------------------------------------------------------
 # Cours importés depuis un PDF
 # ---------------------------------------------------------------------------
+def source_access(plan: dict, index: int) -> tuple:
+    """Comment la section atteint son PDF : outil Read, ou texte extrait ici.
+
+    `claude` lit le PDF lui-meme ; les autres moteurs recoivent le texte des
+    pages de la section.
+    """
+    source = plan.get("source") or {}
+    pdf = source.get("pdf")
+    if not pdf or not os.path.exists(pdf):
+        return {}, ""
+    if cc.uses_tools():
+        return source_tools(plan), ""
+    from .. import pdf_text
+    pages = (plan.get("sections") or [{}])[index].get("pages") or ""
+    return {}, pdf_text.extract(pdf, pages, limit=60000)
+
+
 def source_tools(plan: dict) -> dict:
     """Un cours importé relit son PDF : outil Read, limité au dossier du document."""
     pdf = (plan.get("source") or {}).get("pdf")
@@ -969,14 +993,20 @@ def read_course_document(doc: str, model: Optional[str] = None,
     folder = str(td_mod.td_dir(doc))
     model = model or str(settings.get("model/exercises"))
     on_progress("Lecture du document", 0.01)
+    access, document = {}, ""
+    if cc.uses_tools():
+        access = {"tools": "Read", "add_dirs": [folder], "cwd": folder}
+    else:
+        from .. import pdf_text
+        document = pdf_text.extract(src)
     raw, res = cc.run_json(
-        prompts.course_import_prompt(syl, str(src)),
+        prompts.course_import_prompt(syl, str(src), document),
         model=model,
         system=("Vous analysez des cours de mathématiques pour les réécrire. "
                 "Vous répondez uniquement en JSON valide."),
         schema=prompts.COURSE_IMPORT_SCHEMA,
         cancel=cancel,
-        tools="Read", add_dirs=[folder], cwd=folder,
+        **access,
         on_progress=lambda n: on_progress("Lecture du document", min(0.05, 0.01 + n / 400000.0)),
         on_notice=lambda msg: on_progress("Lecture du document — %s" % msg, 0.01),
     )

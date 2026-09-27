@@ -44,6 +44,16 @@ class PrefsDialog(QDialog):
 
         gen = QGroupBox("Génération")
         gf = QFormLayout(gen)
+        self.backend = QComboBox()
+        self.backend.addItem("Automatique (le CLI installé)", "auto")
+        self.backend.addItem("Claude (CLI claude)", "claude")
+        self.backend.addItem("Codex (CLI codex)", "codex")
+        self.backend.setCurrentIndex(max(0, self.backend.findData(str(settings.get("gen/backend")))))
+        self.backend.setToolTip(
+            "Quel assistant en ligne de commande produit les cours. Avec codex, les "
+            "coûts affichés restent à zéro (le CLI ne les donne pas) et la lecture "
+            "des PDF passe par pdftotext.")
+        gf.addRow("Moteur", self.backend)
         self.concurrency = QSpinBox()
         self.concurrency.setRange(1, 4)
         self.concurrency.setValue(int(settings.get("gen/concurrency")))
@@ -90,6 +100,16 @@ class PrefsDialog(QDialog):
 
         self.binary = QLineEdit(str(settings.get("claude/binary")))
         gf.addRow("Binaire claude", self.binary)
+        self.codex_binary = QLineEdit(str(settings.get("codex/binary")))
+        gf.addRow("Binaire codex", self.codex_binary)
+        self.codex_strong = QLineEdit(str(settings.get("codex/model_strong")))
+        self.codex_strong.setPlaceholderText("vide = modèle par défaut de codex")
+        self.codex_strong.setToolTip("Modèle codex utilisé là où l'app demande « opus ».")
+        gf.addRow("Modèle codex (cours)", self.codex_strong)
+        self.codex_fast = QLineEdit(str(settings.get("codex/model_fast")))
+        self.codex_fast.setPlaceholderText("vide = modèle par défaut de codex")
+        self.codex_fast.setToolTip("Modèle codex utilisé là où l'app demande « sonnet ».")
+        gf.addRow("Modèle codex (exercices)", self.codex_fast)
         self.test = QPushButton("Tester le CLI")
         self.test.clicked.connect(self._test)
         gf.addRow("", self.test)
@@ -141,7 +161,9 @@ class PrefsDialog(QDialog):
         root.addWidget(buttons)
 
     def _test(self) -> None:
+        settings.put("gen/backend", self.backend.currentData())
         settings.put("claude/binary", self.binary.text().strip() or "claude")
+        settings.put("codex/binary", self.codex_binary.text().strip() or "codex")
         try:
             version = cc.check_available()
         except cc.ClaudeError as exc:
@@ -160,6 +182,10 @@ class PrefsDialog(QDialog):
         settings.put("claude/stall_timeout", self.stall.value())
         settings.put("claude/retries", self.retries.value())
         settings.put("claude/binary", self.binary.text().strip() or "claude")
+        settings.put("gen/backend", self.backend.currentData())
+        settings.put("codex/binary", self.codex_binary.text().strip() or "codex")
+        settings.put("codex/model_strong", self.codex_strong.text().strip())
+        settings.put("codex/model_fast", self.codex_fast.text().strip())
         settings.put("ui/mastery_threshold", self.threshold.value())
         settings.put("goal/bricks", self.goal.value())
         settings.put("goal/review_batch", self.review_batch.value())

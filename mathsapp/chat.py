@@ -19,12 +19,14 @@ class ChatWorker(QThread):
     failed = Signal(str)
 
     def __init__(self, prompt: str, model: str, system: str,
-                 session_id: Optional[str], parent=None):
+                 session_id: Optional[str], parent=None, history=()):
         super().__init__(parent)
         self.prompt = prompt
         self.model = model
         self.system = system
         self.session_id = session_id
+        # les moteurs sans sessions (codex) recoivent la conversation a chaque tour
+        self.history = list(history)
         self._stop = False
 
     def request_stop(self) -> None:
@@ -35,6 +37,7 @@ class ChatWorker(QThread):
             res = cc.chat_stream(
                 self.prompt, self.model, self.system, self.session_id,
                 on_delta=self.delta.emit, cancel=lambda: self._stop,
+                history=self.history,
             )
             self.finished_ok.emit(res.text, res.session_id or "")
         except cc.ClaudeError as exc:

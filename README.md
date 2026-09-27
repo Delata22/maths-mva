@@ -52,8 +52,10 @@ cd maths-mva
 
 `run.sh` cree l'environnement virtuel et installe PySide6 au premier lancement.
 
-Prerequis : Python 3.10+, et le CLI [`claude`](https://claude.com/claude-code)
-authentifie (`claude auth`). L'application verifie sa presence au demarrage.
+Prerequis : Python 3.10+, et un CLI de génération authentifié : [`claude`](https://claude.com/claude-code)
+(`claude auth`) ou [`codex`](https://github.com/openai/codex) (`codex login`).
+L'application vérifie sa présence au démarrage. Voir aussi [INSTALL.md](INSTALL.md)
+et la section « Générer avec Codex » plus bas.
 
 ---
 
@@ -517,6 +519,25 @@ précédente. La bibliothèque affiche cette même raison à côté de l'état.
   (`git revert`). Si les tests échouent encore, rien n'est enregistré : on
   choisit de retirer les modifications ou de les garder. Une modification ne
   démarre que si le code n'a pas de changement en attente.
+
+## Générer avec Codex
+
+Le moteur se choisit dans **Préférences > Génération > Moteur**. En
+« Automatique » (par défaut), l'application prend `claude` s'il est installé,
+sinon `codex`. Avec Codex :
+
+- les consignes système passent en tête du prompt, et l'historique du chat est
+  renvoyé à chaque message, car `codex exec` ne reprend pas de session ;
+- les sorties JSON passent par `--output-schema`. Si la version du CLI refuse une
+  option, elle est retirée et l'appel rejoué ;
+- Codex ne lit pas les PDF comme `claude` : l'import de TD et de cours reçoit le
+  texte extrait par `pdftotext` (paquet `poppler-utils`). Les formules des
+  transparents en souffrent un peu ;
+- les modèles « opus » et « sonnet » de l'application deviennent les modèles
+  codex réglés dans les Préférences. Si ces champs sont vides, c'est le modèle
+  par défaut de Codex ;
+- le CLI ne renvoie pas de coût : les montants affichés restent à zéro ;
+- « Modifier l'application » depuis l'Assistant reste réservé à `claude`.
 
 ## Corriger ses TD
 

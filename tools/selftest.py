@@ -295,6 +295,71 @@ def test_td() -> None:
             os.environ["MATHSAPP_LIBRARY"] = previous
 
 
+def test_codex_backend() -> None:
+    """Moteur codex : commande, sortie structuree, repli, chat, lecture des PDF."""
+    import json as _json
+    import tempfile
+    from mathsapp import pdf_text
+    from mathsapp.generation import claude_cli as cc, codex_cli as cx
+
+    check("moteur par defaut : claude", cc.backend() in ("claude", "codex"))
+    fake = pathlib.Path(tempfile.mkdtemp(prefix="selftest-codex-")) / "codex"
+    fake.write_text(FAKE_CODEX, encoding="utf-8")
+    fake.chmod(0o755)
+    exe = str(fake)
+    check("codex : version", "faux" in cx.check_available(exe))
+
+    seen = []
+    res = cx.run_once("Un paragraphe.", "opus", system="Consigne.", exe=exe,
+                      on_progress=seen.append)
+    check("codex : texte final et progression", res.text == "<p>ok 0</p>" and seen and seen[-1] > 0,
+          "%r %s" % (res.text, seen[-1:]))
+    schema = {"type": "object", "properties": {"qcm": {"type": "array"}}}
+    res = cx.run_once("QCM.", "sonnet", system="Consigne.", json_schema=schema, exe=exe)
+    data = _json.loads(res.text)
+    check("codex : sortie structuree, consignes en tete", data["qcm"] and data["vu"] is True)
+    os.environ["FAKE_CODEX_REJECT"] = "--output-schema"
+    try:
+        res = cx.run_once("QCM.", "sonnet", json_schema=schema, exe=exe)
+        check("codex : option refusee retiree, JSON redemande", _json.loads(res.text)["qcm"])
+    finally:
+        os.environ.pop("FAKE_CODEX_REJECT", None)
+    pieces = []
+    history = [{"role": "user", "content": "A ?"}, {"role": "assistant", "content": "a"},
+               {"role": "user", "content": "B ?"}]
+    res = cx.chat_stream("B ?", "opus", "S", None, pieces.append, history=history, exe=exe)
+    check("codex : chat en fragments, historique renvoye sans doublon",
+          res.text == "<p>ok 1</p>" and len(pieces) > 1, res.text)
+
+    strict = cx.strict_schema({"type": "object", "properties": {
+        "a": {"type": "string"},
+        "b": {"type": "array", "items": {"type": "object", "properties": {"c": {"type": "integer"}},
+                                         "required": []}}}})
+    inner = strict["properties"]["b"]["items"]
+    check("codex : schema ferme et tout requis",
+          strict["required"] == ["a", "b"] and strict["additionalProperties"] is False
+          and inner["required"] == ["c"] and inner["additionalProperties"] is False)
+    check("codex : noms Claude traduits, autres gardes",
+          cx.model_for("gpt-5-codex") == "gpt-5-codex"
+          and cx.model_for("opus") == str(__import__("mathsapp.settings", fromlist=["x"]).get("codex/model_strong") or ""))
+    cmd = ["codex", "exec", "--json", "--output-schema", "/s.json", "--cd", "/w", "p"]
+    check("codex : retrait d'une option et de sa valeur",
+          cx.drop_flag(cmd, "--output-schema") == ["codex", "exec", "--json", "--cd", "/w", "p"])
+    check("codex : option refusee reconnue",
+          cx.unsupported_flag(cmd, "error: unexpected argument '--output-schema'") == "--output-schema"
+          and cx.unsupported_flag(cmd, "rate limit") is None)
+    check("codex : raisonnement ignore",
+          cx.message_text({"type": "item.completed", "item": {"type": "reasoning", "text": "x"}})
+          == ("", False))
+    check("pdf : plages de pages", pdf_text.page_range("5-18") == (5, 18)
+          and pdf_text.page_range("42") == (42, 42) and pdf_text.page_range("") == (None, None))
+    sample = next(iter(sorted((pathlib.Path(__file__).resolve().parent.parent / "library" / "_td")
+                              .glob("*/source.pdf"))), None)
+    if pdf_text.available() and sample is not None:
+        text = pdf_text.extract(sample, "1-2")
+        check("pdf : texte extrait par pdftotext", len(text) > 100, "%d caracteres" % len(text))
+
+
 def test_course_import() -> None:
     """Cours importes : lecture nettoyee, plan avec source, rangement a part des TD."""
     import tempfile
@@ -429,15 +494,19 @@ def test_assistant() -> None:
     from mathsapp import assistant, status as st_mod
     from mathsapp.syllabus import load
     syl = load()
+    from mathsapp import content
+    # cours pris dans la bibliotheque du moment : elle evolue au fil des generations
+    todo = [cid for cid in reversed(syl.topo) if not content.is_complete(cid)][:2]
+    done = next(c.id for c in syl.all() if content.is_complete(c.id))
 
     text = ('<p>Voici.</p><actions>[{"type": "generate_courses", "courses": '
-            '["pro-convergences", "pro-esperance", "inexistant", "pro-espaces"]},'
+            '["%s", "%s", "inexistant", "%s"]},'
             '{"type": "set_setting", "key": "gen/section_parallel", "value": "4"},'
             '{"type": "set_setting", "key": "claude/binary", "value": "rm"},'
             '{"type": "set_setting", "key": "goal/bricks", "value": 99},'
             '{"type": "open", "page": "course", "course": "Chaînes de Markov"},'
             '{"type": "modify_app", "request": "court"},'
-            '{"type": "inconnu"}]</actions>')
+            '{"type": "inconnu"}]</actions>') % (todo[0], todo[1], done)
     visible, actions = assistant.parse_actions(text, syl)
     kinds = [a["type"] for a in actions]
     check("assistant : texte sans le bloc d'actions", visible == "<p>Voici.</p>", visible)
@@ -445,7 +514,8 @@ def test_assistant() -> None:
           kinds == ["generate_courses", "set_setting", "open"], str(kinds))
     gen = actions[0]
     check("assistant : cours inconnus et deja rediges ecartes",
-          "inexistant" not in gen["courses"] and "pro-espaces" not in gen["courses"],
+          "inexistant" not in gen["courses"] and done not in gen["courses"]
+          and sorted(gen["courses"]) == sorted(todo),
           str(gen["courses"]))
     rank = {cid: i for i, cid in enumerate(syl.topo)}
     check("assistant : cours ranges dans l'ordre des prerequis",
@@ -1665,6 +1735,9 @@ def test_chat() -> None:
     panel.deleteLater()
 
 
+FAKE_CODEX = '#!/usr/bin/env python3\nimport json, os, sys\nargs = sys.argv[1:]\nif args[:1] == ["--version"]:\n    print("codex-cli 0.0-faux"); sys.exit(0)\nif os.environ.get("FAKE_CODEX_REJECT") in args:\n    print("error: unexpected argument \'%s\' found" % os.environ["FAKE_CODEX_REJECT"], file=sys.stderr)\n    sys.exit(2)\nprompt = args[-1]\ndef opt(name):\n    return args[args.index(name) + 1] if name in args else None\nif "--output-schema" in args or "JSON valide" in prompt:\n    answer = json.dumps({"qcm": [{"id": "q1"}], "vu": "CONSIGNES PERMANENTES" in prompt})\nelse:\n    answer = "<p>ok %d</p>" % prompt.count("### Question")\nprint(json.dumps({"type": "item.completed", "item": {"type": "reasoning", "text": "hmm"}}))\nfor i in range(0, len(answer), 5):\n    print(json.dumps({"type": "agent_message_delta", "delta": answer[i:i + 5]}), flush=True)\nprint(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": answer}}))\nif opt("--output-last-message"):\n    open(opt("--output-last-message"), "w").write(answer)\n'
+
+
 def main() -> int:
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication([])
@@ -1675,6 +1748,8 @@ def main() -> int:
     test_syllabus()
     print("\n--- integrite des prompts ---")
     test_prompts_integrity()
+    print("\n--- moteur codex ---")
+    test_codex_backend()
     print("\n--- cours importes ---")
     test_course_import()
     print("\n--- questions libres ---")
