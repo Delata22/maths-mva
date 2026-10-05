@@ -458,8 +458,8 @@ class Dashboard(QWidget):
             name.setObjectName("H2")
             name.setWordWrap(True)
             card.lay.addWidget(name)
-            info = QLabel("%d cours  ·  %d maîtrisé%s  ·  %d généré%s"
-                          % (len(path), done, "s" if done > 1 else "",
+            info = QLabel("%d cours%s  ·  %d maîtrisé%s  ·  %d généré%s"
+                          % (len(path), " choisis, dans l'ordre" if track.courses else "", done, "s" if done > 1 else "",
                              gen, "s" if gen > 1 else ""))
             info.setObjectName("Muted")
             card.lay.addWidget(info)
