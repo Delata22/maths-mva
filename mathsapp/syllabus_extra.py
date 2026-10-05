@@ -266,10 +266,14 @@ def remove_courses(ids) -> int:
     extra["courses"] = [c for c in extra["courses"] if c["id"] not in ids]
     for c in extra["courses"]:
         c["prereqs"] = [p for p in c["prereqs"] if p not in ids]
-    extra["tracks"] = [t for t in extra["tracks"]
-                       if t["goal"] not in ids]
     for t in extra["tracks"]:
-        t["extra"] = [e for e in t["extra"] if e not in ids]
+        t["extra"] = [e for e in t.get("extra", []) if e not in ids]
+        if t.get("courses"):
+            t["courses"] = [c for c in t["courses"] if c not in ids]
+            if t.get("goal") in ids:
+                t["goal"] = t["courses"][-1] if t["courses"] else t["goal"]
+    extra["tracks"] = [t for t in extra["tracks"]
+                       if t.get("goal") not in ids]
     used = {c["domain"] for c in extra["courses"]}
     extra["domains"] = [d for d in extra["domains"] if d["id"] in used]
     write_extra(extra)

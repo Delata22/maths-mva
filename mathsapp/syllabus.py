@@ -41,6 +41,10 @@ class Track:
     extra: List[str]
     group: str = "mva"
     custom: bool = False
+    # liste explicite et ordonnee : le parcours n'est alors pas etendu aux
+    # prerequis (parcours express, qui suppose le reste connu)
+    courses: List[str] = field(default_factory=list)
+    featured: bool = False
 
 
 @dataclass
@@ -69,12 +73,17 @@ class Syllabus:
         self.track_groups: Dict[str, TrackGroup] = {
             g["id"]: TrackGroup(**g) for g in data.get("track_groups", [])
         }
-        self.tracks: Dict[str, Track] = {
-            t["id"]: Track(id=t["id"], title=t["title"], goal=t["goal"],
-                           extra=list(t["extra"]), group=t.get("group", "mva"),
-                           custom=bool(t.get("custom")))
-            for t in data.get("tracks", [])
-        }
+        self.tracks: Dict[str, Track] = {}
+        for t in data.get("tracks", []):
+            courses = [c for c in t.get("courses", []) if c in self.courses]
+            goal = t.get("goal") or (courses[-1] if courses else "")
+            if goal not in self.courses:
+                continue
+            self.tracks[t["id"]] = Track(
+                id=t["id"], title=t["title"], goal=goal,
+                extra=list(t.get("extra", [])), group=t.get("group", "mva"),
+                custom=bool(t.get("custom")), courses=courses,
+                featured=bool(t.get("featured")))
         for cid, course in self.courses.items():
             for p in course.prereqs:
                 self.courses[p].dependents.append(cid)
@@ -158,7 +167,9 @@ class Syllabus:
         return self.ancestors(cid) + [cid]
 
     def tracks_in(self, group_id: str) -> List[Track]:
-        return [t for t in self.tracks.values() if t.group == group_id]
+        """Les parcours du groupe, ceux mis en avant d'abord."""
+        tracks = [t for t in self.tracks.values() if t.group == group_id]
+        return sorted(tracks, key=lambda t: not t.featured)
 
     def group_name(self, group_id: str) -> str:
         g = self.track_groups.get(group_id)
@@ -166,6 +177,8 @@ class Syllabus:
 
     def track_path(self, track_id: str) -> List[str]:
         track = self.tracks[track_id]
+        if track.courses:
+            return list(track.courses)
         targets = [track.goal] + track.extra
         seen: List[str] = []
         for t in targets:
