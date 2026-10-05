@@ -11,14 +11,14 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, status as st_mod, store
+from .. import content, gamify, status as st_mod, store, videos
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
 from . import theme
 from .webview import WebView
 from .widgets import FlowLayout
 
-TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES, TAB_EXERCISES = range(6)
+TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES, TAB_EXERCISES, TAB_VIDEOS = range(7)
 
 
 def _page_path(name: str):
@@ -349,6 +349,10 @@ class CoursePage(QWidget):
         self.tabs.addTab(notes_host, "Notes")
         self.tabs.addTab(self.exercises_view, "Exercices du cours")
         self.tabs.setTabVisible(TAB_EXERCISES, False)
+        # videos locales rattachees au cours (library/_videos), lues hors ligne
+        self.videos_view = WebView()
+        self.tabs.addTab(self.videos_view, "Vidéos")
+        self.tabs.setTabVisible(TAB_VIDEOS, False)
 
     def set_syllabus(self, syl: Syllabus) -> None:
         self.syl = syl
@@ -433,6 +437,7 @@ class CoursePage(QWidget):
 
     def hideEvent(self, event) -> None:  # noqa: N802
         self.flush_reading()
+        self._pause_videos()
         super().hideEvent(event)
 
     def show_exercise(self, number: str) -> None:
@@ -466,6 +471,7 @@ class CoursePage(QWidget):
             return
         if not same:
             self.flush_reading()
+            self._pause_videos()
             self._pending_resume = False
             self._loaded_tabs.clear()
             self.notes.blockSignals(True)
@@ -497,6 +503,9 @@ class CoursePage(QWidget):
         from .. import course_import
         self._doc = course_import.doc_for_course(cid)
         self.tabs.setTabVisible(TAB_EXERCISES, bool(self._doc))
+        self._videos = videos.for_course(cid)
+        self.tabs.setTabVisible(TAB_VIDEOS, bool(self._videos))
+        self.tabs.setTabText(TAB_VIDEOS, "Vidéos (%d)" % len(self._videos))
         self.tabs.setTabEnabled(TAB_QUIZ, self.status.has_exercises)
         self.tabs.setTabEnabled(TAB_PROOFS, self.status.has_exercises)
         if not readable:
@@ -545,7 +554,13 @@ class CoursePage(QWidget):
                 self.chips_row.addWidget(chip)
         self.chips_row.addStretch(1)
 
+    def _pause_videos(self) -> None:
+        if TAB_VIDEOS in self._loaded_tabs:
+            self.videos_view.run_js("var v=document.getElementById('v'); v && v.pause();")
+
     def _on_tab(self, index: int) -> None:
+        if index != TAB_VIDEOS:
+            self._pause_videos()
         if self.course is None or index in self._loaded_tabs:
             return
         cid = self.course.id
@@ -572,6 +587,12 @@ class CoursePage(QWidget):
             self._loaded_tabs.add(index)
         elif index == TAB_PROOFS and self.status and self.status.has_exercises:
             self._load_proofs()
+            self._loaded_tabs.add(index)
+        elif index == TAB_VIDEOS and getattr(self, "_videos", None):
+            from .video_player import build_page
+            path = _page_path("videos_%s.html" % cid)
+            path.write_text(build_page(self._videos), encoding="utf-8")
+            self.videos_view.load_file(path)
             self._loaded_tabs.add(index)
 
     def _load_quiz(self) -> None:
