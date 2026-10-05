@@ -2,8 +2,21 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
+from PySide6.QtGui import QCursor
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
+from PySide6.QtWebEngineCore import (
+    QWebEnginePage, QWebEngineProfile, QWebEngineSettings, QWebEngineUrlRequestInterceptor,
+)
+from PySide6.QtWidgets import QToolTip
+
+# Seuls les contenus locaux sont autorises : l'app doit rester un espace de
+# travail ferme (pas de web, pas de navigateur), meme si une page generee
+# contient un lien ou une ressource distante.
+LOCAL_SCHEMES = {"file", "qrc", "data", "blob", "about", "qt"}
+
+
+def is_local(url: QUrl) -> bool:
+    return url.scheme().lower() in LOCAL_SCHEMES
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 
@@ -82,13 +95,38 @@ class Bridge(QObject):
         self.proof_review_requested.emit(proof_id, payload)
 
 
+class _Interceptor(QWebEngineUrlRequestInterceptor):
+    """Refuse toute requete reseau (images, scripts, iframes, XHR...)."""
+
+    def interceptRequest(self, info) -> None:  # noqa: N802
+        if not is_local(info.requestUrl()):
+            info.block(True)
+
+
+_interceptor = None
+
+
+def _lock_profile() -> None:
+    global _interceptor
+    if _interceptor is None:
+        _interceptor = _Interceptor()
+        QWebEngineProfile.defaultProfile().setUrlRequestInterceptor(_interceptor)
+
+
 class _Page(QWebEnginePage):
     """Bloque la navigation externe : l'app ne doit pas ouvrir de navigateur."""
 
     def acceptNavigationRequest(self, url: QUrl, nav_type, is_main_frame: bool) -> bool:  # noqa: N802
-        if url.scheme() in ("http", "https"):
+        if not is_local(url):
+            if nav_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked:
+                QToolTip.showText(QCursor.pos(), "Lien externe bloqué")
             return False
         return super().acceptNavigationRequest(url, nav_type, is_main_frame)
+
+    def createWindow(self, _type):  # noqa: N802
+        # target=_blank, window.open : pas de nouvelle fenetre
+        QToolTip.showText(QCursor.pos(), "Lien externe bloqué")
+        return None
 
     def javaScriptConsoleMessage(self, level, message, line, source):  # noqa: N802
         if level == QWebEnginePage.JavaScriptConsoleMessageLevel.ErrorMessageLevel:
@@ -100,6 +138,7 @@ class WebView(QWebEngineView):
 
     def __init__(self, parent=None, with_bridge: bool = False):
         super().__init__(parent)
+        _lock_profile()
         self.setPage(_Page(self))
         s = self.settings()
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
