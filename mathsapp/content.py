@@ -305,9 +305,11 @@ def with_quiz_progress(page: str, progress: dict, course_id: Optional[str]) -> s
 
 def render_course_page(course_id: str, title: str, theme: str = "light") -> pathlib.Path:
     """Ecrit la page complete du cours et retourne son chemin."""
+    from . import brouillon
     from .questions import link_courses
     from .syllabus import load
-    page = build_page(link_courses(read_body(course_id), load()), title, theme)
+    body = brouillon.annotate(read_body(course_id))
+    page = brouillon.inject(build_page(link_courses(body, load()), title, theme), course_id)
     out = course_dir(course_id, create=True) / "_render.html"
     out.write_text(page, encoding="utf-8")
     return out

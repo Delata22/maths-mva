@@ -577,6 +577,131 @@ def generate_sheet(course_id: str, model: Optional[str] = None,
     return res.cost_usd
 
 
+def generate_training(course_id: str, replace: Optional[int] = None,
+                      model: Optional[str] = None,
+                      on_progress: ProgressCb = _noop,
+                      cancel: CancelCb = _never,
+                      syl: Optional[Syllabus] = None) -> tuple[int, float]:
+    """Produit une feuille de TD d'entraînement. Retourne (numéro, coût).
+
+    `replace` : numéro d'une feuille à régénérer à la même place. La feuille
+    n'est écrite qu'une fois complète : une interruption n'en laisse rien."""
+    from .. import training
+    syl = syl or load_syllabus()
+    course = syl.get(course_id)
+    if course is None:
+        raise ValueError("cours inconnu : %s" % course_id)
+    if not content.is_complete(course_id):
+        raise ValueError("Le cours doit être entièrement rédigé avant un TD d'entraînement.")
+    model = model or str(settings.get("model/exercises"))
+    plan = content.read_plan(course_id) or {}
+    titles = [str(s.get("title") or "") for s in plan.get("sections") or []]
+    seen = [re.sub(r"<[^>]+>", " ", ex.get("title") or ex.get("statement", "")[:160]).strip()
+            for td in training.list_tds(course_id)
+            if not replace or int(td.get("id") or 0) != int(replace)
+            for ex in td.get("exercises") or []]
+    started = time.time()
+    label = "TD d'entraînement"
+    on_progress(label, 0.05)
+    data, res = cc.run_json(
+        prompts.training_prompt(syl, course, titles,
+                                content.substance(course_id, limit=24000), seen),
+        model=model,
+        system=("Vous composez des feuilles de TD de mathématiques. Vous répondez "
+                "uniquement en JSON valide."),
+        schema=prompts.TRAINING_SCHEMA,
+        cancel=cancel,
+        on_progress=lambda n: on_progress("%s · %s caractères" % (label, _fmt_thousands(n)),
+                                          min(0.95, 0.05 + n / 30000.0)),
+        on_notice=lambda msg: on_progress("%s — %s" % (label, msg), 0.05),
+    )
+    exercises = training.normalize_exercises(data, titles)
+    if len(exercises) < 3:
+        raise cc.ClaudeError("Feuille incomplète : %d exercice(s) exploitable(s) renvoyé(s)."
+                             % len(exercises))
+    _check(cancel)
+    td_id = training.save(course_id, exercises, replace=replace, model=model,
+                          cost_usd=round(res.cost_usd, 4),
+                          duration_s=round(time.time() - started, 1))
+    on_progress("Terminé", 1.0)
+    return td_id, res.cost_usd
+
+
+def generate_brouillons(course_id: str, keys: Optional[List[str]] = None,
+                        model: Optional[str] = None,
+                        on_progress: ProgressCb = _noop,
+                        cancel: CancelCb = _never,
+                        syl: Optional[Syllabus] = None) -> tuple[int, float]:
+    """Brouillons « comment on trouve » des démonstrations d'un cours.
+
+    Sans `keys` : toutes celles qui en méritent un et n'en ont pas d'à jour.
+    Avec `keys` : celles-là, régénérées. Chaque brouillon est écrit dès qu'il
+    est prêt : une reprise ne refait que ce qui manque. Retourne (nombre, coût)."""
+    from .. import brouillon
+    syl = syl or load_syllabus()
+    course = syl.get(course_id)
+    if course is None:
+        raise ValueError("cours inconnu : %s" % course_id)
+    if not content.has_course(course_id) and not content.has_exercises(course_id):
+        raise ValueError("Le cours doit être rédigé avant les brouillons de ses démonstrations.")
+    model = model or str(settings.get("model/exercises"))
+    entries = brouillon.proofs(course_id)
+    if keys:
+        todo = [e for e in entries if e["key"] in keys]
+        if not todo:
+            raise ValueError("Démonstration introuvable : elle a peut-être disparu avec "
+                             "la régénération du cours.")
+    else:
+        todo = brouillon.pending(course_id, entries)
+    n = len(todo)
+    if not n:
+        on_progress("Tous les brouillons sont à jour", 1.0)
+        return 0, 0.0
+    finished = 0
+    costs: List[float] = []
+    lock = threading.Lock()
+    on_progress("Brouillons 0/%d" % n, 0.03)
+
+    def work(entry: dict) -> None:
+        nonlocal finished
+        _check(cancel)
+        data, res = cc.run_json(
+            prompts.brouillon_prompt(syl, course, entry["title"], entry["statement"],
+                                     entry["text"]),
+            model=model,
+            system=("Vous montrez comment on trouve une démonstration de mathématiques. "
+                    "Vous répondez uniquement en JSON valide."),
+            schema=prompts.BROUILLON_SCHEMA,
+            cancel=cancel,
+            on_notice=lambda msg: on_progress("Brouillon « %s » — %s"
+                                              % (entry["title"][:50], msg),
+                                              0.03 + 0.95 * finished / n),
+        )
+        html_text = content.clean_html(str(data.get("html") or ""))
+        trivial = bool(data.get("trivial"))
+        if not html_text and not trivial:
+            raise cc.ClaudeError("Brouillon vide renvoyé pour « %s »." % entry["title"])
+        brouillon.save(course_id, entry, html_text, trivial, model=model,
+                       cost_usd=round(res.cost_usd, 4))
+        with lock:
+            finished += 1
+            costs.append(res.cost_usd)
+            done = finished
+        on_progress("Brouillons %d/%d — %s" % (done, n, entry["title"][:60]),
+                    0.03 + 0.95 * done / n)
+
+    workers = max(1, min(6, int(settings.get("gen/section_parallel") or 3), n))
+    if workers == 1:
+        for entry in todo:
+            work(entry)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for future in as_completed([pool.submit(work, e) for e in todo]):
+                future.result()
+    on_progress("Terminé", 1.0)
+    return n, sum(costs)
+
+
 def generate_course(course_id: str,
                     on_progress: ProgressCb = _noop,
                     cancel: CancelCb = _never,
@@ -615,6 +740,18 @@ def generate_course(course_id: str,
         except cc.ClaudeError as exc:
             # la fiche est un supplement : son echec ne doit pas perdre le cours
             on_progress("Fiche non produite : %s" % exc, 0.98)
+
+    if settings.get("gen/auto_brouillon"):
+        try:
+            _n, c = generate_brouillons(
+                course_id, None, None,
+                lambda label, frac: on_progress(label, 0.95 + 0.04 * frac), cancel, syl)
+            cost += c
+        except cc.Cancelled:
+            raise
+        except cc.ClaudeError as exc:
+            # supplement aussi : relancable depuis la page du cours
+            on_progress("Brouillons non produits : %s" % exc, 0.98)
 
     duration = time.time() - started
     meta = {

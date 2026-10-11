@@ -66,14 +66,23 @@ def test_syllabus() -> None:
     orphans = [c.id for c in syl.all() for p in c.prereqs if p not in syl.courses]
     check("prerequis tous definis", not orphans, str(orphans[:3]))
     for tid in syl.tracks:
+        track = syl.tracks[tid]
         path = syl.track_path(tid)
+        inside = set(path)
         seen: set = set()
         ok = True
         for cid in path:
-            if any(p not in seen for p in syl.get(cid).prereqs):
+            # parcours calcule : tous les prerequis le precedent. Parcours a liste
+            # choisie (express) : il saute volontairement des prerequis, mais
+            # ceux qu'il contient, directs ou non, doivent venir avant.
+            needed = (syl.get(cid).prereqs if not track.courses
+                      else [p for p in syl.ancestors(cid) if p in inside])
+            if any(p not in seen for p in needed):
                 ok = False
                 break
             seen.add(cid)
+        if track.courses:
+            ok = ok and sorted(path) == sorted(dict.fromkeys(track.courses))
         check("parcours %s ordonne" % tid, ok, "%d cours" % len(path))
 
 
@@ -214,6 +223,12 @@ def test_prompts_integrity() -> None:
                         "courses": [cid], "key_results": ["un résultat"]},
             [{"course": course, "generated": True,
               "substance": content.substance(cid, limit=1500)}], 0, 3),
+        "brouillon_prompt": lambda: prompts.brouillon_prompt(
+            syl, course, "Théorème test", "Soit $f$ continue sur $[a,b]$.",
+            "On pose $g(x) = f(x) - \\lambda x$ et on applique Rolle. " * 20),
+        "training_prompt": lambda: prompts.training_prompt(
+            syl, course, [s["title"] for s in plan["sections"]],
+            content.substance(cid, limit=1500), ["un exercice déjà donné"]),
     }
     failed = []
     for name, build in builders.items():
@@ -226,7 +241,8 @@ def test_prompts_integrity() -> None:
     check("chaque constructeur de prompt s'execute", not failed,
           "%d constructeurs%s" % (len(builders), (" — " + "; ".join(failed[:3])) if failed else ""))
     for schema in ("PLAN_SCHEMA", "EXERCISES_SCHEMA", "SYLLABUS_SCHEMA",
-                   "QCM_REPAIR_SCHEMA", "DAILY_SCHEMA", "TD_SCHEMA"):
+                   "QCM_REPAIR_SCHEMA", "DAILY_SCHEMA", "TD_SCHEMA", "TRAINING_SCHEMA",
+                   "BROUILLON_SCHEMA"):
         check("  schema %s present" % schema, isinstance(getattr(prompts, schema, None), dict))
 
 
@@ -636,6 +652,211 @@ def test_store() -> None:
     store.add_message(tid, "user", "coucou")
     check("fil de discussion persiste", len(store.messages(tid)) == 1)
     store.clear_thread(tid)
+
+
+def test_training() -> None:
+    """TD d'entrainement : normalisation, ecriture d'un bloc, version du cours, rendu."""
+    import tempfile
+    from mathsapp import content, store, training
+    from mathsapp.generation import pipeline, queue as queue_mod
+    from mathsapp.syllabus import load
+
+    check("TD d'entrainement : libelle distinct des TD importes",
+          queue_mod.kind_label("training") != queue_mod.kind_label("td")
+          and "TD 2" in queue_mod.kind_label("training:2"))
+    store.conn()   # la base reste celle deja ouverte, pas celle du dossier temporaire
+    previous = os.environ.get("MATHSAPP_LIBRARY")
+    os.environ["MATHSAPP_LIBRARY"] = tempfile.mkdtemp(prefix="selftest-entrainement-")
+    try:
+        syl = load()
+        try:
+            pipeline.generate_training(syl.topo[0], syl=syl)
+            refused = ""
+        except ValueError as exc:
+            refused = str(exc)
+        check("TD refuse pour un cours non redige, sans appel au modele", "rédigé" in refused,
+              refused)
+
+        cid = "selftest-entrainement"
+        body = "<h2>Suites</h2>" + "<p>texte du cours</p>" * 30
+        content.write_body(cid, body)
+        content.write_json(cid, content.META, {"generated_at": 1000.0})
+        raw = {"exercises": [
+            {"level": "Approfondissement", "title": "C", "statement": "<p>c</p>",
+             "hints": ["h1", "h2", "h3"], "solution": "<p>s</p>", "section": "suites"},
+            {"level": "application directe", "title": "A", "statement": "<p>a</p>",
+             "hints": [], "solution": "<p>s</p>", "section": "Inconnue"},
+            {"level": "classique", "title": "B", "statement": "", "hints": [],
+             "solution": "<p>s</p>", "section": ""},
+        ]}
+        items = training.normalize_exercises(raw, ["Suites"])
+        check("normalisation : enonce vide ecarte, difficulte croissante",
+              [e["title"] for e in items] == ["A", "C"]
+              and [e["id"] for e in items] == ["e1", "e2"])
+        check("normalisation : deux indices au plus, section verifiee",
+              len(items[1]["hints"]) == 2 and items[1]["section"] == "Suites"
+              and items[0]["section"] == "")
+        first = training.save(cid, items, cost_usd=0.3, duration_s=120.0)
+        second = training.save(cid, items)
+        check("plusieurs TD numerotes", (first, second) == (1, 2)
+              and len(training.list_tds(cid)) == 2)
+        check("ecriture d'un bloc : aucun fichier temporaire",
+              not list(training.training_dir(cid).glob("*.tmp")))
+        check("TD a jour du cours", not training.is_outdated(training.read_td(cid, 1), cid))
+
+        content.delete_course(cid)          # comme au debut d'une regeneration
+        content.write_body(cid, body)
+        content.write_json(cid, content.META, {"generated_at": 2000.0})
+        check("TD conserve apres regeneration du cours", len(training.list_tds(cid)) == 2)
+        check("TD signale comme ecrit pour une version anterieure",
+              training.is_outdated(training.read_td(cid, 1), cid))
+
+        page = training.page_body(cid, {"1/e1": "ok"})
+        check("rendu : indices et corrige replies, lien de section, statut, avertissement",
+              '<details class="training-solution">' in page and "<details open" not in page
+              and 'data-section="Suites"' in page
+              and 'data-key="1/e1" data-status="ok" class="on"' in page
+              and "version antérieure" in page)
+        check("estimation tiree des feuilles produites", training.estimate() == (120.0, 0.3))
+        check("suppression d'un TD", training.delete(cid, 2)
+              and [t["id"] for t in training.list_tds(cid)] == [1])
+        empty = training.page_body("selftest-sans-td", {})
+        check("rendu sans feuille : invitation a generer", "Générer un TD" in empty)
+    finally:
+        store.clear_training_status("selftest-entrainement", "1")
+        if previous is None:
+            os.environ.pop("MATHSAPP_LIBRARY", None)
+        else:
+            os.environ["MATHSAPP_LIBRARY"] = previous
+
+
+def test_brouillon() -> None:
+    """Brouillons des demonstrations : cles stables, obsolescence, page, bascule."""
+    import tempfile
+    from mathsapp import assistant, brouillon, content, settings as settings_mod
+    from mathsapp.generation import pipeline, queue as queue_mod
+    from mathsapp.syllabus import load
+    from mathsapp.ui.webview import WebView
+
+    check("brouillon : reglage gen/auto_brouillon, desactive par defaut",
+          settings_mod.DEFAULTS.get("gen/auto_brouillon") is False
+          and "gen/auto_brouillon" in assistant.SETTINGS_ALLOWED)
+    action = assistant.normalize_action(
+        {"type": "set_setting", "key": "gen/auto_brouillon", "value": "oui"}, load())
+    check("brouillon : reglage modifiable par l'assistant",
+          bool(action) and action["value"] is True)
+    check("brouillon : libelle dans la file",
+          queue_mod.kind_label("brouillon:c-x") == "Brouillon d'une démonstration"
+          and queue_mod.kind_label("brouillon") == "Brouillons des démonstrations")
+
+    long_proof = "<p>On pose $g(x) = f(x) - \\lambda x$, puis on applique Rolle.</p>" * 6
+    def body_with(proof: str) -> str:
+        return ('<h2>Accroissements</h2>'
+                '<div class="box theorem"><span class="box-title">Théorème</span>'
+                '<p class="statement">Soit $f$ continue sur $[a,b]$.</p></div>'
+                '<details class="proof" data-of="Théorème des accroissements finis">'
+                '<summary>Démonstration</summary><div class="proof-body">%s</div></details>'
+                '<p>Suite du cours, assez longue pour un vrai corps de cours.</p>'
+                '<details class="proof" data-of="Lemme court"><summary>Démonstration</summary>'
+                '<div class="proof-body"><p>Immédiat.</p></div></details>'
+                '<details class="proof" data-of="Lemme court"><summary>Démonstration</summary>'
+                '<div class="proof-body"><p>Idem.</p></div></details>' % proof)
+
+    previous = os.environ.get("MATHSAPP_LIBRARY")
+    os.environ["MATHSAPP_LIBRARY"] = tempfile.mkdtemp(prefix="selftest-brouillon-")
+    try:
+        syl = load()
+        cid = syl.topo[0]
+        content.write_body(cid, body_with(long_proof))
+        content.write_json(cid, content.EXOS, {"qcm": [], "proofs": [
+            {"id": "d1", "title": "Exercice", "statement": "<p>Montrer que…</p>",
+             "solution": "<p>%s</p>" % ("Raisonnons par récurrence forte. " * 12),
+             "steps": [], "hints": []}]})
+        entries = brouillon.proofs(cid)
+        keys = [e["key"] for e in entries]
+        check("cles stables tirees du nom du resultat",
+              keys == ["c-theoreme-des-accroissements-finis", "c-lemme-court",
+                       "c-lemme-court-2", "d-d1"], str(keys))
+        check("enonce retrouve avant la preuve", "continue" in entries[0]["statement"])
+        check("preuve d'une ligne : pas de brouillon propose",
+              entries[0]["eligible"] and not entries[1]["eligible"] and entries[3]["eligible"])
+        annotated = brouillon.annotate(content.read_body(cid))
+        check("demonstrations du cours marquees de leur cle",
+              'data-of="Théorème des accroissements finis" '
+              'data-brouillon="c-theoreme-des-accroissements-finis">' in annotated
+              and annotated.count("data-brouillon=") == 3)
+        check("a produire : les seules preuves qui le meritent",
+              [e["key"] for e in brouillon.pending(cid)]
+              == ["c-theoreme-des-accroissements-finis", "d-d1"])
+        brouillon.save(cid, entries[0], "<h4>Point de départ</h4><p>Idée $x$.</p>", False)
+        state = brouillon.state_map(cid)
+        check("brouillon enregistre, a jour",
+              state["c-theoreme-des-accroissements-finis"]["status"] == "ok"
+              and [e["key"] for e in brouillon.pending(cid)] == ["d-d1"])
+
+        content.delete_course(cid)          # regeneration : la preuve change
+        content.write_body(cid, body_with(long_proof.replace("Rolle", "le TAF")))
+        state = brouillon.state_map(cid)
+        check("brouillon conserve et marque obsolete quand la preuve change",
+              state["c-theoreme-des-accroissements-finis"]["status"] == "obsolete"
+              and "Idée" in state["c-theoreme-des-accroissements-finis"]["html"])
+        try:
+            pipeline.generate_brouillons(cid, ["c-inconnue"], syl=syl)
+            refused = ""
+        except ValueError as exc:
+            refused = str(exc)
+        check("demonstration disparue : erreur claire, sans appel au modele",
+              "introuvable" in refused, refused)
+
+        # la page de cours : bascule preuve / brouillon, formules rendues
+        page = brouillon.inject(content.build_page(annotated, "Selftest", "light"), cid)
+        check("etat des brouillons joint a la page", "window.BROUILLONS" in page)
+        path = pathlib.Path(tempfile.mkdtemp()) / "brouillon.html"
+        path.write_text(page, encoding="utf-8")
+        view = WebView(with_bridge=True)
+        view.resize(900, 700)
+        view.show()
+        loaded: dict = {}
+        view.loadFinished.connect(lambda ok: loaded.update(ok=ok))
+        view.load_file(path)
+        wait_until(lambda: "ok" in loaded)
+        wait(1500)
+        def js(code: str):
+            box: dict = {}
+            view.page().runJavaScript(code, lambda r: box.update(r=r))
+            wait_until(lambda: "r" in box, 8000)
+            return box.get("r")
+
+        switches = js("document.querySelectorAll('.proof-switch').length")
+        check("bascule sur les seules preuves qui meritent un brouillon",
+              switches == 1, str(switches))
+        # les erreurs levees dans un gestionnaire de clic ne remontent pas a
+        # click() : on les capte pour que l'echec dise ce qui s'est passe
+        js("window.__errs = []; window.addEventListener('error', function (e) {"
+           " window.__errs.push(String(e.message)); });"
+           "var d = document.querySelector('details[data-brouillon]'); d.open = true;"
+           "try { d.querySelectorAll('.proof-switch button')[1].click(); }"
+           "catch (e) { window.__errs.push(String(e)); } true;")
+        wait(300)
+        raw = js("(function(){ try {"
+                 " var d = document.querySelector('details[data-brouillon]');"
+                 " var p = d.querySelector('.brouillon-pane');"
+                 " return JSON.stringify({katex: !!p && !!p.querySelector('.katex'),"
+                 "  display: d.querySelector('.proof-body').style.display,"
+                 "  obsolete: !!p && p.textContent.indexOf('Obsolète') >= 0,"
+                 "  errors: window.__errs || []});"
+                 " } catch (e) { return JSON.stringify({errors: [String(e)]}); } })()")
+        import json as _json
+        toggle = _json.loads(raw) if isinstance(raw, str) else {"errors": [repr(raw)]}
+        check("brouillon affiche a la place de la preuve, formules rendues, obsolete signale",
+              toggle.get("katex") is True and toggle.get("display") == "none"
+              and toggle.get("obsolete") is True, str(toggle))
+        view.deleteLater()
+    finally:
+        if previous is None:
+            os.environ.pop("MATHSAPP_LIBRARY", None)
+        else:
+            os.environ["MATHSAPP_LIBRARY"] = previous
 
 
 def test_pages() -> None:
@@ -1766,6 +1987,10 @@ def main() -> int:
     test_syllabus_extra()
     print("\n--- progression ---")
     test_store()
+    print("\n--- TD d'entrainement ---")
+    test_training()
+    print("\n--- brouillons des demonstrations ---")
+    test_brouillon()
     print("\n--- assemblage des pages ---")
     test_pages()
     print("\n--- contexte entre sections ---")

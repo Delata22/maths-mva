@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..generation.queue import (
-    CANCELLED, DONE, ERROR, KIND_LABEL, QUEUED, RUNNING, GenerationQueue,
+    CANCELLED, DONE, ERROR, KIND_LABEL, QUEUED, RUNNING, GenerationQueue, kind_label,
 )
 
 HEALTH_COLOR = {"vivant": "ok", "lent": "warn", "muet": "err", "inactif": "muted"}
@@ -135,7 +135,7 @@ class QueuePanel(QWidget):
             item.setData(0, Qt.ItemDataRole.UserRole, job.course_id)
             item.setText(0, job.title)
             item.setData(1, Qt.ItemDataRole.UserRole, job.kind)
-            item.setText(1, KIND_LABEL.get(job.kind, job.kind))
+            item.setText(1, kind_label(job.kind))
             item.setForeground(1, QColor(pal["muted"]))
             item.setText(2, job.error or job.label)
             colors = {RUNNING: pal["accent"], DONE: pal["ok"], ERROR: pal["err"],

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox, QLabel,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox, QLabel,
     QLineEdit, QPushButton, QSpinBox, QVBoxLayout,
 )
 
@@ -73,6 +73,14 @@ class PrefsDialog(QDialog):
         self.sections.setValue(int(settings.get("gen/max_sections")))
         self.sections.setToolTip("Plus de sections = cours plus long et plus détaillé.")
         gf.addRow("Sections maximum par cours", self.sections)
+
+        self.auto_brouillon = QCheckBox("à la rédaction d'un nouveau cours")
+        self.auto_brouillon.setChecked(bool(settings.get("gen/auto_brouillon")))
+        self.auto_brouillon.setToolTip(
+            "Produit aussi, pour chaque démonstration, le brouillon « comment on "
+            "trouve » (modèle des exercices). Désactivé : on les génère à la demande, "
+            "démonstration par démonstration ou pour tout un cours.")
+        gf.addRow("Brouillons des démonstrations", self.auto_brouillon)
 
         self.timeout = QSpinBox()
         self.timeout.setRange(120, 7200)
@@ -178,6 +186,7 @@ class PrefsDialog(QDialog):
         settings.put("gen/concurrency", self.concurrency.value())
         settings.put("gen/section_parallel", self.section_parallel.value())
         settings.put("gen/max_sections", self.sections.value())
+        settings.put("gen/auto_brouillon", self.auto_brouillon.isChecked())
         settings.put("claude/timeout", self.timeout.value())
         settings.put("claude/stall_timeout", self.stall.value())
         settings.put("claude/retries", self.retries.value())

@@ -26,7 +26,20 @@ KIND_LABEL = {
     "td": "Correction de TD",
     "refresher": "Rappel ciblé",
     "import": "Import de cours",
+    "training": "TD d'entraînement",
+    "brouillon": "Brouillons des démonstrations",
 }
+
+
+def kind_label(kind: str) -> str:
+    """Libellé d'un type de travail. « training:2 » : régénération du TD 2."""
+    base, _, arg = (kind or "").partition(":")
+    label = KIND_LABEL.get(base, kind)
+    if base == "training" and arg:
+        label += " (TD %s, régénération)" % arg
+    if base == "brouillon" and arg:
+        label = "Brouillon d'une démonstration"
+    return label
 
 
 # Au-dela de ce silence, on considere que l'appel ne repond plus. Le chien de
@@ -163,6 +176,19 @@ class _Task(QRunnable):
             elif job.kind == "sheet":
                 cost = pipeline.generate_sheet(job.course_id, None, on_progress, cancel, syl)
                 msg = "Fiche produite (%.2f $)" % cost
+            elif job.kind.startswith("training"):
+                replace = job.kind.partition(":")[2]
+                td_id, cost = pipeline.generate_training(
+                    job.course_id, int(replace) if replace else None, None,
+                    on_progress, cancel, syl)
+                msg = "TD d'entraînement %d prêt (%.2f $)" % (td_id, cost)
+            elif job.kind.startswith("brouillon"):
+                key = job.kind.partition(":")[2]
+                count, cost = pipeline.generate_brouillons(
+                    job.course_id, [key] if key else None, None, on_progress, cancel, syl)
+                msg = ("%d brouillon%s produit%s (%.2f $)"
+                       % (count, "s" if count > 1 else "", "s" if count > 1 else "", cost)
+                       if count else "Brouillons déjà à jour")
             else:
                 meta = pipeline.generate_course(job.course_id, on_progress, cancel, True, syl)
                 msg = "Généré en %s (%.2f $)" % (

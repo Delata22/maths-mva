@@ -246,6 +246,64 @@ generation. Pour les cours deja rediges :
 python tools/generate.py --sheets
 ```
 
+### Les TD d'entraînement
+
+L'onglet **TD d'entraînement** de la page d'un cours produit, à la demande, une
+feuille d'exercices de rédaction : 5 à 8 exercices de difficulté croissante
+(*application directe*, *classique*, *approfondissement*), dans les notations du
+cours, qui n'utilisent que ce cours et sa chaîne de prérequis. Chaque exercice a
+son énoncé, un ou deux indices progressifs et un corrigé rédigé, repliés et à
+déplier un par un, et un lien vers la section du cours concernée.
+
+Rien n'est généré sans clic : le bouton « Générer un TD » (puis « Générer un
+autre TD ») affiche la durée et le coût estimés, mesurés sur les feuilles déjà
+produites (modèle des exercices). Il est désactivé, avec la raison, tant que le
+cours n'est pas rédigé ou pendant sa génération. Les feuilles s'empilent (TD 1,
+TD 2… avec leur date), chacune peut être régénérée ou supprimée. Une feuille
+n'est écrite qu'une fois complète : une génération interrompue ou en erreur
+reste visible dans la file, avec « Relancer », sans feuille partielle.
+
+Pour chaque exercice, on note **Réussi / Partiellement / À revoir** ; ce suivi
+est conservé dans `progress.db` et n'entre pas dans le calcul de maîtrise, qui
+reste fondé sur les QCM. Les feuilles vivent dans
+`library/<cours>/entrainement/` et survivent à la régénération du cours : elles
+sont alors signalées comme écrites pour une version antérieure.
+
+À ne pas confondre avec les **TD importés** (onglet TD, `Ctrl+5`), qui corrigent
+des sujets fournis par vous.
+
+### Le brouillon d'une démonstration : comment on trouve
+
+La preuve rédigée dit comment on rédige ; le **brouillon** montre comment on la
+trouve. Il est produit à partir de l'énoncé et de la preuve existante, dans ses
+notations : point de départ (ce qu'on veut, ce qu'on a), idée directrice et
+pourquoi elle est naturelle, démarche à rebours qui fait apparaître le choix
+clé (la fonction auxiliaire de Rolle, le $\varepsilon/2$, le $N$ ou le
+$\delta$), au besoin une tentative naïve qui échoue, les calculs de brouillon,
+le lien avec chaque étape de la preuve propre, et l'astuce à retenir en une
+phrase. Ton de cahier de recherche.
+
+- **Dans un cours**, chaque démonstration porte en haut deux onglets,
+  *Preuve rédigée* et *Brouillon : comment on trouve*. La bascule garde la
+  position à l'écran.
+- **Dans l'onglet Démonstrations**, le bouton *Brouillon : comment on trouve*
+  s'affiche à côté de la solution rédigée.
+- Sans brouillon, le panneau propose *Générer le brouillon*, ou *Générer les
+  brouillons de toutes les démonstrations de ce cours* (aussi dans le menu
+  « … » du cours). La génération passe par la file, avec le modèle des
+  exercices ; une erreur s'affiche dans le panneau avec *Relancer*.
+- Les brouillons sont enregistrés avec la démonstration
+  (`library/<cours>/brouillons/`), pas régénérés à l'ouverture, et
+  *Régénérer le brouillon* les refait. Si la preuve change (cours régénéré),
+  le brouillon est gardé et marqué **obsolète**.
+- Une preuve d'une ligne n'a pas de brouillon ; une preuve courte en a un bref.
+- Le réglage `gen/auto_brouillon` (Préférences > Génération, ou l'Assistant ;
+  désactivé par défaut) produit les brouillons automatiquement à la rédaction
+  d'un nouveau cours. Les cours déjà rédigés se traitent à la demande.
+
+Ne pas confondre avec *votre* brouillon de rédaction, dans l'éditeur des
+démonstrations à faire.
+
 ### Les figures
 
 Les cours utilisent `mviz`, une petite bibliotheque maison (aucune dependance) :
@@ -260,7 +318,7 @@ chaleur, curseurs et animations. Les couleurs suivent le theme clair/sombre.
 |---|---|
 | **Accueil** | Avancement global, les six parcours MVA, ce qu'on peut attaquer maintenant, ce qu'il faut reviser |
 | **Bibliotheque** | Les 142 cours, filtrables par domaine, niveau, statut et parcours, avec le score de QCM |
-| **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles |
+| **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles, TD d'entraînement |
 | **Graphe** | Le cursus comme graphe : ce qui est maitrise, ce qui est accessible, ce qui est verrouille |
 
 ### Reprendre la lecture
@@ -508,7 +566,7 @@ précédente. La bibliothèque affiche cette même raison à côté de l'état.
   en régénérer un, ajouter une série de QCM, produire des fiches ;
 - corriger un TD importé, étendre le syllabus ;
 - changer un réglage (modèles, parallélisme, seuil de maîtrise, objectif du
-  jour) ;
+  jour, fiches et brouillons automatiques) ;
 - arrêter des générations, ouvrir une page, lancer une séance ;
 - **modifier l'application**. Claude rédige un cahier des charges précis, puis
   un `claude` limité aux outils Read, Edit, Write, Glob et Grep travaille dans
@@ -656,6 +714,8 @@ library/
     exercises.json   QCM et demonstrations (serie 1)
     quizzes.json     series de QCM supplementaires
     meta.json        modele, duree, cout
+    entrainement/    TD d'entrainement (td-1.json, td-2.json…)
+    brouillons/      brouillons « comment on trouve », un fichier par demonstration
   progress.db        scores, statuts, notes, fils de discussion
 ```
 
@@ -674,6 +734,8 @@ mathsapp/
   status.py          verrouille / disponible / a etudier / en cours / maitrise
   store.py           SQLite : scores, statuts, notes, discussions
   content.py         lecture des cours generes et assemblage des pages
+  training.py        TD d'entrainement : feuilles, version du cours, rendu
+  brouillon.py       brouillons des demonstrations : cles, obsolescence, etat des pages
   chat.py            conversation en streaming
   generation/
     claude_cli.py    appels au CLI claude

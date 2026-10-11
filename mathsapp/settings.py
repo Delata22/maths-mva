@@ -14,6 +14,7 @@ DEFAULTS = {
     "gen/concurrency": 1,
     "gen/section_parallel": 3,
     "gen/auto_sheet": True,
+    "gen/auto_brouillon": False,   # brouillons des demonstrations a la redaction d'un cours
     "gen/max_sections": 9,
     "ui/mastery_threshold": 80,
     "goal/bricks": 1,
@@ -40,6 +41,11 @@ def get(key: str):
     s = settings()
     default = DEFAULTS.get(key)
     value = s.value(key, default)
+    if isinstance(default, bool):
+        # QSettings relit « true » / « false » en texte au lancement suivant
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "oui", "vrai")
+        return bool(value)
     if isinstance(default, int) and not isinstance(value, int):
         try:
             value = int(value)

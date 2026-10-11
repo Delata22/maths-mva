@@ -131,6 +131,16 @@ CREATE TABLE IF NOT EXISTS quiz_progress (
     updated_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_quiz_progress_course ON quiz_progress(course_id);
+
+-- TD d'entrainement : suivi de chaque exercice (ok, partial, review).
+CREATE TABLE IF NOT EXISTS training_state (
+    course_id   TEXT NOT NULL,
+    td_id       TEXT NOT NULL,
+    exercise_id TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    updated_at  REAL NOT NULL,
+    PRIMARY KEY (course_id, td_id, exercise_id)
+);
 """
 
 
@@ -492,6 +502,41 @@ def proof_statuses(course_id: str) -> Dict[str, str]:
         "SELECT proof_id, status FROM proof_state WHERE course_id=?", (course_id,)
     )
     return {r["proof_id"]: r["status"] for r in rows}
+
+
+# ------------------------------------------------------- TD d'entrainement
+TRAINING_STATUSES = ("ok", "partial", "review")
+
+
+def set_training_status(course_id: str, td_id: str, exercise_id: str, status: str) -> None:
+    """Réussi (ok), partiellement (partial), à revoir (review) ; vide pour effacer.
+
+    Sans effet sur la maîtrise du cours, qui reste fondée sur les QCM."""
+    c = conn()
+    if status not in TRAINING_STATUSES:
+        c.execute("DELETE FROM training_state WHERE course_id=? AND td_id=? AND exercise_id=?",
+                  (course_id, str(td_id), exercise_id))
+    else:
+        c.execute(
+            """INSERT INTO training_state (course_id, td_id, exercise_id, status, updated_at)
+               VALUES (?,?,?,?,?)
+               ON CONFLICT(course_id, td_id, exercise_id) DO UPDATE SET
+                 status=excluded.status, updated_at=excluded.updated_at""",
+            (course_id, str(td_id), exercise_id, status, time.time()))
+    c.commit()
+
+
+def training_statuses(course_id: str) -> Dict[str, str]:
+    """{"<td>/<exercice>": statut} pour un cours."""
+    rows = conn().execute(
+        "SELECT td_id, exercise_id, status FROM training_state WHERE course_id=?", (course_id,))
+    return {"%s/%s" % (r["td_id"], r["exercise_id"]): r["status"] for r in rows}
+
+
+def clear_training_status(course_id: str, td_id: str) -> None:
+    c = conn()
+    c.execute("DELETE FROM training_state WHERE course_id=? AND td_id=?", (course_id, str(td_id)))
+    c.commit()
 
 
 # ------------------------------------------------------------------- resume

@@ -16,9 +16,11 @@
   }
 
   // ------------------------------------------------------------------ KaTeX
-  function renderMath() {
+  function renderMath() { renderMathIn(document.body); }
+
+  function renderMathIn(el) {
     if (typeof renderMathInElement === 'undefined') return;
-    renderMathInElement(document.body, {
+    renderMathInElement(el, {
       delimiters: [
         { left: '$$', right: '$$', display: true },
         { left: '\\[', right: '\\]', display: true },
@@ -118,7 +120,52 @@
       });
       bar.appendChild(btn);
       d.appendChild(bar);
+      addBrouillonSwitch(d, sum);
     });
+  }
+
+  // Bascule « Preuve rédigée » / « Brouillon : comment on trouve », en haut de
+  // la preuve. La barre reste au même endroit de l'écran : on ne perd pas sa
+  // position en passant de l'un à l'autre.
+  function addBrouillonSwitch(d, sum) {
+    var key = d.getAttribute('data-brouillon');
+    if (!key || !window.Brouillon || !window.Brouillon.eligible(key)) return;
+    if (d.querySelector('.proof-switch')) return;
+    var bar = document.createElement('div');
+    bar.className = 'proof-switch';
+    var proofBtn = document.createElement('button');
+    proofBtn.type = 'button';
+    proofBtn.className = 'on';
+    proofBtn.textContent = 'Preuve rédigée';
+    var draftBtn = document.createElement('button');
+    draftBtn.type = 'button';
+    draftBtn.textContent = 'Brouillon : comment on trouve';
+    bar.appendChild(proofBtn);
+    bar.appendChild(draftBtn);
+    sum.parentNode.insertBefore(bar, sum.nextSibling);
+    var pane = null;
+
+    function show(draft) {
+      var before = bar.getBoundingClientRect().top;
+      if (draft && !pane) {
+        try {
+          pane = window.Brouillon.pane(key, bar);
+        } catch (err) {
+          if (window.console) console.error('brouillon : panneau', err);
+          return;
+        }
+      }
+      Array.prototype.forEach.call(d.children, function (c) {
+        if (c === sum || c === bar || c === pane || c.classList.contains('proof-help')) return;
+        c.style.display = draft ? 'none' : '';
+      });
+      if (pane) pane.style.display = draft ? '' : 'none';
+      proofBtn.classList.toggle('on', !draft);
+      draftBtn.classList.toggle('on', draft);
+      window.scrollBy(0, bar.getBoundingClientRect().top - before);
+    }
+    proofBtn.addEventListener('click', function (ev) { ev.preventDefault(); show(false); });
+    draftBtn.addEventListener('click', function (ev) { ev.preventDefault(); show(true); });
   }
 
   function nearestHeading(node) {
@@ -424,6 +471,7 @@
     wrapTables();
     buildToc();
     renderMath();
+    if (window.Brouillon) window.Brouillon.typeset = renderMathIn;
     decorateProofs();
     setupMasks();
     setupCourseRefs();

@@ -140,6 +140,7 @@
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="__ASSETS__/vendor/katex/katex.min.js"></script>
 <script src="__ASSETS__/vendor/katex/contrib/auto-render.min.js"></script>
+<script src="__ASSETS__/brouillon.js"></script>
 </head>
 <body>
 <div id="split"><div id="list"></div><div id="pane"><div id="empty">Choisissez une démonstration.</div></div></div>
@@ -488,9 +489,15 @@ function open(i) {
     + '\\rank \\tr \\Id \\argmin</code>.'
     + '</div></div>';
 
-  h += '<div class="sect"><h4>Solution rédigée</h4>'
-    + '<div class="row"><button class="btn" id="sol">Afficher la solution</button></div>'
-    + '<div id="solution" style="margin-top:14px"></div></div>';
+  var bkey = 'd-' + String(p.id || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  var withDraft = window.Brouillon && window.Brouillon.eligible(bkey);
+  h += '<div class="sect"><h4 id="solhead">Solution rédigée</h4>'
+    + '<div class="row"><button class="btn" id="sol">Afficher la solution</button>'
+    + (withDraft ? '<button class="btn" id="brouillon" title="Comment on trouve cette preuve, '
+       + 'pas seulement comment on la rédige">Brouillon : comment on trouve</button>' : '')
+    + '</div>'
+    + '<div id="solution" style="margin-top:14px"></div>'
+    + '<div id="brouillonbox" style="margin-top:14px"></div></div>';
 
   h += '</div>';
 
@@ -532,12 +539,39 @@ function open(i) {
     this.textContent = 'Masquer les étapes';
   });
 
-  document.getElementById('sol').addEventListener('click', function () {
+  // Solution rédigée et brouillon s'affichent l'un ou l'autre ; le titre de la
+  // section reste au même endroit de l'écran quand on bascule.
+  function keepPlace(change) {
+    var head = document.getElementById('solhead');
+    var before = head.getBoundingClientRect().top;
+    change();
+    pane.scrollTop += head.getBoundingClientRect().top - before;
+  }
+  var solBtn = document.getElementById('sol');
+  var draftBtn = document.getElementById('brouillon');
+  var draftBox = document.getElementById('brouillonbox');
+  function hideDraft() {
+    draftBox.innerHTML = '';
+    if (draftBtn) draftBtn.classList.remove('primary');
+  }
+  solBtn.addEventListener('click', function () {
     var box = document.getElementById('solution');
-    if (box.innerHTML) { box.innerHTML = ''; this.textContent = 'Afficher la solution'; return; }
-    box.innerHTML = p.solution;
-    typeset(box);
-    this.textContent = 'Masquer la solution';
+    keepPlace(function () {
+      if (box.innerHTML) { box.innerHTML = ''; solBtn.textContent = 'Afficher la solution'; return; }
+      hideDraft();
+      box.innerHTML = p.solution;
+      typeset(box);
+      solBtn.textContent = 'Masquer la solution';
+    });
+  });
+  if (draftBtn) draftBtn.addEventListener('click', function () {
+    keepPlace(function () {
+      if (draftBox.innerHTML) { hideDraft(); return; }
+      document.getElementById('solution').innerHTML = '';
+      solBtn.textContent = 'Afficher la solution';
+      window.Brouillon.pane(bkey, null, draftBox);
+      draftBtn.classList.add('primary');
+    });
   });
 
   // ------------------------------------------------------- redaction
@@ -657,6 +691,7 @@ function open(i) {
 }
 
 window.setTheme = function (t) { document.documentElement.setAttribute('data-theme', t); };
+if (window.Brouillon) window.Brouillon.typeset = typeset;
 renderList();
 if (DATA.proofs.length) open(0);
 </script>

@@ -37,6 +37,9 @@ class Bridge(QObject):
     reading_position_changed = Signal(str)        # position de lecture, JSON
     quiz_progress_saved = Signal(str)             # tentative de QCM en cours, JSON
     quiz_progress_cleared = Signal(str)           # serie dont la tentative est effacee
+    training_status_changed = Signal(str, str)    # TD d'entrainement : "td/exercice", statut
+    training_action_requested = Signal(str, str)  # "regenerate" | "delete", numero du TD
+    brouillon_requested = Signal(str)             # cle de la demonstration a (re)generer
 
     @Slot(str, str)
     def askAbout(self, text: str, heading: str) -> None:  # noqa: N802 (appele par JS)
@@ -93,6 +96,18 @@ class Bridge(QObject):
     @Slot(str, str)
     def reviewProof(self, proof_id: str, payload: str) -> None:  # noqa: N802
         self.proof_review_requested.emit(proof_id, payload)
+
+    @Slot(str, str)
+    def setTrainingStatus(self, key: str, value: str) -> None:  # noqa: N802
+        self.training_status_changed.emit(key, value)
+
+    @Slot(str, str)
+    def trainingAction(self, action: str, td_id: str) -> None:  # noqa: N802
+        self.training_action_requested.emit(action, td_id)
+
+    @Slot(str)
+    def generateBrouillon(self, key: str) -> None:  # noqa: N802
+        self.brouillon_requested.emit(key)
 
 
 class _Interceptor(QWebEngineUrlRequestInterceptor):

@@ -175,10 +175,31 @@ class Syllabus:
         g = self.track_groups.get(group_id)
         return g.name if g else group_id
 
+    def _ordered(self, ids: List[str]) -> List[str]:
+        """Liste choisie à la main (parcours express) : on garde son ordre, en
+        faisant seulement passer avant un cours les prérequis, directs ou non,
+        qui figurent aussi dans la liste. Les prérequis absents restent absents."""
+        remaining = list(dict.fromkeys(ids))
+        inside = set(remaining)
+        needs = {cid: set(self.ancestors(cid)) & inside for cid in remaining}
+        placed: List[str] = []
+        done: set = set()
+        while remaining:
+            for cid in remaining:
+                if needs[cid] <= done:
+                    placed.append(cid)
+                    done.add(cid)
+                    remaining.remove(cid)
+                    break
+            else:               # impossible : le graphe est acyclique
+                placed.extend(remaining)
+                break
+        return placed
+
     def track_path(self, track_id: str) -> List[str]:
         track = self.tracks[track_id]
         if track.courses:
-            return list(track.courses)
+            return self._ordered(track.courses)
         targets = [track.goal] + track.extra
         seen: List[str] = []
         for t in targets:

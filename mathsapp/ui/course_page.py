@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, status as st_mod, store, videos
+from .. import content, gamify, settings, status as st_mod, store, videos
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
 from . import theme
@@ -19,6 +19,7 @@ from .webview import WebView
 from .widgets import FlowLayout
 
 TAB_COURSE, TAB_SHEET, TAB_QUIZ, TAB_PROOFS, TAB_NOTES, TAB_EXERCISES, TAB_VIDEOS = range(7)
+TAB_TRAINING = 7      # TD d'entrainement (a ne pas confondre avec les TD importes)
 
 
 def _page_path(name: str):
@@ -181,6 +182,8 @@ class CoursePage(QWidget):
     sheet_export_requested = Signal(str)
     progress_made = Signal()
     cancel_requested = Signal(str)
+    training_requested = Signal(str, int)              # course_id, TD a regenerer (0 : nouveau)
+    brouillon_requested = Signal(str, str)             # course_id, cle ("*" : tout le cours)
 
     def __init__(self, syllabus: Syllabus, parent=None):
         super().__init__(parent)
@@ -254,6 +257,7 @@ class CoursePage(QWidget):
         self.course_view.bridge.course_open_requested.connect(self.open_course.emit)
         self.course_view.bridge.course_section_requested.connect(self.open_course_at.emit)
         self.course_view.bridge.exercise_requested.connect(self.show_exercise)
+        self.course_view.bridge.brouillon_requested.connect(self._on_brouillon_request)
 
         # cours importe : exercices du document et leurs corrections
         self.exercises_view = WebView(with_bridge=True)
@@ -284,6 +288,7 @@ class CoursePage(QWidget):
         self.proofs_view.bridge.proof_review_requested.connect(self._on_proof_review)
         self.proofs_view.bridge.proof_help_requested.connect(self._forward_proof_help)
         self.proofs_view.bridge.ask_requested.connect(self._forward_ask)
+        self.proofs_view.bridge.brouillon_requested.connect(self._on_brouillon_request)
 
         self.notes = QPlainTextEdit()
         self.notes.setPlaceholderText(
@@ -353,6 +358,40 @@ class CoursePage(QWidget):
         self.videos_view = WebView()
         self.tabs.addTab(self.videos_view, "Vidéos")
         self.tabs.setTabVisible(TAB_VIDEOS, False)
+
+        # ------------------------------------------- TD d'entrainement
+        self._course_busy = False
+        self._training_job = None          # (libelle, avancement) du TD en production
+        self.training_holder = QWidget()
+        th = QVBoxLayout(self.training_holder)
+        th.setContentsMargins(0, 0, 0, 0)
+        th.setSpacing(0)
+        training_bar = QWidget()
+        training_bar.setObjectName("TopBar")
+        tb = QHBoxLayout(training_bar)
+        tb.setContentsMargins(14, 7, 14, 7)
+        tb.setSpacing(8)
+        self.training_info = QLabel()
+        self.training_info.setObjectName("Muted")
+        self.training_info.setWordWrap(True)
+        tb.addWidget(self.training_info, 1)
+        self.btn_training = QPushButton("Générer un TD")
+        self.btn_training.setProperty("primary", True)
+        self.btn_training.clicked.connect(
+            lambda: self.training_requested.emit(self.course.id, 0) if self.course else None)
+        tb.addWidget(self.btn_training)
+        th.addWidget(training_bar)
+        self.training_view = WebView(with_bridge=True)
+        self.training_view.bridge.ask_requested.connect(self._forward_ask)
+        self.training_view.bridge.course_open_requested.connect(self.open_course.emit)
+        self.training_view.bridge.course_section_requested.connect(self.open_course_at.emit)
+        self.training_view.bridge.training_status_changed.connect(self._on_training_status)
+        self.training_view.bridge.training_action_requested.connect(self._on_training_action)
+        th.addWidget(self.training_view, 1)
+        self.tabs.addTab(self.training_holder, "TD d'entraînement")
+        self.tabs.setTabToolTip(
+            TAB_TRAINING, "Feuilles d'exercices de rédaction générées à la demande pour ce "
+                          "cours (distinctes des TD importés).")
 
     def set_syllabus(self, syl: Syllabus) -> None:
         self.syl = syl
@@ -511,6 +550,7 @@ class CoursePage(QWidget):
         if not readable:
             self.empty.set_course(self.syl, self.course, self.status)
         self._sync_generate_button()
+        self._sync_training_bar()
         self._on_tab(self.tabs.currentIndex())
 
     def _build_chips(self) -> None:
@@ -594,6 +634,135 @@ class CoursePage(QWidget):
             path.write_text(build_page(self._videos), encoding="utf-8")
             self.videos_view.load_file(path)
             self._loaded_tabs.add(index)
+        elif index == TAB_TRAINING:
+            self._load_training()
+            self._loaded_tabs.add(index)
+
+    # ------------------------------------------------------- TD d'entrainement
+    def _load_training(self) -> None:
+        from .. import training
+        cid = self.course.id
+        body = training.page_body(cid, store.training_statuses(cid))
+        path = _page_path("entrainement_%s.html" % cid)
+        path.write_text(content.build_page(body, "TD d'entraînement — %s" % self.course.title,
+                                           theme.name(), training.PAGE_CSS), encoding="utf-8")
+        self.training_view.load_file(path)
+
+    def reload_training(self) -> None:
+        """Après la production ou la suppression d'une feuille."""
+        self._loaded_tabs.discard(TAB_TRAINING)
+        self._sync_training_bar()
+        if self.tabs.currentIndex() == TAB_TRAINING:
+            self._on_tab(TAB_TRAINING)
+
+    def set_training_state(self, course_busy: bool, job=None) -> None:
+        """État vu de la file : cours en (re)génération, feuille en production."""
+        self._course_busy = course_busy
+        self._training_job = (job.label, job.progress) if job is not None else None
+        self._sync_training_bar()
+
+    def _sync_training_bar(self) -> None:
+        if self.course is None or self.status is None:
+            return
+        from .. import training
+        count = len(training.list_tds(self.course.id))
+        self.tabs.setTabText(TAB_TRAINING, "TD d'entraînement (%d)" % count if count
+                             else "TD d'entraînement")
+        self.btn_training.setText("Générer un autre TD" if count else "Générer un TD")
+        seconds, cost = training.estimate()
+        if self._training_job is not None:
+            label, frac = self._training_job
+            self.btn_training.setEnabled(False)
+            self.training_info.setText("Production en cours : %s — %d %%"
+                                       % (label.split(" · ")[0], int(frac * 100)))
+        elif self._course_busy:
+            self.btn_training.setEnabled(False)
+            self.training_info.setText("Le cours est en cours de génération : le TD "
+                                       "sera disponible une fois la rédaction terminée.")
+        elif not self.status.complete:
+            self.btn_training.setEnabled(False)
+            self.training_info.setText("Un TD s'écrit à partir du cours rédigé : générez "
+                                       "d'abord le cours.")
+        else:
+            self.btn_training.setEnabled(True)
+            self.training_info.setText(
+                "5 à 8 exercices de rédaction, avec indices et corrigés. Rien n'est produit "
+                "sans clic. Environ %d min et %.2f $ par feuille (modèle %s)."
+                % (max(1, round(seconds / 60)), cost, settings.get("model/exercises")))
+
+    # ------------------------------------------------ brouillons des preuves
+    def _brouillon_views(self) -> list:
+        views = []
+        if TAB_COURSE in self._loaded_tabs:
+            views.append(self.course_view)
+        if TAB_PROOFS in self._loaded_tabs:
+            views.append(self.proofs_view)
+        return views
+
+    def _on_brouillon_request(self, key: str) -> None:
+        if self.course and key:
+            self.brouillon_requested.emit(self.course.id, key)
+
+    def push_brouillons(self) -> None:
+        """Brouillons produits : mis à jour dans les pages, sans rechargement
+        (on garde la position de lecture)."""
+        if self.course is None:
+            return
+        from .. import brouillon
+        state = content.protect_math_data(brouillon.state_map(self.course.id))
+        code = "".join("window.setBrouillon && window.setBrouillon(%s, %s);"
+                       % (json.dumps(k), json.dumps(v, ensure_ascii=False))
+                       for k, v in state.items())
+        for view in self._brouillon_views():
+            view.run_js(code)
+
+    def brouillon_failed(self, key: str, message: str) -> None:
+        """Échec ou annulation : message dans le panneau, et bouton Relancer."""
+        for view in self._brouillon_views():
+            view.run_js("window.brouillonFailed && window.brouillonFailed(%s, %s);"
+                        % (json.dumps(key or "*"), json.dumps(message)))
+
+    def set_brouillon_jobs(self, keys: List[str]) -> None:
+        """Brouillons en production dans la file (pages rechargées entre-temps)."""
+        if not keys:
+            return
+        code = "".join("window.brouillonPending && window.brouillonPending(%s);" % json.dumps(k)
+                       for k in keys)
+        for view in self._brouillon_views():
+            view.run_js(code)
+
+    def _on_training_status(self, key: str, value: str) -> None:
+        if not self.course:
+            return
+        td_id, _, exercise_id = key.partition("/")
+        if td_id and exercise_id:
+            store.set_training_status(self.course.id, td_id, exercise_id, value)
+
+    def _on_training_action(self, action: str, td_id: str) -> None:
+        from PySide6.QtWidgets import QMessageBox
+        from .. import training
+        if not self.course or not td_id.isdigit():
+            return
+        cid, n = self.course.id, int(td_id)
+        if action == "delete":
+            answer = QMessageBox.question(
+                self, "Supprimer le TD",
+                "Supprimer le TD %d d'entraînement et son suivi ?" % n,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if answer == QMessageBox.StandardButton.Yes:
+                training.delete(cid, n)
+                self.reload_training()
+        elif action == "regenerate":
+            if not self.btn_training.isEnabled():
+                return
+            answer = QMessageBox.question(
+                self, "Régénérer le TD",
+                "Remplacer le TD %d par une nouvelle feuille ?\n\nLe suivi de ses "
+                "exercices sera effacé. L'ancienne feuille reste en place jusqu'à ce "
+                "que la nouvelle soit complète." % n,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if answer == QMessageBox.StandardButton.Yes:
+                self.training_requested.emit(cid, n)
 
     def _load_quiz(self) -> None:
         sets = content.quiz_sets(self.course.id)
@@ -619,6 +788,8 @@ class CoursePage(QWidget):
                    .replace("__DATA__", json.dumps(content.protect_math_data(data), ensure_ascii=False))
                    .replace("__STATUS__", json.dumps(statuses, ensure_ascii=False))
                    .replace("__DRAFTS__", json.dumps(drafts, ensure_ascii=False)))
+        from .. import brouillon
+        page = brouillon.inject(page, self.course.id)
         path = _page_path("proofs_%s.html" % self.course.id)
         path.write_text(page, encoding="utf-8")
         self.proofs_view.load_file(path)
@@ -675,6 +846,14 @@ class CoursePage(QWidget):
             act = QAction("Régénérer le cours entier", self)
             act.triggered.connect(lambda: self.regenerate_requested.emit(cid))
             menu.addAction(act)
+        if self.status and self.status.generated:
+            from .. import brouillon
+            todo = len(brouillon.pending(cid))
+            act = QAction("Générer les brouillons de toutes les démonstrations de ce cours (%d)"
+                          % todo if todo else "Brouillons des démonstrations : tous à jour", self)
+            act.setEnabled(bool(todo))
+            act.triggered.connect(lambda: self.brouillon_requested.emit(cid, "*"))
+            menu.addAction(act)
         missing = [c for c in self.syl.path_to(cid) if not content.is_complete(c)]
         if missing:
             act = QAction("Générer tout le chemin de prérequis (%d cours)" % len(missing), self)
@@ -706,7 +885,8 @@ class CoursePage(QWidget):
             self._sync_generate_button()
 
     def apply_theme(self) -> None:
-        for view in (self.course_view, self.sheet_view, self.quiz_view, self.proofs_view):
+        for view in (self.course_view, self.sheet_view, self.quiz_view, self.proofs_view,
+                     self.training_view):
             view.set_theme(theme.name())
         if self.course:
             self._build_chips()

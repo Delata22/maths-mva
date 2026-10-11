@@ -36,6 +36,7 @@ SETTINGS_ALLOWED: Dict[str, tuple] = {
     "gen/section_parallel": ("int", 1, 6),
     "gen/max_sections": ("int", 4, 14),
     "gen/auto_sheet": ("bool",),
+    "gen/auto_brouillon": ("bool",),
     "ui/mastery_threshold": ("int", 50, 100),
     "goal/bricks": ("int", 1, 5),
     "goal/review_batch": ("int", 5, 60),

@@ -1279,6 +1279,154 @@ Sortie : le fragment HTML, rien d'autre."""
 
 
 # ---------------------------------------------------------------------------
+# TD d'entraînement : feuille d'exercices de rédaction pour un cours rédigé
+# ---------------------------------------------------------------------------
+TRAINING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "exercises": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "level": {"type": "string"},
+                    "title": {"type": "string"},
+                    "statement": {"type": "string"},
+                    "hints": {"type": "array", "items": {"type": "string"}},
+                    "solution": {"type": "string"},
+                    "section": {"type": "string"},
+                },
+                "required": ["level", "title", "statement", "hints", "solution", "section"],
+            },
+        },
+    },
+    "required": ["exercises"],
+}
+
+
+def training_prompt(syl: Syllabus, course: Course, section_titles: List[str],
+                    substance: str, seen: List[str]) -> str:
+    """Feuille de TD : 5 à 8 exercices de rédaction, indices et corrigés."""
+    later = [syl.get(d) for d in course.dependents]
+    later_txt = ", ".join(c.title for c in later if c) or "(aucun)"
+    sections = "\n".join("  - %s" % t for t in section_titles) or "  (aucune)"
+    seen_txt = "\n".join("  - %s" % t for t in seen[:40]) or "  (aucun)"
+    return f"""{STYLE}
+
+{_context(syl, course)}
+
+Vous composez une FEUILLE DE TD d'entraînement pour ce cours, déjà rédigé dans
+l'application. Ce ne sont pas des QCM : ce sont des exercices de rédaction,
+qu'on cherche sur une feuille puis qu'on rédige.
+
+SECTIONS DU COURS (titres exacts) :
+{sections}
+
+MATIÈRE DU COURS RÉDIGÉ (énoncés, définitions, notations à reprendre telles quelles) :
+{substance}
+
+EXERCICES DÉJÀ DONNÉS DANS LES FEUILLES PRÉCÉDENTES (ne pas les reprendre) :
+{seen_txt}
+
+CE QUI EST ATTENDU
+
+1. Entre 5 et 8 exercices, de difficulté croissante, chacun étiqueté par le
+   champ `level` :
+     - "application" : application directe d'une définition ou d'un théorème
+       du cours (2 exercices environ) ;
+     - "classique" : l'exercice qu'on retrouve dans tout bon recueil, qui
+       combine deux idées du cours (2 à 3 exercices) ;
+     - "approfondissement" : demande du recul, un contre-exemple, une
+       hypothèse qu'on affaiblit, ou un raisonnement en plusieurs étapes
+       (1 à 3 exercices).
+2. Cohérence : mêmes notations et même vocabulaire que le cours. Vous pouvez
+   utiliser ce cours et sa chaîne de prérequis (listés plus haut), RIEN
+   d'autre. Aucune notion des cours ultérieurs : {later_txt}.
+3. Pour chaque exercice :
+     - `title` : quelques mots qui nomment l'exercice ;
+     - `statement` : énoncé complet et autosuffisant, questions numérotées
+       si besoin (<ol>) ;
+     - `hints` : un ou deux indices progressifs, le premier donne la
+       stratégie, le second la première étape concrète ;
+     - `solution` : corrigé complet et rédigé, rigoureux, qui dit pourquoi on
+       fait chaque étape avant de la faire, et signale où sert chaque
+       hypothèse ;
+     - `section` : le titre EXACT de la section du cours concernée, pris dans
+       la liste ci-dessus (chaîne vide si aucune ne convient).
+4. Français avec TOUS les accents.
+
+Tous les champs texte sont du HTML simple (p, ol, ul, li, strong, em) avec du
+LaTeX entre $ ... $ et $$ ... $$ (KaTeX ; macros \\R \\N \\Z \\Q \\C \\E \\P \\eps
+\\norm{{}} \\abs{{}} \\scal{{}}{{}}). Pas de titres <h*>, pas de figures, pas de
+blocs ```. Répondez uniquement par l'objet JSON."""
+
+
+# ---------------------------------------------------------------------------
+# Brouillon d'une démonstration : comment on TROUVE la preuve
+# ---------------------------------------------------------------------------
+BROUILLON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "trivial": {"type": "boolean"},
+        "html": {"type": "string"},
+    },
+    "required": ["trivial", "html"],
+}
+
+
+def brouillon_prompt(syl: Syllabus, course: Course, title: str, statement: str,
+                     proof: str) -> str:
+    """Brouillon de recherche d'une preuve, cohérent avec la preuve rédigée."""
+    short_note = ("La preuve est courte : brouillon bref, quelques lignes, en gardant "
+                  "seulement les intertitres utiles." if len(proof) < 700 else "")
+    return f"""{_context(syl, course)}
+
+Vous écrivez le BROUILLON DE RECHERCHE d'une démonstration de ce cours. La
+preuve rédigée existe déjà et le lecteur l'a sous les yeux. Elle dit COMMENT on
+rédige ; vous montrez comment on la TROUVE : ce qu'on essaie, pourquoi, et d'où
+sortent les choix qui paraissent tomber du ciel (fonction auxiliaire, $\\eps/2$,
+choix de $N$ ou de $\\delta$, bonne variable, constante, borne, récurrence
+renforcée…).
+
+RÉSULTAT DÉMONTRÉ : {title}
+
+ÉNONCÉ (et contexte qui précède la preuve) :
+{statement or "(voir la preuve)"}
+
+PREUVE RÉDIGÉE (référence : mêmes notations, mêmes étapes) :
+{proof[:9000]}
+
+CE QUI EST ATTENDU, dans le champ `html`, avec ces intertitres <h4> :
+1. « Point de départ » : ce qu'on veut, ce qu'on a ; les hypothèses
+   disponibles et celle qui a l'air de devoir servir.
+2. « L'idée directrice » : l'idée de la preuve, et pourquoi elle est
+   naturelle ici (ce qui, dans l'énoncé, la suggère).
+3. « À rebours » : démarche à rebours ou par analyse-synthèse qui fait
+   apparaître le choix clé. Par exemple : on écrit l'inégalité souhaitée, on
+   voit ce qu'il faut imposer, on en déduit $N$ ou $\\delta$. Calculs de brouillon
+   assumés, avec leurs tâtonnements.
+4. « Une tentative naïve » (seulement si elle est instructive) : l'essai
+   qu'on ferait d'abord, où il échoue, ce que cet échec apprend.
+5. « Retour à la preuve rédigée » : le lien explicite avec chaque étape de la
+   preuve propre (« c'est pour cela que la preuve commence par poser… »).
+6. « L'astuce à retenir » : une seule phrase, l'astuce réutilisable ailleurs.
+
+Ton de cahier de recherche : phrases courtes, « on essaie », « ça ne marche
+pas parce que », « il faudrait que… donc on prend… ». Pas de rédaction
+formelle, pas de répétition intégrale de la preuve. Restez strictement cohérent
+avec la preuve rédigée et ses notations.
+{short_note}
+Si la preuve est immédiate (une ligne, aucun choix à expliquer), mettez
+`trivial` à true et, dans `html`, une ou deux phrases qui disent pourquoi il
+n'y a rien à chercher. Sinon `trivial` vaut false.
+
+Format de `html` : HTML simple (h4, p, ul, ol, li, strong, em), maths en LaTeX
+entre $ ... $ et $$ ... $$ (KaTeX ; macros \\R \\N \\Z \\Q \\C \\E \\P \\eps
+\\norm{{}} \\abs{{}} \\scal{{}}{{}}). Pas de blocs ```, pas de <h1>-<h3>.
+Français avec TOUS les accents. Répondez uniquement par l'objet JSON."""
+
+
+# ---------------------------------------------------------------------------
 # Rappel ciblé : cinq questions sur les notions qui coincent dans un cours
 # ---------------------------------------------------------------------------
 def refresher_prompt(syl: Syllabus, course: Course, digest: str, missed: List[dict],

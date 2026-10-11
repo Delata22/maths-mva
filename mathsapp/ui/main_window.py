@@ -285,6 +285,8 @@ class MainWindow(QMainWindow):
         self.course_page.exercises_requested.connect(self.enqueue_exercises)
         self.course_page.sheet_requested.connect(self.enqueue_sheet)
         self.course_page.quiz_set_requested.connect(self.enqueue_quiz_set)
+        self.course_page.training_requested.connect(self.enqueue_training)
+        self.course_page.brouillon_requested.connect(self.enqueue_brouillon)
         self.course_page.sheet_export_requested.connect(self.export_sheet_pdf)
         self.course_page.progress_made.connect(self._refresh_current)
         self.course_page.cancel_requested.connect(self.queue.cancel)
@@ -625,6 +627,51 @@ class MainWindow(QMainWindow):
             "Nouvelle série de questions pour « %s » — environ deux minutes"
             % self.syl.title(course_id), 8000)
 
+    def enqueue_training(self, course_id: str, replace: int = 0) -> None:
+        """TD d'entraînement : une nouvelle feuille, ou la feuille `replace` refaite."""
+        if not content.is_complete(course_id):
+            self.statusBar().showMessage(
+                "Le cours doit être entièrement rédigé avant un TD d'entraînement", 6000)
+            return
+        kind = "training:%d" % replace if replace else "training"
+        if self.queue.enqueue(course_id, self.syl.title(course_id), kind) is None:
+            self.statusBar().showMessage("Ce TD est déjà en production", 5000)
+            return
+        self._reveal_queue()
+        self.statusBar().showMessage(
+            "TD d'entraînement pour « %s » en production" % self.syl.title(course_id), 8000)
+        self._on_queue_changed()
+
+    def enqueue_brouillon(self, course_id: str, key: str) -> None:
+        """Brouillon d'une démonstration (clé), ou de toutes celles du cours (« * »)."""
+        from .. import brouillon
+        if key == "*":
+            todo = len(brouillon.pending(course_id))
+            if not todo:
+                self.statusBar().showMessage("Tous les brouillons de ce cours sont à jour", 6000)
+                self.course_page.brouillon_failed("*", "")
+                return
+            if todo > 3:
+                answer = QMessageBox.question(
+                    self, "Brouillons des démonstrations",
+                    "Produire les brouillons de %d démonstrations de « %s » ?\n\n"
+                    "Un appel au modèle %s par démonstration, plusieurs en parallèle. "
+                    "Chaque brouillon est enregistré dès qu'il est prêt."
+                    % (todo, self.syl.title(course_id), settings.get("model/exercises")),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                if answer != QMessageBox.StandardButton.Yes:
+                    self.course_page.brouillon_failed("*", "")
+                    return
+        kind = "brouillon" if key == "*" else "brouillon:%s" % key
+        if self.queue.enqueue(course_id, self.syl.title(course_id), kind) is None:
+            self.statusBar().showMessage("Ce brouillon est déjà en production", 5000)
+            return
+        self._reveal_queue()
+        self.statusBar().showMessage(
+            "Brouillon%s en production pour « %s »"
+            % ("s" if key == "*" else "", self.syl.title(course_id)), 6000)
+        self._on_queue_changed()
+
     def enqueue_td(self, td_id: str) -> None:
         """Lire un sujet de TD si besoin, puis corriger ses exercices."""
         from .. import td as td_mod
@@ -850,9 +897,19 @@ class MainWindow(QMainWindow):
             self._library_refresh.start()
         course = self.course_page.course
         if course is not None:
-            job = self.queue.job_for(course.id)
+            mine = [j for j in self.queue.jobs if j.course_id == course.id and j.active]
+            # un TD d'entrainement ou un brouillon en production n'occupe pas le
+            # bouton Générer du cours
+            job = next((j for j in mine
+                        if not j.kind.startswith(("training", "brouillon"))), None)
+            self.course_page.set_brouillon_jobs(
+                [j.kind.partition(":")[2] or "*" for j in mine
+                 if j.kind.startswith("brouillon")])
             self.course_page.set_generation_progress(
                 job is not None, job.progress if job else 0.0, job.label if job else "")
+            self.course_page.set_training_state(
+                any(j.kind in ("course", "regenerate", "exercises") for j in mine),
+                next((j for j in mine if j.kind.startswith("training")), None))
         self._update_liveness()
 
     def _on_job_done(self, course_id: str, _kind: str, ok: bool, message: str) -> None:
@@ -895,9 +952,22 @@ class MainWindow(QMainWindow):
             self.dashboard.refresh()
         elif self.stack.currentIndex() == PAGE_GRAPH:
             self.graph.rebuild()
+        if self.course_page.course and self.course_page.course.id == course_id:
+            self._on_queue_changed()
+            if _kind.startswith("brouillon"):
+                # mis a jour dans la page, sans recharger : la lecture reste en place
+                key = _kind.partition(":")[2] or "*"
+                self.course_page.push_brouillons()
+                if not ok:
+                    self.course_page.brouillon_failed(
+                        key, "génération annulée" if message == "Annulé"
+                        else (message.splitlines() or ["erreur inconnue"])[0])
+                return
         if self.course_page.course and self.course_page.course.id == course_id and ok:
             if _kind == "quiz":
                 self.course_page.reload_quiz()
+            elif _kind.startswith("training"):
+                self.course_page.reload_training()
             else:
                 self.course_page.reload_content()
 
