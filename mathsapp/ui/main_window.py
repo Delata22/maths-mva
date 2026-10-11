@@ -1234,36 +1234,72 @@ class MainWindow(QMainWindow):
             self.chat.set_action_state(aid, "failed", str(exc)[:200])
 
     def _start_code_change(self, action: dict) -> None:
-        from .. import assistant
         aid = action["id"]
-        if getattr(self, "_code_worker", None) is not None:
-            self.chat.set_action_state(aid, "", "une modification est déjà en cours")
-            return
         from ..generation import claude_cli as cc
         if cc.backend() != "claude":
             # l'edition du code s'appuie sur les outils d'edition du CLI claude
             self.chat.set_action_state(
                 aid, "failed", "réservé au moteur claude (Préférences > Génération)")
             return
+        busy = getattr(self, "_code_worker", None) is not None
         answer = QMessageBox.question(
             self, "Modifier l'application",
             "Claude va modifier le code de l'application :\n\n%s\n\n"
             "Il peut seulement lire et éditer les fichiers du projet, pas vos cours ni votre "
             "progression. L'application lance ensuite les tests. Si tout passe, le "
             "changement est enregistré dans git, et vous pouvez redémarrer ou l'annuler.\n\n"
-            "Comptez quelques minutes et de l'ordre de 1 à 5 $." % action["detail"],
+            "Comptez quelques minutes et de l'ordre de 1 à 5 $.%s" % (
+                action["detail"],
+                "\n\nUne autre modification est en cours : celle-ci attendra sa fin et "
+                "démarrera automatiquement." if busy else ""),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer != QMessageBox.StandardButton.Yes:
             self.chat.set_action_state(aid, "", "")
             return
+        if getattr(self, "_code_worker", None) is not None:
+            # ni rejet ni disparition : la carte attend la fin du chantier en cours
+            self._code_waiting = getattr(self, "_code_waiting", [])
+            if all(a["id"] != aid for a in self._code_waiting):
+                self._code_waiting.append(action)
+            self.chat.set_action_state(
+                aid, "waiting", "en attente du chantier en cours : démarrera automatiquement "
+                                "à sa fin")
+            return
+        self._launch_code_change(action)
+
+    def _launch_code_change(self, action: dict) -> None:
+        from .. import assistant
+        aid = action["id"]
         worker = assistant.CodeChangeWorker(action["request"], self, title=action["detail"])
         self._code_worker = worker
         self.chat.set_action_state(aid, "running", "en cours…")
         self.chat.work_begin("Modification : %s" % action["detail"])
         worker.activity.connect(self.chat.work_line)
         worker.done.connect(lambda result, a=aid: self._on_code_change_done(a, result))
-        worker.finished.connect(lambda: setattr(self, "_code_worker", None))
+        worker.finished.connect(self._on_code_worker_finished)
         worker.start()
+
+    def _on_code_worker_finished(self) -> None:
+        """Fin d'un chantier : la modification suivante en attente démarre seule,
+        sauf si le code garde des changements non enregistrés."""
+        from .. import assistant
+        self._code_worker = None
+        waiting = getattr(self, "_code_waiting", [])
+        if not waiting:
+            return
+        try:
+            tracked, _untracked = assistant.git_status()
+        except Exception:  # noqa: BLE001
+            tracked = []
+        if tracked:
+            for action in waiting:
+                self.chat.set_action_state(
+                    action["id"], "",
+                    "pas lancée : le chantier précédent a laissé des modifications non "
+                    "enregistrées. Retirez-les ou gardez-les, puis cliquez pour lancer.")
+            self._code_waiting = []
+            return
+        self._launch_code_change(waiting.pop(0))
 
     def _on_code_change_done(self, aid: str, result: dict) -> None:
         import html as html_mod

@@ -548,6 +548,21 @@ rédaction, leur score et leurs prérequis, les parcours, les TD, la file de
 génération et les réglages. Il répond brièvement et propose des **cartes
 d'action**. Rien ne part sans un clic sur la carte.
 
+Les cartes sont enregistrées avec leur message dans `progress.db` (table
+`chat_action`), avec l'état de chacune : proposée, validée, en attente, en
+cours, faite, échec, ignorée. Elles sont reconstruites à chaque affichage de la
+conversation : après la fin d'une modification de l'application, en revenant à
+l'Assistant depuis un autre fil, après un rechargement de la page ou un
+redémarrage, et quelle que soit la longueur de la conversation. Une carte non
+validée reste cliquable tant qu'on ne l'a pas **ignorée** (bouton *Ignorer*) ;
+une carte faite, en cours ou en attente ne peut pas être relancée. Une carte
+dont le cours ou le TD n'existe plus est grisée, avec la raison. Une
+modification de l'application demandée pendant qu'une autre tourne passe
+**en attente du chantier en cours** et démarre seule à sa fin (sauf si le code
+garde des changements non enregistrés : la carte redevient alors cliquable,
+avec l'explication). Une carte en cours ou en attente lors d'une fermeture de
+l'application redevient cliquable au redémarrage.
+
 L'état est reconstruit à chaque envoi. De plus, la file de génération à jour
 est jointe au début de chaque message : dans une conversation reprise, Claude
 ne se fie donc pas à une file périmée. Pour chaque travail de la file, cet état

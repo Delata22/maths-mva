@@ -32,6 +32,7 @@ class Bridge(QObject):
     quiz_set_requested = Signal()                 # nouvelle serie de QCM
     course_open_requested = Signal(str)           # identifiant de cours
     action_requested = Signal(str)                # assistant : identifiant d'action
+    action_ignored = Signal(str)                  # assistant : carte ignorée
     course_section_requested = Signal(str, str)   # cours, titre de section
     exercise_requested = Signal(str)              # cours importe : numero d'exercice
     reading_position_changed = Signal(str)        # position de lecture, JSON
@@ -84,6 +85,10 @@ class Bridge(QObject):
     @Slot(str)
     def runAction(self, action_id: str) -> None:  # noqa: N802
         self.action_requested.emit(action_id)
+
+    @Slot(str)
+    def ignoreAction(self, action_id: str) -> None:  # noqa: N802
+        self.action_ignored.emit(action_id)
 
     @Slot(str, str)
     def setProofStatus(self, proof_id: str, value: str) -> None:  # noqa: N802

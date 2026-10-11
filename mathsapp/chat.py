@@ -117,11 +117,19 @@ class ChatSession:
             store.set_thread_title(self.thread_id, " ".join(text.split())[:120])
         store.add_message(self.thread_id, "user", text)
 
-    def record_assistant(self, text: str, session_id: str) -> None:
-        store.add_message(self.thread_id, "assistant", text)
+    def record_assistant(self, text: str, session_id: str, actions=()) -> int:
+        """Enregistre la réponse et ses cartes d'action (état « proposée »)."""
+        message_id = store.add_message(self.thread_id, "assistant", text)
+        if actions:
+            store.add_chat_actions(self.thread_id, message_id, list(actions))
         if session_id:
             self.session_id = session_id
             store.set_thread_session(self.thread_id, session_id)
+        return message_id
+
+    def actions(self):
+        """Cartes d'action du fil, par identifiant de message."""
+        return store.chat_actions(self.thread_id)
 
     def reset(self) -> None:
         store.clear_thread(self.thread_id)

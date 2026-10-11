@@ -109,6 +109,21 @@ CREATE TABLE IF NOT EXISTS chat_message (
 );
 CREATE INDEX IF NOT EXISTS idx_msg_thread ON chat_message(thread_id);
 
+-- Assistant : cartes d'action proposees avec un message, et leur etat
+-- (proposed, validated, waiting, running, done, failed, ignored). Les cartes
+-- sont reconstruites depuis cette table a chaque rendu de la conversation.
+CREATE TABLE IF NOT EXISTS chat_action (
+    id         TEXT PRIMARY KEY,
+    thread_id  INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    position   INTEGER NOT NULL DEFAULT 0,
+    data       TEXT NOT NULL,
+    state      TEXT NOT NULL DEFAULT 'proposed',
+    note       TEXT NOT NULL DEFAULT '',
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_action_thread ON chat_action(thread_id);
+
 -- Position de lecture : une par cours. Section (ancre et titre) et decalage
 -- relatif dans la section, plutot qu'un defilement en pixels qui varie avec la
 -- largeur de la fenetre, le rendu des formules ou le zoom.
@@ -646,12 +661,54 @@ def set_thread_session(thread_id: int, session_id: str) -> None:
     c.commit()
 
 
-def add_message(thread_id: int, role: str, content: str) -> None:
+def add_message(thread_id: int, role: str, content: str) -> int:
     c = conn()
-    c.execute("INSERT INTO chat_message (thread_id, role, content, created_at) VALUES (?,?,?,?)",
-              (thread_id, role, content, time.time()))
+    cur = c.execute("INSERT INTO chat_message (thread_id, role, content, created_at) VALUES (?,?,?,?)",
+                    (thread_id, role, content, time.time()))
     c.execute("UPDATE chat_thread SET updated_at=? WHERE id=?", (time.time(), thread_id))
     c.commit()
+    return int(cur.lastrowid)
+
+
+def add_chat_actions(thread_id: int, message_id: int, actions: list) -> None:
+    """Enregistre les cartes d'action d'un message, toutes « proposées »."""
+    c = conn()
+    now = time.time()
+    for pos, action in enumerate(actions):
+        c.execute("INSERT OR REPLACE INTO chat_action (id, thread_id, message_id, position, "
+                  "data, state, note, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                  (action["id"], thread_id, message_id, pos,
+                   json.dumps(action, ensure_ascii=False), "proposed", "", now))
+    c.commit()
+
+
+def set_chat_action_state(action_id: str, state: str, note: str = "") -> None:
+    c = conn()
+    c.execute("UPDATE chat_action SET state=?, note=?, updated_at=? WHERE id=?",
+              (state, note, time.time(), action_id))
+    c.commit()
+
+
+def chat_action(action_id: str) -> Optional[dict]:
+    """Une carte : l'action (dict) avec son état (`state`) et sa note (`note`)."""
+    r = conn().execute("SELECT * FROM chat_action WHERE id=?", (action_id,)).fetchone()
+    if r is None:
+        return None
+    return dict(json.loads(r["data"]), state=r["state"], note=r["note"])
+
+
+def chat_actions(thread_id: int) -> Dict[int, list]:
+    """Cartes d'un fil, regroupées par message, dans l'ordre de proposition."""
+    out: Dict[int, list] = {}
+    for r in conn().execute("SELECT * FROM chat_action WHERE thread_id=? "
+                            "ORDER BY message_id, position", (thread_id,)):
+        try:
+            data = json.loads(r["data"])
+        except (TypeError, ValueError):
+            continue
+        out.setdefault(int(r["message_id"]), []).append(
+            dict(data, state=r["state"], note=r["note"]))
+    return out
 
 
 def messages(thread_id: int) -> List[sqlite3.Row]:
@@ -662,6 +719,7 @@ def messages(thread_id: int) -> List[sqlite3.Row]:
 def clear_thread(thread_id: int) -> None:
     c = conn()
     c.execute("DELETE FROM chat_message WHERE thread_id=?", (thread_id,))
+    c.execute("DELETE FROM chat_action WHERE thread_id=?", (thread_id,))
     c.execute("UPDATE chat_thread SET session_id=NULL WHERE id=?", (thread_id,))
     c.commit()
 
@@ -685,6 +743,7 @@ def set_thread_title(thread_id: int, title: str) -> None:
 def delete_thread(thread_id: int) -> None:
     c = conn()
     c.execute("DELETE FROM chat_message WHERE thread_id=?", (thread_id,))
+    c.execute("DELETE FROM chat_action WHERE thread_id=?", (thread_id,))
     c.execute("DELETE FROM chat_thread WHERE id=?", (thread_id,))
     c.commit()
 

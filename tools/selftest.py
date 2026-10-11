@@ -584,6 +584,46 @@ def test_assistant() -> None:
     check("discussion ordinaire : message intact",
           ChatSession.turn_prompt(fake, "salut") == "salut")
 
+    # cartes d'action : enregistrees avec leur message, etat propre a chacune
+    from mathsapp import store
+    tid = store.create_thread(None, "selftest-actions", "test")
+    try:
+        cards = [{"id": "st-a1", "type": "open", "page": "graph", "label": "A"},
+                 {"id": "st-a2", "type": "open", "page": "course", "course": "pro-markov",
+                  "label": "B"},
+                 {"id": "st-a3", "type": "modify_app", "request": "x" * 12, "label": "C"}]
+        first_msg = store.add_message(tid, "assistant", "<p>un</p>")
+        store.add_chat_actions(tid, first_msg, cards[:2])
+        for i in range(60):   # conversation longue : les cartes anciennes restent
+            store.add_message(tid, "user" if i % 2 else "assistant", "m%d" % i)
+        last_msg = store.add_message(tid, "assistant", "<p>deux</p>")
+        store.add_chat_actions(tid, last_msg, cards[2:])
+        store.set_chat_action_state("st-a1", "done", "ouvert")
+        saved = store.chat_actions(tid)
+        check("assistant : cartes rattachees a leur message",
+              [c["id"] for c in saved.get(first_msg, [])] == ["st-a1", "st-a2"]
+              and [c["id"] for c in saved.get(last_msg, [])] == ["st-a3"], str(saved)[:200])
+        check("assistant : etat independant pour chaque carte d'un message",
+              [c["state"] for c in saved[first_msg]] == ["done", "proposed"])
+        check("assistant : carte relue avec son action",
+              (store.chat_action("st-a2") or {}).get("course") == "pro-markov")
+        check("assistant : carte faite non relancable",
+              "done" not in assistant.CARD_CLICKABLE and "ignored" not in assistant.CARD_CLICKABLE
+              and "waiting" not in assistant.CARD_CLICKABLE)
+        store.set_chat_action_state("st-a3", "running", "en cours…")
+        check("assistant : chantier interrompu par un redemarrage, carte relancable",
+              assistant.settle_card(store.chat_action("st-a3"))[0] == "failed"
+              and assistant.settle_card(store.chat_action("st-a3"), {"st-a3"})[0] == "running")
+        check("assistant : attente interrompue, carte de nouveau proposee",
+              assistant.settle_card({"id": "z", "state": "waiting"})[0] == "proposed")
+        check("assistant : cours devenu invalide explique",
+              "introuvable" in assistant.action_problem(
+                  {"type": "generate_courses", "courses": ["cours-disparu"]}, syl)
+              and assistant.action_problem(cards[1], syl) == "")
+    finally:
+        store.delete_thread(tid)
+    check("assistant : cartes effacees avec le fil", store.chat_action("st-a1") is None)
+
 
 def test_math_lt() -> None:
     """Un « < » de formule ne doit jamais etre pris pour une balise."""
@@ -1908,6 +1948,10 @@ def test_views() -> None:
     window.chat.view.bridge.runAction("t1")
     check("assistant : une action validee s'execute",
           window.stack.currentIndex() == PAGE_GRAPH)
+    window.go(PAGE_HOME)
+    window.chat.view.bridge.runAction("t1")
+    check("assistant : une carte faite ne s'execute pas deux fois",
+          window.stack.currentIndex() == PAGE_HOME)
     window.chat.set_context(None, "general")
 
     from mathsapp.ui.main_window import PAGE_QUESTIONS

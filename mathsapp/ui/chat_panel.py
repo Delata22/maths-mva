@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..content import protect_math
-from .. import assistant, content, questions, settings
+from .. import assistant, content, questions, settings, store
 from ..chat import ChatSession, ChatWorker, clean_answer
 from ..paths import ASSETS_DIR, library_dir
 from ..syllabus import Course, Syllabus
@@ -75,10 +75,14 @@ class ChatPanel(QWidget):
         self.worker: Optional[ChatWorker] = None
         self._empty_text = EMPTY_GENERAL
         self._ready = False
+        self._loaded_once = False
         self._queued_calls: list[str] = []
         self.state_provider = None          # fourni par la fenetre, pour l'assistant
         self.queue_provider = None          # idem : file de generation, a chaque message
-        self._actions: dict = {}
+        self._actions: dict = {}            # cartes affichées : id -> action et état
+        self._live: set = set()             # cartes en cours ou en attente, suivies ici
+        self._work_thread: Optional[int] = None   # fil de la modification du code en cours
+        self._work_title = ""
         self._raw = ""
         self._sent = 0
 
@@ -112,6 +116,7 @@ class ChatPanel(QWidget):
         self.view = WebView(self, with_bridge=True)
         self.view.loadFinished.connect(self._on_loaded)
         self.view.bridge.action_requested.connect(self._on_action_clicked)
+        self.view.bridge.action_ignored.connect(self._on_action_ignored)
         self.view.bridge.course_open_requested.connect(lambda cid: self.course_opened.emit(cid, ""))
         self.view.bridge.course_section_requested.connect(self.course_opened.emit)
         root.addWidget(self.view, 1)
@@ -153,6 +158,13 @@ class ChatPanel(QWidget):
 
     def _on_loaded(self, ok: bool) -> None:
         self._ready = bool(ok)
+        if not ok:
+            return
+        if self._loaded_once and self.worker is None:
+            # page rechargée : la conversation et ses cartes sont reconstruites
+            self._queued_calls.clear()
+            self.render_history()
+        self._loaded_once = True
         for code in self._queued_calls:
             self.view.run_js(code)
         self._queued_calls.clear()
@@ -184,7 +196,18 @@ class ChatPanel(QWidget):
         self.title.setText(title or (course.title if course else "Discussion générale"))
         self.title.setToolTip(self.title.text())
         self.hint.setText("modèle : %s" % settings.get("model/chat"))
+        self.render_history()
+
+    def render_history(self) -> None:
+        """Rejoue la conversation enregistrée, cartes d'action comprises : elles
+        sont reconstruites depuis leur état persistant (fin d'une modification du
+        code, rechargement de la page, redémarrage)."""
+        if self.session is None:
+            return
+        mode = self.session.mode
         self._js("window.chatReset(%s);" % json.dumps(self._empty_text))
+        self._actions = {}
+        cards = self.session.actions() if mode == "assistant" else {}
         for msg in self.session.history():
             role = msg["role"]
             body = (html_mod.escape(msg["content"]) if role == "user"
@@ -192,12 +215,18 @@ class ChatPanel(QWidget):
             if mode == "question" and role != "user":
                 body = questions.link_courses(body, self.syl)
             self._js("window.chatAdd(%s, %s);" % (json.dumps(role), json.dumps(protect_math(body))))
+            if cards.get(int(msg["id"])):
+                self._show_cards(cards[int(msg["id"])])
+        if self._work_thread is not None and self._work_thread == self.session.thread_id:
+            # une modification du code tourne encore : son journal reprend ici
+            self._js("window.chatWorkBegin(%s);" % json.dumps(self._work_title))
 
     def reset(self) -> None:
         if self.session is None:
             return
         self.stop()
         self.session.reset()
+        self._actions = {}
         self._js("window.chatReset(%s);" % json.dumps(self._empty_text))
 
     # ---------------------------------------------------------------- envoi
@@ -280,37 +309,104 @@ class ChatPanel(QWidget):
             answer = questions.link_courses(answer, self.syl)
         self._js("window.chatFinalize(%s);" % json.dumps(protect_math(answer)))
         if self.session:
-            self.session.record_assistant(answer, session_id)
+            # les cartes sont enregistrées avec le message, état « proposée »
+            self.session.record_assistant(answer, session_id, actions)
         self.show_actions(actions)
 
     # ------------------------------------------------------------ assistant
     def show_actions(self, actions: list) -> None:
-        if not actions:
-            return
-        for action in actions:
-            self._actions[action["id"]] = action
-        self._js("window.chatActions(%s);" % json.dumps(actions, ensure_ascii=False))
+        """Affiche les cartes d'un message qui vient d'arriver."""
+        self._show_cards([dict(a, state="proposed", note="") for a in actions])
 
-    def _on_action_clicked(self, action_id: str) -> None:
-        action = self._actions.get(action_id)
-        if action is not None:
-            self.action_triggered.emit(action)
+    def _show_cards(self, cards: list) -> None:
+        """Affiche des cartes enregistrées, chacune avec son propre état. Une carte
+        encore cliquable dont l'objet n'existe plus est désactivée, avec la raison."""
+        shown = []
+        for card in cards:
+            state, note = assistant.settle_card(card, self._live)
+            if (state, note) != (card.get("state"), card.get("note")):
+                store.set_chat_action_state(card["id"], state, note)
+            card = dict(card, state=state, note=note)
+            self._actions[card["id"]] = card
+            view = dict(card)
+            if state in assistant.CARD_CLICKABLE and self.syl is not None:
+                problem = assistant.action_problem(card, self.syl)
+                if problem:
+                    view.update(state="invalid", note=problem)
+            if not view["note"]:
+                view["note"] = assistant.CARD_TEXT.get(view["state"], "")
+            shown.append(view)
+        if shown:
+            self._js("window.chatActions(%s);" % json.dumps(shown, ensure_ascii=False))
 
-    def set_action_state(self, action_id: str, state: str, text: str = "") -> None:
+    def _push_state(self, action_id: str, state: str, text: str) -> None:
         self._js("window.chatActionState(%s, %s, %s);"
                  % (json.dumps(action_id), json.dumps(state), json.dumps(text)))
 
+    def _on_action_clicked(self, action_id: str) -> None:
+        card = store.chat_action(action_id) or self._actions.get(action_id)
+        if card is None:
+            return
+        state = card.get("state") or "proposed"
+        if state not in assistant.CARD_CLICKABLE:
+            # déjà validée, en cours, faite ou ignorée : jamais de double exécution
+            self._push_state(action_id, state,
+                             card.get("note") or assistant.CARD_TEXT.get(state, ""))
+            return
+        problem = assistant.action_problem(card, self.syl) if self.syl is not None else ""
+        if problem:
+            self._push_state(action_id, "invalid", problem)
+            return
+        self.set_action_state(action_id, "validated", "en cours…")
+        self.action_triggered.emit({k: v for k, v in card.items() if k not in ("state", "note")})
+
+    def _on_action_ignored(self, action_id: str) -> None:
+        card = store.chat_action(action_id) or self._actions.get(action_id)
+        if card is not None and (card.get("state") or "proposed") in assistant.CARD_CLICKABLE:
+            self.set_action_state(action_id, "ignored", "ignorée")
+
+    def set_action_state(self, action_id: str, state: str, text: str = "") -> None:
+        """Change l'état d'une carte et l'enregistre ("" : de nouveau proposée).
+        L'état est persistant même si la conversation affichée est une autre."""
+        state = state or "proposed"
+        store.set_chat_action_state(action_id, state, text)
+        if state in assistant.CARD_LIVE:
+            self._live.add(action_id)
+        else:
+            self._live.discard(action_id)
+        if action_id in self._actions:
+            self._actions[action_id].update(state=state, note=text)
+        self._push_state(action_id, state, text or assistant.CARD_TEXT.get(state, ""))
+
+    def _on_work_thread(self) -> bool:
+        return (self.session is not None and self._work_thread is not None
+                and self.session.thread_id == self._work_thread)
+
     def work_begin(self, title: str) -> None:
+        self._work_thread = self.session.thread_id if self.session else None
+        self._work_title = title
         self._js("window.chatWorkBegin(%s);" % json.dumps(title))
 
     def work_line(self, line: str) -> None:
-        self._js("window.chatWorkLine(%s);" % json.dumps(line))
+        if self._on_work_thread():
+            self._js("window.chatWorkLine(%s);" % json.dumps(line))
 
     def work_end(self, html: str, actions: Optional[list] = None) -> None:
-        self._js("window.chatWorkEnd(%s);" % json.dumps(protect_math(html)))
-        if self.session:
-            self.session.record_assistant(html, "")
-        self.show_actions(actions or [])
+        """Fin d'une modification du code : le compte rendu et ses cartes vont dans
+        le fil de l'assistant, même si une autre conversation est affichée."""
+        actions = actions or []
+        thread = self._work_thread
+        if thread is None and self.session is not None:
+            thread = self.session.thread_id
+        visible = self.session is not None and self.session.thread_id == thread
+        self._work_thread, self._work_title = None, ""
+        if thread is not None:
+            message_id = store.add_message(thread, "assistant", html)
+            if actions:
+                store.add_chat_actions(thread, message_id, actions)
+        if visible:
+            self._js("window.chatWorkEnd(%s);" % json.dumps(protect_math(html)))
+            self.show_actions(actions)
 
     def _on_failed(self, message: str) -> None:
         self._js("window.chatError(%s);" % json.dumps(html_mod.escape(message)))

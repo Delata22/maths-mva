@@ -395,6 +395,48 @@ def parse_actions(text: str, syl: Syllabus) -> Tuple[str, List[dict]]:
     return visible, actions
 
 
+# ------------------------------------------------------- état des cartes
+# Une carte est enregistrée avec son message (store.chat_action) et passe par :
+# proposed -> validated (clic) -> running / waiting -> done | failed ; ou ignored.
+CARD_CLICKABLE = ("proposed", "failed")
+CARD_LIVE = ("validated", "running", "waiting")
+CARD_TEXT = {"running": "en cours…", "validated": "en cours…",
+             "waiting": "en attente du chantier en cours", "done": "fait",
+             "failed": "échec", "ignored": "ignorée"}
+
+
+def action_problem(action: dict, syl: Syllabus) -> str:
+    """Pourquoi une carte enregistrée ne peut plus s'exécuter ('' si elle le peut)."""
+    kind = action.get("type")
+    refs = list(action.get("courses") or [])
+    if action.get("course"):
+        refs.append(action["course"])
+    missing = [str(cid) for cid in refs if cid not in syl.courses]
+    if missing:
+        return "cours introuvable%s dans le syllabus : %s" % (
+            "s" if len(missing) > 1 else "", ", ".join(missing))
+    if kind in ("regenerate_course", "new_quiz_set") and not content.has_course(action["course"]):
+        return "le cours « %s » n'est plus rédigé" % syl.title(action["course"])
+    if kind == "correct_td" and action.get("td") not in td_mod.list_ids():
+        return "TD introuvable : %s" % action.get("td")
+    if kind == "set_setting" and action.get("key") not in SETTINGS_ALLOWED:
+        return "ce réglage n'est plus modifiable par l'assistant"
+    return ""
+
+
+def settle_card(card: dict, live=()) -> Tuple[str, str]:
+    """État d'une carte enregistrée au moment de l'afficher. Une carte « en cours »
+    ou « en attente » que cette session de l'application ne suit pas (redémarrage)
+    est rendue de nouveau cliquable, avec une explication."""
+    state = card.get("state") or "proposed"
+    note = card.get("note") or ""
+    if state in CARD_LIVE and card.get("id") not in live:
+        if state == "waiting":
+            return "proposed", "attente interrompue par un redémarrage : cliquez pour lancer"
+        return "failed", "interrompue avant la fin (redémarrage) : vous pouvez relancer"
+    return state, note
+
+
 # -------------------------------------------------------------- git
 def _git(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=str(PROJECT_ROOT), capture_output=True,

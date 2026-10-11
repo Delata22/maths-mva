@@ -63,6 +63,13 @@
   .action.done .s { color: #0f9d76; }
   .action.failed { border-left-color: #dc2626; }
   .action.failed .s { color: #dc2626; }
+  .action.waiting { border-left-color: #d97706; }
+  .action.waiting .s { color: #d97706; }
+  .action.ignored, .action.invalid { opacity: .65; border-left-color: var(--line); }
+  .action.invalid .s { color: #b45309; }
+  .action button.ignore {
+    background: transparent; border-color: transparent; color: var(--muted); padding: 4px 6px;
+  }
   .work {
     font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 11.5px;
     color: var(--muted); white-space: pre-wrap; max-height: 240px; overflow: auto;
@@ -216,28 +223,45 @@ window.chatActions = function (list) {
     row.className = 'row';
     var b = document.createElement('button');
     b.textContent = a.button || (a.costly ? 'Lancer' : 'Faire');
-    if (a.secondary) b.className = 'secondary';
     b.onclick = function () {
       if (!bridge) return;
       window.chatActionState(a.id, 'running', 'en cours…');
       bridge.runAction(a.id);
     };
+    b.className = (a.secondary ? 'secondary ' : '') + 'go';
+    var ig = document.createElement('button');
+    ig.className = 'ignore';
+    ig.textContent = 'Ignorer';
+    ig.title = 'Écarter cette proposition';
+    ig.onclick = function () {
+      if (bridge && bridge.ignoreAction) bridge.ignoreAction(a.id);
+    };
     var s = document.createElement('span');
     s.className = 's';
-    row.appendChild(b); row.appendChild(s);
+    row.appendChild(b); row.appendChild(ig); row.appendChild(s);
     card.appendChild(row);
     wrap.appendChild(card);
   });
   log.appendChild(wrap);
+  // chaque carte a son propre etat (rendu depuis l'historique enregistre)
+  list.forEach(function (a) {
+    window.chatActionState(a.id, a.state || '', a.note || '');
+  });
   toBottom(true);
 };
+// etats : proposed (ou vide), validated, running, waiting, done, failed,
+// ignored, invalid. Seules proposed et failed laissent le bouton actif.
+var STATES = ['done', 'failed', 'running', 'validated', 'waiting', 'ignored', 'invalid'];
 window.chatActionState = function (id, state, text) {
   var card = document.getElementById('action-' + id);
   if (!card) return;
-  card.classList.remove('done', 'failed', 'running');
-  if (state) card.classList.add(state);
+  STATES.forEach(function (c) { card.classList.remove(c); });
+  if (state === 'validated') state = 'running';
+  if (state && state !== 'proposed') card.classList.add(state);
   card.querySelector('.s').textContent = text || '';
-  card.querySelector('button').disabled = (state === 'done' || state === 'running');
+  var open = (!state || state === 'proposed' || state === 'failed');
+  card.querySelector('button.go').disabled = !open;
+  card.querySelector('button.ignore').style.display = open ? '' : 'none';
 };
 var work = null;
 window.chatWorkBegin = function (title) {
