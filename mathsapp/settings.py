@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSettings
 
-ORG = "maths-mva"
-APP = "MathsMVA"
+ORG = "fastlearning"
+APP = "FastLearning"
 
 DEFAULTS = {
     "model/course": "opus",

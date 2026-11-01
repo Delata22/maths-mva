@@ -86,23 +86,23 @@ class CurriculumTest(unittest.TestCase):
             (lib / "dl-cnn").mkdir()
             from mathsapp import curriculum, syllabus
             curriculum.reload()
-            self.assertEqual(curriculum.active_ids(), ["maths", "ml-mva"])
+            self.assertEqual(curriculum.active_ids(), ["maths", "ml"])
             syl = syllabus.load()
             self.assertEqual(len(syl.courses), 262)
-            # les remises à niveau du socle passent dans « Les cours de la rentrée »
-            self.assertEqual(syl.tracks["maths-proba"].group, "rentree")
+            # les remises à niveau du socle passent dans « Les bases » du pack ML
+            self.assertEqual(syl.tracks["maths-proba"].group, "ml-bases")
             self.assertIn("Remise à niveau", syl.tracks["maths-proba"].title)
 
     def test_disabling_a_pack_keeps_syllabus_consistent(self):
         with _Lib() as lib:
             from mathsapp import curriculum, syllabus, syllabus_extra
-            curriculum.set_active(["ml-mva"])
+            curriculum.set_active(["ml"])
             # un ajout perso qui dépend d'un cours de ML
             syllabus_extra.write_extra({"domains": [], "courses": [{
                 "id": "perso-x", "title": "X", "domain": "dl", "level": 3,
                 "prereqs": ["dl-cnn", "al-svd"], "summary": "", "objectives": [],
                 "keywords": []}], "tracks": [{"id": "t", "title": "T", "goal": "perso-x",
-                                              "extra": ["dl-cnn"], "group": "mva"}]})
+                                              "extra": ["dl-cnn"], "group": "ml-avance"}]})
             syllabus.load.cache_clear()
             self.assertIn("dl-cnn", syllabus.load().courses)
             curriculum.set_active([])
@@ -154,7 +154,7 @@ class CurriculumTest(unittest.TestCase):
             text = prompts.style(syl, syl.get("mq-schrodinger"))
             self.assertIn("Discipline : physique", text)
             self.assertIn("Vérifier les unités.", text)
-            self.assertNotIn("MVA", text)
+            self.assertNotIn("apprentissage automatique", text)
 
             # export puis import : un nouvel identifiant, rien d'écrasé
             out = lib / "partage.json"
@@ -170,7 +170,7 @@ class CurriculumTest(unittest.TestCase):
     def test_builtin_packs_are_consistent(self):
         from mathsapp import curriculum
         packs = {p.stem: json.loads(p.read_text()) for p in curriculum.BUILTIN_DIR.glob("*.json")}
-        self.assertEqual(set(packs), {"maths", "ml-mva"})
+        self.assertEqual(set(packs), {"maths", "ml"})
         maths_ids = {c["id"] for c in packs["maths"]["courses"]}
         for c in packs["maths"]["courses"]:
             self.assertTrue(set(c["prereqs"]) <= maths_ids, c["id"])

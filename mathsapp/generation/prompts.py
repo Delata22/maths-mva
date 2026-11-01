@@ -1621,7 +1621,7 @@ FORME DE LA RÉPONSE :
 
 
 def code_change_system() -> str:
-    return """Vous modifiez le code de « maths-app », une application de bureau Python
+    return """Vous modifiez le code de « FastLearning », une application de bureau Python
 (PySide6 + QtWebEngine) qui génère des cursus scientifiques complets (maths en
 socle, puis n'importe quel domaine) et les cours qui vont avec. Vous
 travaillez dans le dossier du projet, avec les outils Read, Edit, Write, Glob

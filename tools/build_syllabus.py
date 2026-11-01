@@ -3,7 +3,7 @@ definitions compactes ci-dessous.
 
 Deux packs :
     maths   le socle, de la logique a l'analyse fonctionnelle (toujours actif)
-    ml-mva  l'apprentissage automatique, tel que prepare pour le M2 MVA
+    ml      l'apprentissage automatique, des fondements aux grands modeles
 
 Un cours appartient au pack de son domaine, sauf exceptions listees dans
 COURSE_PACK (un cours de maths qui s'appuie sur un cours de ML).
@@ -1205,7 +1205,7 @@ ML_DOMAINS = [
 # Cours ranges dans un autre pack que celui de leur domaine : un pack ne peut
 # s'appuyer que sur les packs qu'il requiert.
 COURSE_PACK = {
-    "af-rkhs": "ml-mva",      # s'appuie sur ml-noyaux
+    "af-rkhs": "ml",      # s'appuie sur ml-noyaux
 }
 
 PACK_META = {
@@ -1226,15 +1226,14 @@ PACK_META = {
             "quantificateurs dans le bon ordre.",
         ],
     },
-    "ml-mva": {
-        "title": "Apprentissage automatique (M2 MVA)",
+    "ml": {
+        "title": "Apprentissage automatique",
         "description": ("De l'apprentissage statistique aux grands modèles : fondements, "
                         "modèles classiques, théorie, bayésien, deep learning, génératif, "
-                        "vision, langage, renforcement, transport optimal, pratique PyTorch. "
-                        "Construit pour préparer le M2 MVA (ENS Paris-Saclay)."),
+                        "vision, langage, renforcement, transport optimal, pratique PyTorch."),
         "discipline": "apprentissage automatique",
         "requires": ["maths"],
-        "goal": ("entrer en M2 MVA (ENS Paris-Saclay, parcours IA) : optimisation, "
+        "goal": ("maîtriser l'apprentissage automatique au niveau master : optimisation, "
                  "probabilités, apprentissage statistique et apprentissage profond"),
         "style": [
             "Démontrez les résultats importants, en étapes explicites, avec la stratégie "
@@ -1297,117 +1296,117 @@ MATHS_TRACKS = {
     },
 }
 
-# Deux familles de parcours pour le M2 : les cours de la rentree (remise a
-# niveau et introduction au deep learning), puis les cours du M2 proprement dits.
+# Deux familles de parcours : les bases (remises a niveau et introduction au
+# deep learning), puis les cours avances, un par grand theme.
 ML_TRACK_GROUPS = [
-    ("rentree", "Les cours de la rentrée", "Remise à niveau et introduction au deep learning."),
-    ("mva", "Les cours du M2", "Ce que chaque cours suppose acquis, et tout le chemin pour y arriver."),
+    ("ml-bases", "Les bases", "Remises à niveau et introduction au deep learning."),
+    ("ml-avance", "Les cours avancés", "Chaque grand thème, avec tout le chemin pour y arriver."),
 ]
 
-# Les remises a niveau du MVA sont des chapitres du socle : le pack ML les
-# range dans « Les cours de la rentree », sous leur titre MVA.
+# Les remises a niveau sont des chapitres du socle : le pack ML les range
+# dans « Les bases », sous un titre de remise a niveau.
 ML_TRACK_OVERRIDES = {
-    "maths-proba": {"group": "rentree", "title": "Remise à niveau — Probabilités"},
-    "maths-optimisation": {"group": "rentree", "title": "Remise à niveau — Optimisation convexe"},
-    "maths-analyse-fonc": {"group": "rentree", "title": "Remise à niveau — Analyse fonctionnelle"},
-    "maths-stats": {"group": "rentree", "title": "Remise à niveau — Statistiques"},
-    "maths-fourier": {"group": "rentree", "title": "Remise à niveau — Analyse de Fourier"},
+    "maths-proba": {"group": "ml-bases", "title": "Remise à niveau — Probabilités"},
+    "maths-optimisation": {"group": "ml-bases", "title": "Remise à niveau — Optimisation convexe"},
+    "maths-analyse-fonc": {"group": "ml-bases", "title": "Remise à niveau — Analyse fonctionnelle"},
+    "maths-stats": {"group": "ml-bases", "title": "Remise à niveau — Statistiques"},
+    "maths-fourier": {"group": "ml-bases", "title": "Remise à niveau — Analyse de Fourier"},
 }
 
 ML_TRACKS = {
-    "mva-deep-learning": {
-        "group": "rentree",
+    "ia-deep-learning": {
+        "group": "ml-bases",
         "title": "Introduction au deep learning (PyTorch)",
         "goal": "pra-entrainement",
         "extra": ["ml-backprop", "dl-cnn", "dl-attention", "pra-pytorch", "pra-debug"],
     },
 
-    "mva-dl-avance": {
-        "group": "mva",
+    "ia-dl-avance": {
+        "group": "ml-avance",
         "title": "Apprentissage profond",
         "goal": "dl-transformers-avance",
         "extra": ["dl-optimisation", "dl-cnn-architectures", "dl-autosupervise", "dl-transfert"],
     },
-    "mva-vision": {
-        "group": "mva",
+    "ia-vision": {
+        "group": "ml-avance",
         "title": "Vision par ordinateur",
         "goal": "vis-reconnaissance",
         "extra": ["vis-geometrie", "vis-segmentation-profonde", "vis-video", "vis-multimodal"],
     },
-    "mva-image": {
-        "group": "mva",
+    "ia-image": {
+        "group": "ml-avance",
         "title": "Traitement et restauration d'images",
         "goal": "vis-variationnel",
         "extra": ["vis-debruitage", "vis-filtrage"],
     },
-    "mva-nlp": {
-        "group": "mva",
+    "ia-nlp": {
+        "group": "ml-avance",
         "title": "Langage, parole et grands modèles",
         "goal": "nlp-llm",
         "extra": ["nlp-transformers", "nlp-alignement", "nlp-rag", "nlp-evaluation", "nlp-parole"],
     },
-    "mva-rl": {
-        "group": "mva",
+    "ia-rl": {
+        "group": "ml-avance",
         "title": "Apprentissage par renforcement",
         "goal": "rl-acteur-critique",
         "extra": ["rl-exploration", "rl-hors-ligne", "rl-modele", "rl-multi-agents"],
     },
-    "mva-generatif": {
-        "group": "mva",
+    "ia-generatif": {
+        "group": "ml-avance",
         "title": "Modèles génératifs pour l'image",
         "goal": "gen-diffusion-pratique",
         "extra": ["ml-generatifs", "gen-gan", "gen-images", "gen-evaluation"],
     },
-    "mva-noyaux": {
-        "group": "mva",
+    "ia-noyaux": {
+        "group": "ml-avance",
         "title": "Méthodes à noyaux",
         "goal": "ml-noyaux-passage-echelle",
         "extra": ["af-rkhs", "th-noyaux", "bay-gp"],
     },
-    "mva-bayesien": {
-        "group": "mva",
+    "ia-bayesien": {
+        "group": "ml-avance",
         "title": "Modèles graphiques et apprentissage bayésien",
         "goal": "bay-variationnel",
         "extra": ["bay-graphiques", "bay-hmm", "bay-mcmc", "bay-gp", "bay-causalite"],
     },
-    "mva-stats-comp": {
-        "group": "mva",
+    "ia-stats-comp": {
+        "group": "ml-avance",
         "title": "Statistique computationnelle",
         "goal": "bay-monte-carlo-sequentiel",
         "extra": ["bay-mcmc", "bay-nonparametrique", "bay-optimisation"],
     },
-    "mva-graphes": {
-        "group": "mva",
+    "ia-graphes": {
+        "group": "ml-avance",
         "title": "Graphes en apprentissage",
         "goal": "gr-gnn",
         "extra": ["gr-spectral", "gr-plongements", "geo-equivariance"],
     },
-    "mva-geometrie": {
-        "group": "mva",
+    "ia-geometrie": {
+        "group": "ml-avance",
         "title": "Analyse géométrique de données",
         "goal": "geo-varietes",
         "extra": ["ml-acp-noyau", "vis-nuages"],
     },
-    "mva-transport": {
-        "group": "mva",
+    "ia-transport": {
+        "group": "ml-avance",
         "title": "Transport optimal",
         "goal": "ot-applications",
         "extra": ["ot-wasserstein", "ot-sinkhorn", "ot-dualite"],
     },
-    "mva-theorie": {
-        "group": "mva",
+    "ia-theorie": {
+        "group": "ml-avance",
         "title": "Fondements théoriques de l'apprentissage profond",
         "goal": "th-surparametrisation",
         "extra": ["th-rademacher", "th-pac-bayes", "th-minimax", "th-dl"],
     },
-    "mva-sequentiel": {
-        "group": "mva",
+    "ia-sequentiel": {
+        "group": "ml-avance",
         "title": "Apprentissage séquentiel",
         "goal": "th-agregation",
         "extra": ["th-online", "th-bandits"],
     },
-    "mva-pratique": {
-        "group": "mva",
+    "ia-pratique": {
+        "group": "ml-avance",
         "title": "Deep learning en pratique",
         "goal": "pra-passage-echelle",
         "extra": ["pra-debug", "pra-experiences", "pra-performance", "pra-deploiement"],
@@ -1416,7 +1415,7 @@ ML_TRACKS = {
 
 PACKS = [
     ("maths", MATHS_DOMAINS, MATHS_TRACK_GROUPS, MATHS_TRACKS, {}),
-    ("ml-mva", ML_DOMAINS, ML_TRACK_GROUPS, ML_TRACKS, ML_TRACK_OVERRIDES),
+    ("ml", ML_DOMAINS, ML_TRACK_GROUPS, ML_TRACKS, ML_TRACK_OVERRIDES),
 ]
 
 

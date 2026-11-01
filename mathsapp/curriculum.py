@@ -27,7 +27,7 @@ BUILTIN_DIR = DATA_DIR / "packs"
 BASE_PACK = "maths"
 CUSTOM_PACK = "perso"          # cours ajoutés un par un (syllabus_extra)
 CUSTOM_GROUP = "perso"         # parcours sans groupe connu
-BUILTIN_ORDER = ["maths", "ml-mva"]
+BUILTIN_ORDER = ["maths", "ml"]
 PACK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,40}$")
 
 DEFAULT_LEVELS = [
@@ -42,15 +42,6 @@ DEFAULT_PROFILE = {
     "title": "Mon cursus",
     "start_level": ("fin de lycée scientifique (spécialité mathématiques), "
                     "sans notion post-bac"),
-    "about": "",
-}
-
-# Profil d'origine de l'application : celui qu'on reprend pour une
-# bibliothèque créée avant l'arrivée des packs.
-LEGACY_PROFILE = {
-    "title": "Maths MVA",
-    "start_level": ("terminale option maths expertes, solide mais sans aucune "
-                    "notion post-bac"),
     "about": "",
 }
 
@@ -140,7 +131,7 @@ def config() -> dict:
     data = _read_json(config_file())
     if data is None:
         if _legacy_library():
-            data = {"packs": list(BUILTIN_ORDER), "profile": dict(LEGACY_PROFILE)}
+            data = {"packs": list(BUILTIN_ORDER), "profile": dict(DEFAULT_PROFILE)}
         else:
             data = {"packs": [BASE_PACK], "profile": dict(DEFAULT_PROFILE)}
         data["version"] = 1

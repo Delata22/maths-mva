@@ -1,4 +1,4 @@
-# Installer Maths App
+# Installer FastLearning
 
 Application de bureau pour apprendre une discipline scientifique de zéro : un
 cursus complet (les maths en socle, puis le domaine de ton choix) de cours
@@ -24,8 +24,8 @@ codex login                      # se connecter une fois
 ## 2. Lancer
 
 ```bash
-git clone https://github.com/Delata22/maths-mva.git
-cd maths-mva
+git clone https://github.com/Delata22/FastLearning.git
+cd FastLearning
 ./run.sh
 ```
 
@@ -55,7 +55,7 @@ activer** : les parcours apparaissent sur l'accueil.
 
 Règle aussi ton profil dans **Cursus → Packs et profil** (niveau de départ,
 ce que les cours doivent savoir de toi) : il est repris dans tous les cours.
-Le pack « Apprentissage automatique (M2 MVA) » est disponible au même endroit.
+Le pack « Apprentissage automatique » est disponible au même endroit.
 
 ## 5. Bon à savoir
 

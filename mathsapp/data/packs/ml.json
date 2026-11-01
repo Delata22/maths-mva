@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "id": "ml-mva",
-  "title": "Apprentissage automatique (M2 MVA)",
-  "description": "De l'apprentissage statistique aux grands modèles : fondements, modèles classiques, théorie, bayésien, deep learning, génératif, vision, langage, renforcement, transport optimal, pratique PyTorch. Construit pour préparer le M2 MVA (ENS Paris-Saclay).",
+  "id": "ml",
+  "title": "Apprentissage automatique",
+  "description": "De l'apprentissage statistique aux grands modèles : fondements, modèles classiques, théorie, bayésien, deep learning, génératif, vision, langage, renforcement, transport optimal, pratique PyTorch.",
   "discipline": "apprentissage automatique",
   "requires": [
     "maths"
   ],
-  "goal": "entrer en M2 MVA (ENS Paris-Saclay, parcours IA) : optimisation, probabilités, apprentissage statistique et apprentissage profond",
+  "goal": "maîtriser l'apprentissage automatique au niveau master : optimisation, probabilités, apprentissage statistique et apprentissage profond",
   "style": [
     "Démontrez les résultats importants, en étapes explicites, avec la stratégie annoncée avant les calculs.",
     "Rigueur : les énoncés sont exacts et les hypothèses complètes. Quand un résultat n'est qu'empirique, dites-le.",
@@ -105,19 +105,19 @@
   ],
   "track_groups": [
     {
-      "id": "rentree",
-      "name": "Les cours de la rentrée",
-      "description": "Remise à niveau et introduction au deep learning."
+      "id": "ml-bases",
+      "name": "Les bases",
+      "description": "Remises à niveau et introduction au deep learning."
     },
     {
-      "id": "mva",
-      "name": "Les cours du M2",
-      "description": "Ce que chaque cours suppose acquis, et tout le chemin pour y arriver."
+      "id": "ml-avance",
+      "name": "Les cours avancés",
+      "description": "Chaque grand thème, avec tout le chemin pour y arriver."
     }
   ],
   "tracks": [
     {
-      "id": "mva-deep-learning",
+      "id": "ia-deep-learning",
       "title": "Introduction au deep learning (PyTorch)",
       "goal": "pra-entrainement",
       "extra": [
@@ -127,10 +127,10 @@
         "pra-pytorch",
         "pra-debug"
       ],
-      "group": "rentree"
+      "group": "ml-bases"
     },
     {
-      "id": "mva-dl-avance",
+      "id": "ia-dl-avance",
       "title": "Apprentissage profond",
       "goal": "dl-transformers-avance",
       "extra": [
@@ -139,10 +139,10 @@
         "dl-autosupervise",
         "dl-transfert"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-vision",
+      "id": "ia-vision",
       "title": "Vision par ordinateur",
       "goal": "vis-reconnaissance",
       "extra": [
@@ -151,20 +151,20 @@
         "vis-video",
         "vis-multimodal"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-image",
+      "id": "ia-image",
       "title": "Traitement et restauration d'images",
       "goal": "vis-variationnel",
       "extra": [
         "vis-debruitage",
         "vis-filtrage"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-nlp",
+      "id": "ia-nlp",
       "title": "Langage, parole et grands modèles",
       "goal": "nlp-llm",
       "extra": [
@@ -174,10 +174,10 @@
         "nlp-evaluation",
         "nlp-parole"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-rl",
+      "id": "ia-rl",
       "title": "Apprentissage par renforcement",
       "goal": "rl-acteur-critique",
       "extra": [
@@ -186,10 +186,10 @@
         "rl-modele",
         "rl-multi-agents"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-generatif",
+      "id": "ia-generatif",
       "title": "Modèles génératifs pour l'image",
       "goal": "gen-diffusion-pratique",
       "extra": [
@@ -198,10 +198,10 @@
         "gen-images",
         "gen-evaluation"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-noyaux",
+      "id": "ia-noyaux",
       "title": "Méthodes à noyaux",
       "goal": "ml-noyaux-passage-echelle",
       "extra": [
@@ -209,10 +209,10 @@
         "th-noyaux",
         "bay-gp"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-bayesien",
+      "id": "ia-bayesien",
       "title": "Modèles graphiques et apprentissage bayésien",
       "goal": "bay-variationnel",
       "extra": [
@@ -222,10 +222,10 @@
         "bay-gp",
         "bay-causalite"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-stats-comp",
+      "id": "ia-stats-comp",
       "title": "Statistique computationnelle",
       "goal": "bay-monte-carlo-sequentiel",
       "extra": [
@@ -233,10 +233,10 @@
         "bay-nonparametrique",
         "bay-optimisation"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-graphes",
+      "id": "ia-graphes",
       "title": "Graphes en apprentissage",
       "goal": "gr-gnn",
       "extra": [
@@ -244,20 +244,20 @@
         "gr-plongements",
         "geo-equivariance"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-geometrie",
+      "id": "ia-geometrie",
       "title": "Analyse géométrique de données",
       "goal": "geo-varietes",
       "extra": [
         "ml-acp-noyau",
         "vis-nuages"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-transport",
+      "id": "ia-transport",
       "title": "Transport optimal",
       "goal": "ot-applications",
       "extra": [
@@ -265,10 +265,10 @@
         "ot-sinkhorn",
         "ot-dualite"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-theorie",
+      "id": "ia-theorie",
       "title": "Fondements théoriques de l'apprentissage profond",
       "goal": "th-surparametrisation",
       "extra": [
@@ -277,20 +277,20 @@
         "th-minimax",
         "th-dl"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-sequentiel",
+      "id": "ia-sequentiel",
       "title": "Apprentissage séquentiel",
       "goal": "th-agregation",
       "extra": [
         "th-online",
         "th-bandits"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     },
     {
-      "id": "mva-pratique",
+      "id": "ia-pratique",
       "title": "Deep learning en pratique",
       "goal": "pra-passage-echelle",
       "extra": [
@@ -299,28 +299,28 @@
         "pra-performance",
         "pra-deploiement"
       ],
-      "group": "mva"
+      "group": "ml-avance"
     }
   ],
   "track_overrides": {
     "maths-proba": {
-      "group": "rentree",
+      "group": "ml-bases",
       "title": "Remise à niveau — Probabilités"
     },
     "maths-optimisation": {
-      "group": "rentree",
+      "group": "ml-bases",
       "title": "Remise à niveau — Optimisation convexe"
     },
     "maths-analyse-fonc": {
-      "group": "rentree",
+      "group": "ml-bases",
       "title": "Remise à niveau — Analyse fonctionnelle"
     },
     "maths-stats": {
-      "group": "rentree",
+      "group": "ml-bases",
       "title": "Remise à niveau — Statistiques"
     },
     "maths-fourier": {
-      "group": "rentree",
+      "group": "ml-bases",
       "title": "Remise à niveau — Analyse de Fourier"
     }
   },

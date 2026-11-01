@@ -3,7 +3,7 @@
 
   python tools/curriculum.py list
   python tools/curriculum.py enable physique-quantique
-  python tools/curriculum.py disable ml-mva
+  python tools/curriculum.py disable ml
   python tools/curriculum.py profile --title "Physique" --start "fin de lycée"
   python tools/curriculum.py new "Physique quantique" \\
       --goals "comprendre la QM jusqu'à l'intrication" --size 40 [--save]

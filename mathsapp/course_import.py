@@ -21,7 +21,7 @@ from .syllabus import Syllabus
 KIND = "course"
 IMPORT = "import.json"
 DOMAIN = {
-    "id": "mva-cours",          # identifiant historique, gardé pour les imports existants
+    "id": "imports",
     "name": "Cours importés",
     "description": "Cours magistraux importés en PDF : réécrits avec des "
                    "intuitions, reliés au cursus, exercices corrigés.",

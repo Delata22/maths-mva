@@ -18,9 +18,9 @@ from .ui.main_window import MainWindow  # noqa: E402
 def main() -> int:
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
-    app.setApplicationName("Maths MVA")   # ne pas changer : chemins de stockage Qt
-    app.setOrganizationName("maths-mva")
-    app.setDesktopFileName("maths-mva")
+    app.setApplicationName("FastLearning")
+    app.setOrganizationName("fastlearning")
+    app.setDesktopFileName("fastlearning")
     from .paths import ASSETS_DIR
     app.setWindowIcon(QIcon(str(ASSETS_DIR / "icon.svg")))
 

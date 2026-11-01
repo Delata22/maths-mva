@@ -1,4 +1,4 @@
-# Maths App — des cursus scientifiques générés à la demande
+# FastLearning — des cursus scientifiques générés à la demande
 
 Application de bureau (Ubuntu, PySide6) pour apprendre une discipline
 scientifique de zéro, avec des cours écrits pour vous par le `claude` (ou le
@@ -15,8 +15,8 @@ Le cursus est fait de **packs** :
 
 - **Mathématiques** (132 cours), le socle, toujours actif : de la logique
   propositionnelle à l'analyse fonctionnelle ;
-- **Apprentissage automatique (M2 MVA)** (130 cours), un pack prêt à l'emploi,
-  construit pour préparer le master MVA ;
+- **Apprentissage automatique** (130 cours), un pack prêt à l'emploi, des
+  fondements aux grands modèles ;
 - **vos propres cursus** : décrivez un domaine et vos objectifs (physique
   quantique, chimie, neurosciences…), et Claude conçoit le cursus complet,
   fondations manquantes comprises, branché sur les cours de maths. Un pack se
@@ -57,8 +57,8 @@ faire corriger par Claude</em></p>
 ## Installation
 
 ```bash
-git clone https://github.com/Delata22/maths-mva.git
-cd maths-mva
+git clone https://github.com/Delata22/FastLearning.git
+cd FastLearning
 ./run.sh
 ```
 
@@ -88,12 +88,12 @@ Les packs intégrés, dans `mathsapp/data/packs/` :
   analyse réelle, algèbre linéaire, topologie, calcul différentiel, mesure,
   probabilités, statistiques, optimisation convexe, Fourier, analyse
   fonctionnelle, calcul numérique, algèbre générale ;
-- **`ml-mva`**, l'apprentissage qui s'appuie dessus : fondements et
+- **`ml`**, l'apprentissage qui s'appuie dessus : fondements et
   évaluation, modèles classiques, théorie de l'apprentissage, bayésien,
   apprentissage profond, génératif, vision, langage, renforcement, transport
-  optimal, pratique PyTorch. Ses parcours sont ceux du M2 MVA : *les cours de
-  la rentrée* (les remises à niveau de l'ENS et l'introduction au deep
-  learning) et *les cours du M2*.
+  optimal, pratique PyTorch. Ses parcours forment deux familles : *les bases*
+  (remises à niveau et introduction au deep learning) et *les cours avancés*,
+  un par grand thème.
 
 Un parcours regroupe un cours cible et l'intégralité de ce qu'il faut savoir
 avant : le parcours « Langage, parole et grands modèles » compte 114 cours, en
@@ -142,7 +142,7 @@ En ligne de commande :
 python tools/curriculum.py list
 python tools/curriculum.py new "Physique quantique" --goals "…" --size 40   # écrit la proposition
 python tools/curriculum.py import physique-quantique.json                   # l'enregistre et l'active
-python tools/curriculum.py enable ml-mva
+python tools/curriculum.py enable ml
 python tools/curriculum.py export physique-quantique ~/physique.json
 python tools/curriculum.py profile --start "fin de lycée, spécialité physique"
 ```
@@ -365,7 +365,7 @@ chaleur, curseurs et animations. Les couleurs suivent le theme clair/sombre.
 
 | Vue | A quoi ca sert |
 |---|---|
-| **Accueil** | Avancement global, les six parcours MVA, ce qu'on peut attaquer maintenant, ce qu'il faut reviser |
+| **Accueil** | Avancement global, les parcours de chaque pack, ce qu'on peut attaquer maintenant, ce qu'il faut reviser |
 | **Bibliotheque** | Les 142 cours, filtrables par domaine, niveau, statut et parcours, avec le score de QCM |
 | **Cours** | Lecture, fiche de revision, QCM, demonstrations, notes personnelles, TD d'entraînement |
 | **Graphe** | Le cursus comme graphe : ce qui est maitrise, ce qui est accessible, ce qui est verrouille |
@@ -548,8 +548,8 @@ transparents Beamer, en français ou en anglais.
    cours liés pris dans le catalogue, puis un plan de 4 à 10 sections. Chaque
    section indique ses pages, tout ce qu'elles contiennent et les passages trop
    elliptiques. Il transcrit aussi fidèlement chaque exercice.
-2. **Inscription** : le cours rejoint le syllabus dans le domaine « Cours du
-   MVA », avec ses prérequis. Le plan tiré du document remplace le plan habituel.
+2. **Inscription** : le cours rejoint le syllabus dans le domaine « Cours
+   importés », avec ses prérequis. Le plan tiré du document remplace le plan habituel.
 3. **Rédaction** : c'est la génération habituelle. Chaque section **relit ses
    pages** et garde toutes les définitions, notations, hypothèses et exemples,
    en français avec les termes anglais entre parenthèses. Elle ajoute les
@@ -695,7 +695,7 @@ En ligne de commande :
 
 ```bash
 python tools/td.py run ~/TD1.pdf        # importer, lire et corriger
-python tools/td.py correct td-mva-2026  # reprendre
+python tools/td.py correct td1        # reprendre
 python tools/td.py list
 ```
 
@@ -813,7 +813,7 @@ mathsapp/
     pipeline.py      plan -> sections -> exercices
     queue.py         file d'attente en arriere-plan
   ui/                fenetre principale et vues
-  data/packs/        packs integres (maths, ml-mva), produits par build_syllabus.py
+  data/packs/        packs integres (maths, ml), produits par build_syllabus.py
   assets/            KaTeX, styles, mviz, pages QCM et demonstrations
 tools/
   build_syllabus.py  source des packs integres

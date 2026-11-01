@@ -13,3 +13,4 @@ library/
 
 # supports de cours personnels (non redistribuables)
 /*.pdf
+/specs.md
