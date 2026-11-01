@@ -1785,3 +1785,104 @@ traitée dans l'un de ces cours, liez-la à sa première mention avec
 section, là où ils aident vraiment :
 {related}
 """
+
+
+# ---------------------------------------------------------------------------
+# Fiches de lacunes : les notions de base redemandées à l'assistant
+# ---------------------------------------------------------------------------
+_GAP_QUESTION = {
+    "type": "object",
+    "properties": {
+        "question": {"type": "string"},
+        "choices": {"type": "array", "items": {"type": "string"}},
+        "answer": {"type": "integer"},
+        "explanation": {"type": "string"},
+    },
+    "required": ["question", "choices", "answer", "explanation"],
+}
+GAPS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "cards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": dict(_GAP_QUESTION["properties"], **{
+                    "notion": {"type": "string"},
+                    "course_id": {"type": "string"},
+                    "difficulty": {"type": "integer"},
+                    "same_as": {"type": "string"},
+                    "variants": {"type": "array", "items": _GAP_QUESTION},
+                }),
+                "required": ["notion", "course_id", "question", "choices", "answer",
+                             "explanation"],
+            },
+        },
+    },
+    "required": ["cards"],
+}
+
+
+GAPS_BUDGET = 70_000   # octets d'échanges dans le prompt
+
+
+def gaps_prompt(syl: Syllabus, items: List[dict], existing: List[dict]) -> str:
+    """`items` : [{course_id, user, assistant}] ; `existing` : fiches actives [{id, notion}]."""
+    # le prompt part en argument du CLI (limite d'environ 128 ko par argument) :
+    # on garde les échanges les plus récents dans un budget fixe
+    blocks: List[str] = []
+    used = 0
+    for e in reversed(items):
+        block = ("--- cours %s [%s]\nÉTUDIANT : %s\nASSISTANT : %s"
+                 % (syl.title(e["course_id"]), e["course_id"],
+                    e["user"].strip()[:1200], (e["assistant"] or "").strip()[:700]))
+        if used + len(block.encode("utf-8")) > GAPS_BUDGET:
+            break
+        blocks.insert(0, block)
+        used += len(block.encode("utf-8"))
+    known = "\n".join("  - [%s] %s" % (c["id"], c["notion"]) for c in existing) or "  (aucune)"
+    courses = sorted({e["course_id"] for e in items})
+    return f"""Vous relisez la séance de travail d'un étudiant en M2 MVA qui reprend
+ses bases de mathématiques. Pendant qu'il travaillait un cours, il a posé des
+questions à l'assistant. Beaucoup portent sur la démonstration du moment, mais
+certaines révèlent une NOTION DE BASE OUBLIÉE : une définition, une propriété ou
+un calcul élémentaire qu'il devrait savoir sans réfléchir (par exemple
+$|z|^2 = z\\bar z$, $\\overline{{zw}} = \\bar z\\,\\bar w$, la sesquilinéarité du
+produit scalaire hermitien, la dérivée de $t \\mapsto t^2$…). Il les redemande,
+avance, et les oublie le lendemain.
+
+Votre travail : repérer ces notions fondamentales et en faire des fiches de
+révision espacée.
+
+Échanges de la séance :
+{chr(10).join(blocks)}
+
+Fiches qui existent déjà :
+{known}
+
+RÈGLES :
+1. Une fiche = UNE notion fondamentale réutilisable hors de cette démonstration.
+   Ignorez ce qui est propre à l'exercice en cours (« pourquoi poser ce
+   $\\lambda$ ici », « est-ce que mon $t^*$ est bon ») sauf s'il en ressort une
+   règle générale qu'il ignorait.
+2. Ne retenez que ce qu'il ne savait VRAIMENT pas ou s'est trompé : une
+   hésitation levée seul ne compte pas. Zéro fiche est une réponse acceptable.
+   Au plus six fiches, les plus utiles d'abord.
+3. Si la notion a déjà sa fiche, ne la recréez pas : renvoyez seulement
+   {{"same_as": "<id>", "notion": ..., "course_id": ...}} avec des champs de
+   question vides (question "", choices [], answer 0, explanation "").
+4. Chaque fiche est une question à choix unique, à chercher DE TÊTE avant de
+   voir les propositions : la question doit avoir une réponse courte et nette
+   (une formule, une valeur, vrai/faux justifié). Quatre propositions de forme
+   comparable, les distracteurs reprenant les erreurs qu'il a réellement
+   faites dans les échanges. Position de la bonne réponse variée.
+5. `explanation` : deux ou trois phrases qui redonnent la règle exacte et
+   pourquoi elle est vraie, assez pour la reconstruire sans le cours.
+6. `variants` : deux autres versions de la même notion (valeurs différentes,
+   sens inverse, autre formulation), même format, pour qu'il retienne la
+   notion et pas la phrase.
+7. `notion` : un intitulé court (« Module au carré d'un complexe »).
+   `course_id` : l'un de {", ".join(courses)}. `difficulty` de 1 à 3.
+8. Formules en LaTeX entre $…$. Français avec tous les accents.
+
+Répondez uniquement par {{"cards": [...]}}."""

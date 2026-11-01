@@ -144,7 +144,8 @@ def refresher_candidates(now: Optional[float] = None, window_days: int = 21,
         "SELECT course_id, COUNT(*) n,"
         " SUM(CASE WHEN last_ok = 0 THEN 1 ELSE 0 END) fails,"
         " SUM(CASE WHEN last_ok = 0 AND tries >= 2 THEN 1 ELSE 0 END) repeated"
-        " FROM question_result WHERE updated_at >= ? GROUP BY course_id", (since,)).fetchall()
+        " FROM question_result WHERE updated_at >= ? AND set_id != 'lacunes'"
+        " GROUP BY course_id", (since,)).fetchall()
     cutoff = _dt.date.fromtimestamp(now - cooldown_days * 86400).isoformat()
     recent = {cid for day, cid in content.refreshers() if day > cutoff}
     out = []

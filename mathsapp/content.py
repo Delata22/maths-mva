@@ -545,6 +545,8 @@ def question_index() -> dict:
         data = read_refresher(day, course_id) or {}
         for q in data.get("qcm", []):
             index[(course_id, "rappel", q["id"])] = q
+    from . import gaps
+    index.update(gaps.index())
     return index
 
 

@@ -1091,6 +1091,36 @@ def generate_refresher(course_id: str, day: Optional[str] = None,
     return day, res.cost_usd
 
 
+def generate_gaps(model: Optional[str] = None, on_progress: ProgressCb = _noop,
+                  cancel: CancelCb = _never, syl: Optional[Syllabus] = None,
+                  until: Optional[float] = None) -> tuple[dict, float]:
+    """Relit les échanges avec l'assistant depuis la dernière lecture et propose
+    des fiches de lacunes. Retourne ({new, relapsed}, coût)."""
+    from .. import gaps
+    syl = syl or load_syllabus()
+    until = until if until is not None else time.time()
+    # premiere relecture (ou longue absence) : seulement les derniers jours
+    since = max(gaps.load()["scanned_until"], until - gaps.FIRST_SCAN_DAYS * 86400)
+    items = [e for e in gaps.exchanges(since, until) if e["course_id"] in syl.courses]
+    if not items:
+        return gaps.propose([], (), until), 0.0
+    on_progress("Relecture de la séance", 0.1)
+    existing = [{"id": c["id"], "notion": c["notion"]} for c in gaps.cards(gaps.ACTIVE)]
+    data, res = cc.run_json(
+        prompts.gaps_prompt(syl, items, existing),
+        model=model or str(settings.get("model/exercises")),
+        system=("Vous repérez les notions de mathématiques de base qu'un étudiant a "
+                "oubliées. Vous répondez uniquement en JSON valide."),
+        schema=prompts.GAPS_SCHEMA,
+        cancel=cancel,
+        on_progress=lambda n: on_progress("Relecture de la séance", min(0.9, 0.1 + n / 9000.0)),
+        on_notice=lambda msg: on_progress("Lacunes — %s" % msg, 0.1),
+    )
+    result = gaps.propose(data.get("cards") or [], set(syl.courses), until)
+    on_progress("Terminé", 1.0)
+    return result, res.cost_usd
+
+
 # ---------------------------------------------------------------------------
 # Cours importés depuis un PDF
 # ---------------------------------------------------------------------------

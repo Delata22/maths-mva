@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, review as review_mod, status as st_mod, store
+from .. import content, gamify, gaps, review as review_mod, status as st_mod, store
 from ..status import MASTERED, PARTIAL, Status
 from ..syllabus import Syllabus
 from . import theme
@@ -284,6 +284,27 @@ class Dashboard(QWidget):
         btn_challenge.setToolTip("Cinq questions déjà vues, chronométrées.")
         btn_challenge.clicked.connect(lambda: self.session_requested.emit("challenge"))
         actions.addWidget(btn_challenge)
+
+        # fiches de lacunes : fin de seance, validation, compteur
+        gs = gaps.stats()
+        if gs["proposed"]:
+            btn_gaps = QPushButton("Valider %d fiche%s de lacunes"
+                                   % (gs["proposed"], "s" if gs["proposed"] > 1 else ""))
+            btn_gaps.setProperty("primary", True)
+            btn_gaps.clicked.connect(lambda: self.session_requested.emit("gaps-validate"))
+        else:
+            btn_gaps = QPushButton("Fin de séance : mes lacunes")
+            btn_gaps.setToolTip("Relit vos questions à l'assistant depuis la dernière fois et "
+                                "propose une fiche par notion de base oubliée.")
+            btn_gaps.clicked.connect(lambda: self.session_requested.emit("gaps-scan"))
+        actions.addWidget(btn_gaps)
+        if gs["active"]:
+            label = QLabel("fiches : %d acquise%s · %d en cours"
+                           % (gs["acquired"], "s" if gs["acquired"] > 1 else "", gs["learning"]))
+            label.setObjectName("Muted")
+            label.setToolTip("Une fiche est acquise quand elle ne revient plus qu'au bout "
+                             "de trois semaines.")
+            actions.addWidget(label)
 
         upcoming = review_mod.upcoming(8)
         if sum(upcoming[1:]):

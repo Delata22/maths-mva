@@ -10,3 +10,6 @@ library/
 # divers
 .DS_Store
 *.log
+
+# supports de cours personnels (non redistribuables)
+/*.pdf

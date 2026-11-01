@@ -23,6 +23,7 @@ KIND_TITLE = {
     "daily": "Quiz du jour",
     "challenge": "Défi éclair",
     "refresher": "Rappel ciblé",
+    "gaps": "Fiches de lacunes",
 }
 KIND_HINT = {
     "review": "Les questions dont c'est le moment, toutes matières confondues. "
@@ -32,6 +33,8 @@ KIND_HINT = {
     "refresher": "Cinq questions neuves sur ce qui a coincé récemment. Chaque "
                  "correction rappelle le point de cours en jeu.",
     "challenge": "Cinq questions déjà vues, chronométrées. Il y a un record à battre.",
+    "gaps": "Les notions de base redemandées pendant la séance. Répondez de tête : "
+            "une erreur ramène la fiche demain, une réussite l'espace.",
 }
 
 

@@ -28,6 +28,7 @@ KIND_LABEL = {
     "import": "Import de cours",
     "training": "TD d'entraînement",
     "brouillon": "Brouillons des démonstrations",
+    "gaps": "Fiches de lacunes",
 }
 
 
@@ -165,6 +166,14 @@ class _Task(QRunnable):
                 _day, cost = pipeline.generate_refresher(
                     job.course_id, None, None, on_progress, cancel, syl)
                 msg = "Rappel prêt (%.2f $)" % cost
+            elif job.kind == "gaps":
+                result, cost = pipeline.generate_gaps(None, on_progress, cancel, syl)
+                msg = "%d fiche%s proposée%s" % (
+                    result["new"], "s" if result["new"] > 1 else "", "s" if result["new"] > 1 else "")
+                if result["relapsed"]:
+                    msg += ", %d notion%s à revoir" % (
+                        len(result["relapsed"]), "s" if len(result["relapsed"]) > 1 else "")
+                msg += " (%.2f $)" % cost
             elif job.kind == "daily":
                 day, cost = pipeline.generate_daily_quiz(
                     None, None, on_progress, cancel, syl)

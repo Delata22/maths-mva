@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, review as review_mod, settings, status as st_mod, store
+from .. import content, gamify, gaps, review as review_mod, settings, status as st_mod, store
 from ..generation.claude_cli import ClaudeError, check_available
 from ..generation.queue import DONE, ERROR, GenerationQueue
 from ..syllabus import Syllabus, load as load_syllabus, reload as reload_syllabus
@@ -126,6 +126,7 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(300, self._check_cli)
         QTimer.singleShot(900, self._check_interrupted)
+        QTimer.singleShot(2500, self._check_gaps)
         self.go_home()
 
     # ------------------------------------------------------------- barre haute
@@ -375,6 +376,12 @@ class MainWindow(QMainWindow):
         if kind.startswith("refresher:"):
             self.start_refresher(kind.split(":", 1)[1])
             return
+        if kind == "gaps-scan":
+            self.scan_gaps()
+            return
+        if kind == "gaps-validate":
+            self.validate_gaps()
+            return
         statuses = st_mod.compute(self.syl)
         if kind == "daily":
             day = gamify.today()
@@ -447,6 +454,51 @@ class MainWindow(QMainWindow):
                 out.append(dict(question, course_id=key[0], set_id=key[1]))
         return out or None
 
+    # ------------------------------------------------------- fiches de lacunes
+    def scan_gaps(self, quiet: bool = False) -> None:
+        """Fin de séance : relire les échanges avec l'assistant pour en tirer des fiches."""
+        if not gaps.needs_scan():
+            if not quiet:
+                self.statusBar().showMessage(
+                    "Aucune nouvelle question à l'assistant depuis la dernière relecture", 7000)
+            return
+        if self.queue.enqueue(gaps.JOB_ID, "Lacunes de la séance", "gaps") is None:
+            if not quiet:
+                self.statusBar().showMessage("Relecture déjà en cours", 6000)
+        elif not quiet:
+            self.statusBar().showMessage(
+                "Relecture de la séance — les fiches proposées arrivent dans une minute", 10000)
+
+    def validate_gaps(self) -> None:
+        from .gaps_dialog import GapsDialog
+        proposed = gaps.cards(gaps.PROPOSED)
+        if not proposed:
+            self.statusBar().showMessage("Aucune fiche à valider", 6000)
+            return
+        dialog = GapsDialog(proposed, self.syl, self)
+        if not dialog.exec():
+            return
+        kept = gaps.decide(dialog.kept(), dialog.dropped(), dialog.edits())
+        if self.stack.currentIndex() == PAGE_HOME:
+            self.dashboard.refresh()
+        if kept and dialog.quiz_now():
+            day = gamify.today()
+            self.session.start("gaps", [dict(gaps.as_question(c), set_id=gaps.SET_ID, day=day)
+                                        for c in kept])
+            self.go(PAGE_SESSION)
+
+    def _check_gaps(self) -> None:
+        """Au démarrage : une séance d'un jour précédent jamais relue l'est maintenant,
+        et des fiches en attente de validation sont signalées."""
+        import datetime as _dt
+        midnight = _dt.datetime.combine(_dt.date.today(), _dt.time()).timestamp()
+        if gaps.needs_scan(before=midnight):
+            self.scan_gaps(quiet=True)
+        elif gaps.cards(gaps.PROPOSED):
+            n = len(gaps.cards(gaps.PROPOSED))
+            self.notice.show_message("%d fiche%s de lacunes à valider" % (n, "s" if n > 1 else ""),
+                                     "Valider", self.validate_gaps)
+
     def start_refresher(self, course_id: str) -> None:
         """Rappel ciblé de cinq questions : le lance s'il est prêt, sinon le prépare."""
         day = gamify.today()
@@ -477,17 +529,18 @@ class MainWindow(QMainWindow):
         if not answers:
             return
 
+        # une revision melange des series (QCM du cours, quiz du jour, fiches de
+        # lacunes) : chaque reponse est rangee dans la serie d'ou vient sa question
+        fixed = {"daily": "daily", "refresher": "rappel", "gaps": gaps.SET_ID}.get(kind)
         by_course: dict = {}
         for answer in answers:
-            cid = answer.get("courseId") or ""
-            by_course.setdefault(cid, []).append(answer)
+            key = (answer.get("courseId") or "", fixed or str(answer.get("setId") or "1"))
+            by_course.setdefault(key, []).append(answer)
 
         xp = 0
-        for cid, group in by_course.items():
+        for (cid, set_id), group in by_course.items():
             if not cid or cid not in self.syl.courses:
                 continue
-            set_id = ({"daily": "daily", "refresher": "rappel"}.get(kind)
-                      or str(group[0].get("setId") or "1"))
             detail = {"answers": group, "session": kind}
             store.record_attempt(cid, len(group),
                                  sum(1 for a in group if a.get("ok")),
@@ -497,7 +550,7 @@ class MainWindow(QMainWindow):
                                             a.get("kind", "direct")) for a in group)
             gamify.log("session:%s" % kind, questions=len(group),
                        correct=sum(1 for a in group if a.get("ok")),
-                       reviews=len(group) if kind == "review" else 0,
+                       reviews=len(group) if kind in ("review", "gaps") else 0,
                        xp=gained, domain=course.domain)
             xp += gained
 
@@ -506,6 +559,8 @@ class MainWindow(QMainWindow):
             bonus = gamify.XP["review_done"]
         elif kind == "daily":
             bonus = gamify.XP["daily_quiz"]
+        elif kind == "gaps":
+            bonus = gamify.XP["review_done"]
         elif kind == "refresher":
             bonus = gamify.XP["refresher"]
             key = getattr(self, "_refresher_key", None)
@@ -925,6 +980,14 @@ class MainWindow(QMainWindow):
             if ok and cid and not self._queue_hidden:
                 self.notice.show_message("Cours importé : « %s »" % title, "Ouvrir",
                                          lambda c=cid: self.open_course(c))
+        if _kind == "gaps" and ok:
+            if self.stack.currentIndex() == PAGE_HOME:
+                self.dashboard.refresh()
+            if gaps.cards(gaps.PROPOSED):
+                self.notice.show_message(message, "Valider", self.validate_gaps)
+            else:
+                self.statusBar().showMessage("Lacunes : %s" % message, 10000)
+            return
         if _kind == "refresher" and ok and not self._queue_hidden:
             self.notice.show_message(
                 "Rappel prêt : cinq questions sur « %s »" % self.syl.title(course_id),
