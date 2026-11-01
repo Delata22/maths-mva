@@ -1,7 +1,8 @@
-# Installer Maths MVA
+# Installer Maths App
 
-Application de bureau pour préparer les maths du master MVA : un cursus complet
-de cours générés à la demande, avec QCM, démonstrations, fiches, TD corrigés et
+Application de bureau pour apprendre une discipline scientifique de zéro : un
+cursus complet (les maths en socle, puis le domaine de ton choix) de cours
+générés à la demande, avec QCM, démonstrations, fiches, TD corrigés et
 révisions espacées. Les cours sont écrits par l'assistant en ligne de commande
 installé sur ta machine : **Codex** ou **Claude Code**. L'app n'a besoin d'aucune
 clé d'API : elle passe par ton compte, déjà connecté dans le CLI.
@@ -23,7 +24,7 @@ codex login                      # se connecter une fois
 ## 2. Lancer
 
 ```bash
-unzip maths-mva.zip
+git clone https://github.com/Delata22/maths-mva.git
 cd maths-mva
 ./run.sh
 ```
@@ -42,7 +43,21 @@ L'app choisit seule le CLI installé. Dans **Préférences > Génération** :
   rapide pour les exercices ;
 - le bouton **Tester le CLI** vérifie que tout répond.
 
-## 4. Bon à savoir
+## 4. Créer ton cursus
+
+Au premier lancement, seul le socle de mathématiques est actif. Sur l'accueil,
+**Créer un cursus…** (ou le menu **Cursus → Nouveau cursus**) : indique le
+domaine (par exemple « Physique quantique »), tes objectifs avec tes mots, ton
+niveau de départ, et une taille indicative. Claude conçoit le cursus complet,
+avec les fondations qui manquent (mécanique, électromagnétisme, maths en
+plus…), branché sur les cours de maths. Tu relis, puis **Enregistrer et
+activer** : les parcours apparaissent sur l'accueil.
+
+Règle aussi ton profil dans **Cursus → Packs et profil** (niveau de départ,
+ce que les cours doivent savoir de toi) : il est repris dans tous les cours.
+Le pack « Apprentissage automatique (M2 MVA) » est disponible au même endroit.
+
+## 5. Bon à savoir
 
 - La bibliothèque démarre vide. Ouvre un cours dans **Bibliothèque** ou dans le
   **Graphe**, puis **Générer**. Un cours complet (texte, figures, QCM,

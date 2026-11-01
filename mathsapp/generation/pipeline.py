@@ -803,8 +803,8 @@ def propose_syllabus(request: str, count: int = 10,
     raw, res = cc.run_json(
         prompts.syllabus_prompt(syl, request, count, domain_hint, level_hint),
         model=model,
-        system=("Vous concevez des syllabus de mathematiques et d'apprentissage. "
-                "Vous repondez uniquement en JSON valide."),
+        system=("Vous concevez des syllabus universitaires (%s). "
+                "Vous repondez uniquement en JSON valide." % syl.discipline()),
         schema=prompts.SYLLABUS_SCHEMA,
         cancel=cancel,
         on_progress=lambda n: on_progress("Conception du syllabus", min(0.9, 0.15 + n / 14000.0)),
@@ -813,6 +813,32 @@ def propose_syllabus(request: str, count: int = 10,
     batch, notes = syllabus_extra.normalize(raw)
     on_progress("Terminé", 1.0)
     return batch, notes, (raw.get("notes") or "").strip()
+
+
+def design_curriculum(brief: dict, size: int = 40, model: Optional[str] = None,
+                      on_progress: ProgressCb = _noop, cancel: CancelCb = _never,
+                      syl: Optional[Syllabus] = None) -> tuple[dict, List[str], float]:
+    """Conçoit un nouveau pack de cours à partir d'objectifs (voir curriculum_gen).
+
+    Retourne (pack, remarques, coût). Rien n'est enregistré."""
+    from .. import curriculum_gen
+    syl = syl or load_syllabus()
+    model = model or str(settings.get("model/course"))
+
+    def runner(prompt, system, schema, label, lo, hi):
+        _check(cancel)
+        on_progress(label, lo)
+        data, res = cc.run_json(
+            prompt, model=model, system=system, schema=schema, cancel=cancel,
+            on_progress=lambda n: on_progress(label, min(hi, lo + (hi - lo) * n / 12000.0)),
+            on_notice=lambda msg: on_progress("%s — %s" % (label, msg), lo),
+        )
+        return data, float(res.cost_usd or 0)
+
+    pack, notes, cost = curriculum_gen.design(brief, size, runner, syl,
+                                              on_progress=on_progress, cancel=cancel)
+    on_progress("Terminé", 1.0)
+    return pack, notes, cost
 
 
 # ---------------------------------------------------------------------------

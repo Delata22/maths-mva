@@ -3,7 +3,7 @@
 
   python tools/td.py run ~/TD1.pdf          importer, lire et corriger d'un coup
   python tools/td.py add ~/TD1.pdf          importer seulement
-  python tools/td.py correct td-mva-2026    lire (si besoin) puis corriger
+  python tools/td.py correct td-exemple      lire (si besoin) puis corriger
   python tools/td.py list                   TD importés et leur avancement
 """
 from __future__ import annotations

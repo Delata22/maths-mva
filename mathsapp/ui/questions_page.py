@@ -35,7 +35,7 @@ class QuestionsPage(QWidget):
         head = QLabel("Questions")
         head.setObjectName("H2")
         lv.addWidget(head)
-        hint = QLabel("Une question de maths, n'importe laquelle. La réponse indique "
+        hint = QLabel("Une question sur le cursus, n'importe laquelle. La réponse indique "
                       "les cours du cursus qui la traitent.")
         hint.setObjectName("Muted")
         hint.setWordWrap(True)

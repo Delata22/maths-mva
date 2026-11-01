@@ -1,10 +1,10 @@
 """Extensions du syllabus créées depuis l'application.
 
-Le syllabus de base vit dans `mathsapp/data/syllabus.json` : il est versionné
-et reconstruit par `tools/build_syllabus.py`. Les ajouts faits depuis l'app
-vivent à part, dans `library/syllabus_extra.json`, à côté du contenu généré.
-Les deux sont fusionnés au chargement, de sorte qu'une mise à jour du syllabus
-de base n'efface jamais ce que l'utilisateur a ajouté.
+Le syllabus de base est formé par les packs actifs (voir `curriculum.py`).
+Les cours ajoutés un par un depuis l'app vivent à part, dans
+`library/syllabus_extra.json`, à côté du contenu généré. Les deux sont
+fusionnés au chargement, de sorte qu'une mise à jour des packs n'efface jamais
+ce que l'utilisateur a ajouté.
 """
 from __future__ import annotations
 
@@ -13,7 +13,8 @@ import re
 import unicodedata
 from typing import Dict, List, Optional, Tuple
 
-from .paths import SYLLABUS_FILE, library_dir
+from . import curriculum
+from .paths import library_dir
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,60}$")
 EMPTY: Dict[str, list] = {"domains": [], "courses": [], "tracks": []}
@@ -36,8 +37,8 @@ def slugify(text: str, prefix: str = "") -> str:
 
 # --------------------------------------------------------------------- accès
 def read_base() -> dict:
-    with open(SYLLABUS_FILE, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    """Syllabus des packs actifs."""
+    return curriculum.merged_base()
 
 
 def read_extra() -> dict:
@@ -66,13 +67,17 @@ def merged() -> dict:
         return base
 
     data = dict(base)
+    data["packs"] = list(base.get("packs", [])) + [{
+        "id": curriculum.CUSTOM_PACK, "title": "Mes ajouts", "description": "",
+        "discipline": "", "requires": [], "goal": "", "style": [], "builtin": False}]
     known_domains = {d["id"] for d in base["domains"]}
     data["domains"] = list(base["domains"]) + [
         dict(d, custom=True) for d in extra["domains"] if d["id"] not in known_domains]
 
     known_courses = {c["id"] for c in base["courses"]}
     data["courses"] = list(base["courses"]) + [
-        dict(c, custom=True) for c in extra["courses"] if c["id"] not in known_courses]
+        dict(c, custom=True, pack=curriculum.CUSTOM_PACK)
+        for c in extra["courses"] if c["id"] not in known_courses]
 
     known_tracks = {t["id"] for t in base.get("tracks", [])}
     data["tracks"] = list(base.get("tracks", [])) + [
@@ -168,7 +173,7 @@ def normalize(batch: dict, base: Optional[dict] = None,
             continue
         domain = c.get("domain")
         if domain not in existing_domains:
-            fallback = domains[0]["id"] if domains else "ml"
+            fallback = domains[0]["id"] if domains else base["domains"][-1]["id"]
             notes.append("domaine inconnu « %s » pour « %s », rattaché à %s"
                          % (domain, title, fallback))
             domain = fallback
@@ -203,7 +208,7 @@ def normalize(batch: dict, base: Optional[dict] = None,
 
     # ---- parcours proposés
     tracks: List[dict] = []
-    groups = {g["id"] for g in base.get("track_groups", [])} or {"mva"}
+    groups = {g["id"] for g in base.get("track_groups", [])}
     existing_tracks = {t["id"] for t in base.get("tracks", [])} | {t["id"] for t in extra["tracks"]}
     for t in batch.get("tracks", []) or []:
         tid = t.get("id") or slugify(t.get("title", ""))
@@ -217,7 +222,7 @@ def normalize(batch: dict, base: Optional[dict] = None,
             "title": (t.get("title") or tid).strip(),
             "goal": goal,
             "extra": [e for e in (t.get("extra") or []) if e in valid and e != goal],
-            "group": t.get("group") if t.get("group") in groups else "mva",
+            "group": t.get("group") if t.get("group") in groups else curriculum.CUSTOM_GROUP,
         })
         existing_tracks.add(tid)
 

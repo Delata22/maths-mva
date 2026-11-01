@@ -155,7 +155,14 @@ def refresh_streak() -> Streak:
     rows = {r["day"]: dict(r) for r in c.execute("SELECT * FROM day_log ORDER BY day")}
     now = dt.date.today()
     month = now.strftime("%Y-%m")
-    freezes_left = max(0, FREEZES_PER_MONTH - _freezes_used(month))
+    # le gel est decompte sur le mois du jour manque : le 1er du mois, un oubli
+    # du 31 reste couvrable avec les gels du mois precedent
+    spent: Dict[str, int] = {}
+
+    def left(m: str) -> int:
+        if m not in spent:
+            spent[m] = _freezes_used(m)
+        return FREEZES_PER_MONTH - spent[m]
 
     def worked(day: str) -> bool:
         row = rows.get(day)
@@ -176,12 +183,12 @@ def refresh_streak() -> Streak:
         # Un gel couvre un oubli des deux derniers jours, pas un trou ancien :
         # il protege une serie qu'on entretient, il ne fabrique pas un passe.
         recent = (now - cursor).days <= 2
-        if day != now.isoformat() and freezes_left - consumed > 0 and current > 0 \
-                and recent and day.startswith(month):
+        if day != now.isoformat() and left(day[:7]) > 0 and current > 0 and recent:
             c.execute("INSERT OR IGNORE INTO day_log (day) VALUES (?)", (day,))
             c.execute("UPDATE day_log SET frozen=1 WHERE day=?", (day,))
             rows.setdefault(day, {"bricks": 0, "frozen": 1})["frozen"] = 1
             consumed += 1
+            spent[day[:7]] = spent.get(day[:7], 0) + 1
             current += 1
             cursor -= dt.timedelta(days=1)
             continue
@@ -203,7 +210,7 @@ def refresh_streak() -> Streak:
         best = max(best, run)
 
     return Streak(current=current, best=max(best, current),
-                  freezes_left=max(0, freezes_left - consumed),
+                  freezes_left=max(0, left(month)),
                   today_done=worked(now.isoformat()),
                   days=rows)
 
@@ -298,7 +305,7 @@ MILESTONES: List[Milestone] = [
               lambda c: _complete_domains(c) >= 3,
               lambda c: (_complete_domains(c), 3)),
     Milestone("track-half", "Un parcours à moitié",
-              "La moitié des cours d'un parcours MVA.",
+              "La moitié des cours d'un parcours.",
               lambda c: _best_track_fraction(c) >= 0.5,
               lambda c: (int(round(100 * _best_track_fraction(c))), 50)),
     Milestone("track-done", "Un parcours entier",

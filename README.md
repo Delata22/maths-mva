@@ -1,16 +1,28 @@
-# Maths MVA
+# Maths App — des cursus scientifiques générés à la demande
 
-Application de bureau (Ubuntu, PySide6) pour reprendre les mathematiques de zero
-et arriver pret aux cours de remise a niveau du M2 MVA.
+Application de bureau (Ubuntu, PySide6) pour apprendre une discipline
+scientifique de zéro, avec des cours écrits pour vous par le `claude` (ou le
+`codex`) installé sur votre machine.
 
-Le principe : un syllabus complet de 142 cours, de la logique propositionnelle
-aux modeles generatifs, relies par un graphe de prerequis. Chaque cours est
-**genere a la demande par le `claude` installe localement** — cours redige,
-figures interactives, demonstrations, QCM a difficulte croissante et
-demonstrations a faire. Un chat Opus est disponible partout, y compris pour se
-faire expliquer une demonstration etape par etape.
+Le principe : un cursus complet, relié par un graphe de prérequis. Chaque cours
+est **généré à la demande** : cours rédigé, figures interactives,
+démonstrations, QCM à difficulté croissante, exercices à faire, fiche de
+révision. Un chat est disponible partout, y compris pour se faire expliquer une
+démonstration étape par étape, et des révisions espacées entretiennent ce qui a
+été vu.
 
-Tout est local : aucun serveur, aucun navigateur, KaTeX embarque.
+Le cursus est fait de **packs** :
+
+- **Mathématiques** (132 cours), le socle, toujours actif : de la logique
+  propositionnelle à l'analyse fonctionnelle ;
+- **Apprentissage automatique (M2 MVA)** (130 cours), un pack prêt à l'emploi,
+  construit pour préparer le master MVA ;
+- **vos propres cursus** : décrivez un domaine et vos objectifs (physique
+  quantique, chimie, neurosciences…), et Claude conçoit le cursus complet,
+  fondations manquantes comprises, branché sur les cours de maths. Un pack se
+  partage comme un simple fichier JSON.
+
+Tout est local : aucun serveur, aucun navigateur, KaTeX embarqué.
 
 ![Accueil](docs/images/accueil.png)
 
@@ -45,7 +57,7 @@ faire corriger par Claude</em></p>
 ## Installation
 
 ```bash
-git clone git@github.com:Delata22/maths-mva.git
+git clone https://github.com/Delata22/maths-mva.git
 cd maths-mva
 ./run.sh
 ```
@@ -61,46 +73,83 @@ et la section « Générer avec Codex » plus bas.
 
 ## Comment ca marche
 
-### Le syllabus
+### Le cursus : un socle et des packs
 
-262 cours repartis en 26 domaines, chacun avec ses prerequis, son niveau (1 a 5)
-et ses objectifs. Le graphe de prerequis est verifie acyclique a la
-construction, et les identifiants restent en ASCII (ils servent de noms de
-dossiers).
+Un **pack** est un morceau de syllabus autonome : des domaines, des cours (avec
+prérequis, niveau de 1 à 5 et objectifs), des parcours, et ce qui oriente la
+génération : la discipline, l'objectif visé et quelques consignes de rédaction
+propres à la discipline (pour la physique : unités, ordres de grandeur, cas
+limites…). Le graphe de prérequis est vérifié acyclique, et les identifiants
+restent en ASCII (ils servent de noms de dossiers).
 
-Deux moities :
+Les packs intégrés, dans `mathsapp/data/packs/` :
 
-- **les mathematiques**, de la logique propositionnelle a l'analyse
-  fonctionnelle, en passant par l'algebre lineaire, le calcul differentiel, la
-  mesure, les probabilites, les statistiques, l'optimisation convexe et
-  Fourier ;
-- **l'apprentissage**, qui s'appuie dessus : fondements et evaluation, modeles
-  classiques, theorie de l'apprentissage, bayesien et modeles graphiques,
-  apprentissage profond, modeles generatifs, vision, langage et grands modeles,
-  renforcement, transport optimal et donnees structurees, et la mise en
-  pratique avec PyTorch.
+- **`maths`**, le socle, toujours actif : logique, ensembles, nombres,
+  analyse réelle, algèbre linéaire, topologie, calcul différentiel, mesure,
+  probabilités, statistiques, optimisation convexe, Fourier, analyse
+  fonctionnelle, calcul numérique, algèbre générale ;
+- **`ml-mva`**, l'apprentissage qui s'appuie dessus : fondements et
+  évaluation, modèles classiques, théorie de l'apprentissage, bayésien,
+  apprentissage profond, génératif, vision, langage, renforcement, transport
+  optimal, pratique PyTorch. Ses parcours sont ceux du M2 MVA : *les cours de
+  la rentrée* (les remises à niveau de l'ENS et l'introduction au deep
+  learning) et *les cours du M2*.
 
-Les **parcours** sont de deux familles :
-
-- *les cours de la rentree* : les cinq remises a niveau de l'ENS et
-  l'introduction au deep learning ;
-- *les cours du M2* : vision, langage, renforcement, modeles generatifs,
-  methodes a noyaux, modeles graphiques, graphes, transport optimal, fondements
-  theoriques, apprentissage sequentiel, statistique computationnelle...
-
-Un parcours regroupe le cours cible et l'integralite de ce qu'il faut savoir
-avant : le parcours « Langage, parole et grands modeles » compte 114 cours, en
+Un parcours regroupe un cours cible et l'intégralité de ce qu'il faut savoir
+avant : le parcours « Langage, parole et grands modèles » compte 114 cours, en
 partant de la logique.
 
-Le syllabus de base se modifie dans `tools/build_syllabus.py`, puis :
+**Cursus → Packs et profil** active ou désactive les packs (désactiver ne
+supprime rien : le contenu généré reste sur le disque), importe ou exporte un
+pack, et règle le profil : le nom affiché, votre **niveau de départ** et ce que
+les cours doivent savoir de vous. Le profil et les packs actifs sont repris dans
+toutes les consignes de génération : un cours de maths sait qu'il sert à la
+physique quantique si ce pack est actif.
+
+Les packs intégrés se modifient dans `tools/build_syllabus.py`, puis :
 
 ```bash
 .venv/bin/python tools/build_syllabus.py
 ```
 
+### Créer un cursus pour un autre domaine
+
+**Cursus → Nouveau cursus** (`Ctrl+Maj+N`, ou la carte de l'accueil tant que
+seul le socle est actif). Vous donnez le domaine, vos objectifs avec vos mots,
+votre niveau de départ, le niveau visé et une taille indicative. Claude conçoit
+alors le cursus en trois temps :
+
+1. **l'architecture** : en partant des objectifs et en remontant, les domaines
+   nécessaires dans l'ordre, fondations comprises. Pour la physique quantique :
+   mécanique classique, ondes, électromagnétisme, les maths absentes du socle,
+   puis la mécanique quantique elle-même ;
+2. **les cours**, domaine par domaine, chacun câblé sur les cours de maths
+   existants et sur les domaines déjà produits ;
+3. **les parcours**, qui apparaissent ensuite sur l'accueil.
+
+La proposition est nettoyée comme une extension de syllabus (identifiants
+recalculés, doublons écartés, prérequis inventés retirés, cycles refusés), puis
+présentée par domaine avant tout enregistrement. Comptez quelques minutes : un
+appel pour l'architecture, puis un par domaine. Les cours eux-mêmes se génèrent
+ensuite comme les autres, depuis la bibliothèque ou le bouton « Générer » d'un
+parcours.
+
+Le pack est enregistré dans `library/packs/<id>.json`. Pour le partager :
+**Exporter…** dans *Packs et profil*, et **Importer un pack…** de l'autre côté.
+En ligne de commande :
+
+```bash
+python tools/curriculum.py list
+python tools/curriculum.py new "Physique quantique" --goals "…" --size 40   # écrit la proposition
+python tools/curriculum.py import physique-quantique.json                   # l'enregistre et l'active
+python tools/curriculum.py enable ml-mva
+python tools/curriculum.py export physique-quantique ~/physique.json
+python tools/curriculum.py profile --start "fin de lycée, spécialité physique"
+```
+
 ### Etendre le syllabus depuis l'application
 
-Le bouton **Syllabus** (`Ctrl+N`) demande a Claude de concevoir une serie de
+Le menu **Cursus → Ajouter des cours au syllabus** (`Ctrl+N`) demande a Claude de concevoir une serie de
 cours sur un sujet absent du cursus, et de la brancher sur les prerequis deja
 presents.
 
@@ -433,7 +482,8 @@ reconstruire le suivi par question si la base est restauree.
 | `Ctrl+1..4` | Accueil / Bibliotheque / Cours / Graphe |
 | `Ctrl+K` | Ouvrir le chat sur le cours courant |
 | `Ctrl+F` | Rechercher un cours |
-| `Ctrl+N` | Etendre le syllabus |
+| `Ctrl+N` | Etendre le syllabus de quelques cours |
+| `Ctrl+Maj+N` | Nouveau cursus |
 | `Alt+↑` / `Alt+↓` | Puissance / indice, dans l'editeur de demonstrations |
 | `Ctrl+G` | Afficher ou masquer la file de génération |
 
@@ -698,7 +748,7 @@ Pratique pour lancer un gros lot et laisser tourner :
 ```bash
 python tools/generate.py al-svd cd-hessienne     # des cours precis
 python tools/generate.py --path opt-dualite-kkt  # un cours et tous ses prerequis
-python tools/generate.py --track mva-optimisation
+python tools/generate.py --track maths-optimisation
 python tools/generate.py --list
 python tools/generate.py --resume                # reprendre ce qui a ete interrompu
 ```
@@ -732,6 +782,9 @@ library/
     entrainement/    TD d'entrainement (td-1.json, td-2.json…)
     brouillons/      brouillons « comment on trouve », un fichier par demonstration
   progress.db        scores, statuts, notes, fils de discussion
+  curriculum.json    packs actifs et profil
+  packs/             cursus créés ou importés (un fichier JSON par pack)
+  syllabus_extra.json  cours ajoutés un par un (« Ajouter des cours au syllabus »)
 ```
 
 `library/` n'est pas versionne : c'est votre progression et votre contenu. Pour
@@ -744,6 +797,8 @@ clic droit > *Supprimer le contenu genere* (les scores sont conserves).
 
 ```
 mathsapp/
+  curriculum.py      packs actifs, profil, import / export des packs
+  curriculum_gen.py  conception d'un nouveau cursus (architecture, cours, parcours)
   syllabus.py        chargement du syllabus, graphe de prerequis
   syllabus_extra.py  ajouts faits depuis l'app : fusion, validation, retrait
   status.py          verrouille / disponible / a etudier / en cours / maitrise
@@ -758,9 +813,11 @@ mathsapp/
     pipeline.py      plan -> sections -> exercices
     queue.py         file d'attente en arriere-plan
   ui/                fenetre principale et vues
+  data/packs/        packs integres (maths, ml-mva), produits par build_syllabus.py
   assets/            KaTeX, styles, mviz, pages QCM et demonstrations
 tools/
-  build_syllabus.py  source du syllabus
+  build_syllabus.py  source des packs integres
+  curriculum.py      packs et nouveau cursus en ligne de commande
   generate.py        generation sans interface
   selftest.py        verification de bout en bout
   shot.py            capture d'une page de cours

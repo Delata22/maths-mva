@@ -18,7 +18,7 @@ from .ui.main_window import MainWindow  # noqa: E402
 def main() -> int:
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
-    app.setApplicationName("Maths MVA")
+    app.setApplicationName("Maths MVA")   # ne pas changer : chemins de stockage Qt
     app.setOrganizationName("maths-mva")
     app.setDesktopFileName("maths-mva")
     from .paths import ASSETS_DIR

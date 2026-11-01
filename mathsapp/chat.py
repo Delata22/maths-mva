@@ -89,7 +89,7 @@ class ChatSession:
         if self.mode == "question":
             from .generation.prompts import question_system
             from .questions import catalogue
-            return question_system(catalogue(self.syl))
+            return question_system(catalogue(self.syl), self.syl)
         if self.mode == "assistant":
             from .generation.prompts import assistant_system
             return assistant_system(self.state_provider() if self.state_provider else "")

@@ -31,7 +31,7 @@ LEVELS = [
     ("Fondations (post-bac)", "fondations, accessible juste apres le lycee"),
     ("Licence", "niveau licence"),
     ("Master 1", "niveau master 1"),
-    ("Master 2 / MVA", "niveau master 2, recherche"),
+    ("Master 2 / recherche", "niveau master 2, recherche"),
 ]
 
 

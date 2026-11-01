@@ -4,7 +4,7 @@ Le document est rangé comme un sujet de TD (library/_td/<id>, type « course »
 on réutilise ainsi la copie, la lecture des exercices et leur correction. Ce
 module ajoute ce qui est propre aux cours :
 - la transcription du document en plan (import.json) ;
-- l'inscription du cours dans le syllabus, domaine « Cours du MVA » ;
+- l'inscription du cours dans le syllabus, domaine « Cours importés » ;
 - un plan de génération qui garde la source : chaque section relit ses pages ;
 - la page de l'onglet Exercices du cours.
 """
@@ -21,9 +21,9 @@ from .syllabus import Syllabus
 KIND = "course"
 IMPORT = "import.json"
 DOMAIN = {
-    "id": "mva-cours",
-    "name": "Cours du MVA",
-    "description": "Cours magistraux du master importés en PDF : réécrits avec des "
+    "id": "mva-cours",          # identifiant historique, gardé pour les imports existants
+    "name": "Cours importés",
+    "description": "Cours magistraux importés en PDF : réécrits avec des "
                    "intuitions, reliés au cursus, exercices corrigés.",
     "color": "#0ea5e9",
 }
@@ -144,7 +144,7 @@ def normalize_import(raw: dict, syl: Syllabus) -> dict:
 def course_entry(data: dict, suffix: str = "") -> dict:
     title = data["title"] + suffix
     return {
-        "id": syllabus_extra.slugify(title, prefix="mva"),
+        "id": syllabus_extra.slugify(title, prefix="imp"),
         "title": title,
         "domain": DOMAIN["id"],
         "level": data["level"],
@@ -189,7 +189,7 @@ def register(doc: str, syl: Syllabus) -> str:
     cid = meta.get("course_id")
     if not (cid and cid in syl.courses):
         batch = None
-        for suffix in ("", " (MVA)", " — %s" % doc):
+        for suffix in ("", " (importé)", " — %s" % doc):
             entry = course_entry(data, suffix)
             candidate, _notes = syllabus_extra.normalize(
                 {"domains": [DOMAIN], "courses": [entry], "tracks": []})

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, gaps, review as review_mod, status as st_mod, store
+from .. import content, curriculum, gamify, gaps, review as review_mod, status as st_mod, store
 from ..status import MASTERED, PARTIAL, Status
 from ..syllabus import Syllabus
 from . import theme
@@ -58,6 +58,7 @@ class Dashboard(QWidget):
     show_graph = Signal(str)
     session_requested = Signal(str)      # review / daily / challenge
     resume_requested = Signal(str)       # cours a rouvrir a la position de lecture
+    curriculum_requested = Signal()      # ouvrir « Nouveau cursus »
 
     def __init__(self, syllabus: Syllabus, parent=None):
         super().__init__(parent)
@@ -98,7 +99,7 @@ class Dashboard(QWidget):
         mastered = sum(1 for s in statuses.values() if s.mastered)
         generated = sum(1 for s in statuses.values() if s.complete)
 
-        title = QLabel("Remise à niveau M2 MVA")
+        title = QLabel(curriculum.profile()["title"])
         title.setObjectName("H1")
         self.root.addWidget(title)
 
@@ -110,13 +111,18 @@ class Dashboard(QWidget):
         self.root.addWidget(_bar(mastered, total, pal["ok"]))
         self.root.addSpacing(6)
 
+        self._welcome(pal)
         self._resume(statuses, pal)
         self._today(statuses, pal)
         self._progression(statuses, pal)
         self._milestones(statuses, pal)
         self._interrupted(statuses, pal)
-        self._tracks(statuses, pal)
-        self._tracks_compact(statuses, pal)
+        for group in self.syl.ordered_groups():
+            tracks = self.syl.tracks_in(group)
+            if len(tracks) <= 6:
+                self._tracks(group, tracks, statuses, pal)
+            else:
+                self._tracks_compact(group, tracks, statuses, pal)
         self._next(statuses, pal)
         self._review(statuses, pal)
         self._week(statuses, pal)
@@ -461,11 +467,35 @@ class Dashboard(QWidget):
         card.lay.addWidget(host)
         self.root.addWidget(card)
 
-    def _tracks(self, statuses: Dict[str, Status], pal: dict) -> None:
-        group = "rentree"
-        tracks = self.syl.tracks_in(group)
-        if not tracks:
+    def _welcome(self, pal: dict) -> None:
+        """Seul le socle de maths est actif : on montre comment aller plus loin."""
+        if any(p.id not in (curriculum.BASE_PACK, curriculum.CUSTOM_PACK)
+               for p in self.syl.packs.values()):
             return
+        card = Card()
+        name = QLabel("Étendre le cursus à votre domaine")
+        name.setObjectName("H2")
+        card.lay.addWidget(name)
+        text = QLabel(
+            "Les mathématiques sont le socle. Décrivez vos objectifs (physique "
+            "quantique, chimie, neurosciences…) : Claude conçoit le cursus complet, "
+            "fondations comprises, branché sur ces cours de maths. D'autres packs sont "
+            "déjà prêts, comme l'apprentissage automatique.")
+        text.setObjectName("Muted")
+        text.setWordWrap(True)
+        card.lay.addWidget(text)
+        row = QHBoxLayout()
+        btn = QPushButton("Créer un cursus…")
+        btn.setProperty("primary", True)
+        btn.clicked.connect(self.curriculum_requested.emit)
+        row.addWidget(btn)
+        row.addStretch(1)
+        host = QWidget()
+        host.setLayout(row)
+        card.lay.addWidget(host)
+        self.root.addWidget(card)
+
+    def _tracks(self, group: str, tracks, statuses: Dict[str, Status], pal: dict) -> None:
         self._section_title(self.syl.group_name(group),
                             "chaque parcours = le cours cible et tout ce qu'il faut avant")
         grid = QGridLayout()
@@ -507,12 +537,9 @@ class Dashboard(QWidget):
         host.setLayout(grid)
         self.root.addWidget(host)
 
-    def _tracks_compact(self, statuses: Dict[str, Status], pal: dict) -> None:
-        """Les parcours du M2 : trop nombreux pour des cartes, une ligne chacun."""
-        group = "mva"
-        tracks = self.syl.tracks_in(group)
-        if not tracks:
-            return
+    def _tracks_compact(self, group: str, tracks, statuses: Dict[str, Status],
+                        pal: dict) -> None:
+        """Groupe trop fourni pour des cartes : une ligne par parcours."""
         self._section_title(self.syl.group_name(group),
                             "ce que chaque cours suppose acquis, et le chemin pour y arriver")
         card = Card()

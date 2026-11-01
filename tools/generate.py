@@ -2,7 +2,7 @@
 """Generation de cours en ligne de commande, sans interface.
 
   python tools/generate.py al-svd cd-hessienne
-  python tools/generate.py --track mva-optimisation
+  python tools/generate.py --track maths-optimisation
   python tools/generate.py --path opt-dualite-kkt      # le cours et ses prerequis
   python tools/generate.py --list
 """
@@ -32,7 +32,7 @@ def main() -> int:
     syl = load()
     parser = argparse.ArgumentParser(description="Generer des cours sans lancer l'application.")
     parser.add_argument("ids", nargs="*", help="identifiants de cours")
-    parser.add_argument("--track", help="generer tout un parcours MVA")
+    parser.add_argument("--track", help="generer tout un parcours (cours cible et prerequis)")
     parser.add_argument("--path", help="generer un cours et tous ses prerequis")
     parser.add_argument("--list", action="store_true", help="lister les cours")
     parser.add_argument("--resume", action="store_true",

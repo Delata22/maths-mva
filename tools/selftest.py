@@ -410,8 +410,8 @@ def test_course_import() -> None:
           data["sections"][0]["exercises"] == ["1"])
     check("import : doublons de mots-cles retires", data["keywords"] == ["a", "b"])
     entry = course_import.course_entry(dict(data, title="Rappels d'optimisation — partie I"))
-    check("import : cours range dans le domaine des cours du MVA",
-          entry["domain"] == course_import.DOMAIN["id"] and entry["id"].startswith("mva-"),
+    check("import : cours range dans le domaine des cours importes",
+          entry["domain"] == course_import.DOMAIN["id"] and entry["id"].startswith("imp-"),
           entry["id"])
 
     previous = os.environ.get("MATHSAPP_LIBRARY")
@@ -1135,8 +1135,9 @@ def test_gamify() -> None:
         streak = gamify.refresh_streak()
         check("la serie couvre l'oubli d'hier", streak.current == 3,
               "%d jours" % streak.current)
-        check("un gel a ete consomme", streak.freezes_left < gamify.FREEZES_PER_MONTH,
-              "%d gels restants" % streak.freezes_left)
+        yesterday = (today_d - _dt.timedelta(days=1)).isoformat()
+        check("un gel a ete consomme", bool(gamify.day_row(yesterday).get("frozen")),
+              "%d gels restants ce mois-ci" % streak.freezes_left)
         check("le trou de 3-4 jours n'est pas couvert", streak.current < 6)
     finally:
         for d in days:

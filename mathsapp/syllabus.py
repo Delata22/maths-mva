@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Dict, Iterable, List, Optional
 
-from . import syllabus_extra
+from . import curriculum, syllabus_extra
 
 
 @dataclass
@@ -20,6 +20,7 @@ class Course:
     objectives: List[str]
     keywords: List[str]
     custom: bool = False
+    pack: str = ""
     dependents: List[str] = field(default_factory=list)
     depth: int = 0
 
@@ -31,6 +32,7 @@ class Domain:
     description: str
     color: str
     custom: bool = False
+    pack: str = ""
 
 
 @dataclass
@@ -39,7 +41,7 @@ class Track:
     title: str
     goal: str
     extra: List[str]
-    group: str = "mva"
+    group: str = curriculum.CUSTOM_GROUP
     custom: bool = False
     # liste explicite et ordonnee : le parcours n'est alors pas etendu aux
     # prerequis (parcours express, qui suppose le reste connu)
@@ -52,6 +54,21 @@ class TrackGroup:
     id: str
     name: str
     description: str
+    pack: str = ""
+
+
+@dataclass
+class Pack:
+    """Un morceau de syllabus : sa discipline et ce qu'il vise orientent la
+    génération (voir curriculum.py)."""
+    id: str
+    title: str
+    description: str = ""
+    discipline: str = ""
+    requires: List[str] = field(default_factory=list)
+    goal: str = ""
+    style: List[str] = field(default_factory=list)
+    builtin: bool = False
 
 
 class Syllabus:
@@ -60,18 +77,31 @@ class Syllabus:
             d["id"]: Domain(**d) for d in data["domains"]
         }
         self.domain_order: List[str] = [d["id"] for d in data["domains"]]
-        self.levels: Dict[int, str] = {l["value"]: l["name"] for l in data["levels"]}
+        self.levels: Dict[int, str] = {
+            l["value"]: l["name"] for l in (data.get("levels") or curriculum.DEFAULT_LEVELS)}
+        self.packs: Dict[str, Pack] = {}
+        for p in data.get("packs", []):
+            self.packs[p["id"]] = Pack(**{k: p[k] for k in Pack.__dataclass_fields__ if k in p})
         self.courses: Dict[str, Course] = {}
         for c in data["courses"]:
+            if c["id"] in self.courses:
+                continue
             self.courses[c["id"]] = Course(
                 id=c["id"], title=c["title"], domain=c["domain"], level=c["level"],
                 prereqs=list(c["prereqs"]), summary=c["summary"],
                 objectives=list(c["objectives"]), keywords=list(c["keywords"]),
-                custom=bool(c.get("custom")),
+                custom=bool(c.get("custom")), pack=c.get("pack", ""),
             )
-        self.order: List[str] = [c["id"] for c in data["courses"]]
+        # un prerequis peut appartenir a un pack desactive : on l'ignore plutot
+        # que de refuser tout le syllabus
+        for course in self.courses.values():
+            course.prereqs = [p for p in course.prereqs
+                              if p in self.courses and p != course.id]
+        self.order: List[str] = list(self.courses)
         self.track_groups: Dict[str, TrackGroup] = {
-            g["id"]: TrackGroup(**g) for g in data.get("track_groups", [])
+            g["id"]: TrackGroup(id=g["id"], name=g["name"], description=g.get("description", ""),
+                                pack=g.get("pack", ""))
+            for g in data.get("track_groups", [])
         }
         self.tracks: Dict[str, Track] = {}
         for t in data.get("tracks", []):
@@ -79,10 +109,16 @@ class Syllabus:
             goal = t.get("goal") or (courses[-1] if courses else "")
             if goal not in self.courses:
                 continue
+            group = t.get("group") or curriculum.CUSTOM_GROUP
+            if group not in self.track_groups:
+                group = curriculum.CUSTOM_GROUP
+                self.track_groups.setdefault(group, TrackGroup(
+                    id=group, name="Mes parcours",
+                    description="Les parcours que vous avez créés."))
             self.tracks[t["id"]] = Track(
                 id=t["id"], title=t["title"], goal=goal,
-                extra=list(t.get("extra", [])), group=t.get("group", "mva"),
-                custom=bool(t.get("custom")), courses=courses,
+                extra=[e for e in t.get("extra", []) if e in self.courses and e != goal],
+                group=group, custom=bool(t.get("custom")), courses=courses,
                 featured=bool(t.get("featured")))
         for cid, course in self.courses.items():
             for p in course.prereqs:
@@ -127,6 +163,44 @@ class Syllabus:
         d = self.domains.get(did)
         return d.color if d else "#94a3b8"
 
+    def pack_of(self, cid: str) -> Optional[Pack]:
+        """Le pack qui oriente la génération du cours. Pour un cours ajouté à la
+        main (pack « perso »), celui de son domaine s'il en a un."""
+        c = self.courses.get(cid)
+        if not c:
+            return None
+        pack = self.packs.get(c.pack)
+        if pack is None or not pack.discipline:
+            dom = self.domains.get(c.domain)
+            owner = self.packs.get(dom.pack) if dom else None
+            if owner is not None:
+                return owner
+        return pack
+
+    def discipline(self, cid: Optional[str] = None) -> str:
+        """Discipline d'un cours ; sans cours, celles du cursus actif."""
+        if cid and cid in self.courses:
+            pack = self.pack_of(cid)
+            if pack and pack.discipline:
+                return pack.discipline
+        names = self.disciplines()
+        if not names:
+            return "sciences"
+        if len(names) == 1:
+            return names[0]
+        return ", ".join(names[:-1]) + " et " + names[-1]
+
+    def disciplines(self) -> List[str]:
+        out: List[str] = []
+        for p in self.packs.values():
+            if p.discipline and p.discipline not in out:
+                out.append(p.discipline)
+        return out
+
+    def goals(self) -> List[str]:
+        """Ce que visent les packs actifs, socle exclu."""
+        return [p.goal for p in self.packs.values() if p.goal]
+
     def all(self) -> List[Course]:
         return [self.courses[cid] for cid in self.order]
 
@@ -170,6 +244,16 @@ class Syllabus:
         """Les parcours du groupe, ceux mis en avant d'abord."""
         tracks = [t for t in self.tracks.values() if t.group == group_id]
         return sorted(tracks, key=lambda t: not t.featured)
+
+    def ordered_groups(self) -> List[str]:
+        """Groupes de parcours, du pack le plus spécialisé au socle ; ceux de
+        l'utilisateur en dernier. Les groupes vides sont omis."""
+        rank = {pid: i for i, pid in enumerate(self.packs)}
+        ids = [g for g in self.track_groups if self.tracks_in(g)]
+        return sorted(ids, key=lambda g: (
+            g == curriculum.CUSTOM_GROUP,
+            -rank.get(self.track_groups[g].pack, -1),
+            list(self.track_groups).index(g)))
 
     def group_name(self, group_id: str) -> str:
         g = self.track_groups.get(group_id)

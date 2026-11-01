@@ -1,4 +1,12 @@
-"""Construit mathsapp/data/syllabus.json a partir des definitions compactes ci-dessous.
+"""Construit les packs integres (mathsapp/data/packs/*.json) a partir des
+definitions compactes ci-dessous.
+
+Deux packs :
+    maths   le socle, de la logique a l'analyse fonctionnelle (toujours actif)
+    ml-mva  l'apprentissage automatique, tel que prepare pour le M2 MVA
+
+Un cours appartient au pack de son domaine, sauf exceptions listees dans
+COURSE_PACK (un cours de maths qui s'appuie sur un cours de ML).
 
 Chaque cours est un tuple :
     (id, titre, niveau, [prerequis], resume, [objectifs], [mots_cles])
@@ -8,7 +16,7 @@ Niveaux :
     2  licence 2
     3  licence 3
     4  master 1
-    5  master 2 / niveau MVA
+    5  master 2 / recherche
 """
 import json
 import pathlib
@@ -25,9 +33,9 @@ DOMAINS = [
     ("mesure", "Mesure & intégration", "Tribus, Lebesgue, espaces L^p.", "#22c55e"),
     ("probabilites", "Probabilités", "Du dé à six faces aux martingales.", "#14b8a6"),
     ("statistiques", "Statistiques", "Estimer, tester, apprendre à partir de données.", "#06b6d4"),
-    ("optimisation", "Optimisation convexe", "Cours de remise à niveau MVA.", "#3b82f6"),
-    ("fourier", "Analyse de Fourier", "Cours de remise à niveau MVA.", "#6366f1"),
-    ("analyse_fonc", "Analyse fonctionnelle", "Cours de remise à niveau MVA.", "#0ea5e9"),
+    ("optimisation", "Optimisation convexe", "Minimiser sous contraintes : convexité, dualité, algorithmes du premier ordre.", "#3b82f6"),
+    ("fourier", "Analyse de Fourier", "Décomposer en fréquences : séries, transformée, échantillonnage.", "#6366f1"),
+    ("analyse_fonc", "Analyse fonctionnelle", "Espaces de dimension infinie : Banach, Hilbert, opérateurs.", "#0ea5e9"),
     ("numerique", "Calcul numérique", "Ce qui se passe vraiment quand la machine calcule.", "#64748b"),
     ("ml", "Apprentissage : fondements", "Risque, généralisation, évaluation : le socle commun à tout le reste.", "#f43f5e"),
     ("ml_classique", "Modèles classiques", "Linéaires, noyaux, arbres, ensembles, partitionnement, factorisations.", "#fb7185"),
@@ -1158,7 +1166,7 @@ LEVEL_NAMES = {
     2: "Licence 1-2",
     3: "Licence 3",
     4: "Master 1",
-    5: "Master 2 / MVA",
+    5: "Master 2 / recherche",
 }
 
 C["algebre"] = [
@@ -1181,44 +1189,132 @@ C["algebre"] = [
 ]
 
 
-# Deux familles de parcours : les cours de la rentree (remise a niveau et
-# introduction au deep learning), puis les cours du M2 proprement dits.
-TRACK_GROUPS = [
+# ---------------------------------------------------------------------------
+# Packs
+# ---------------------------------------------------------------------------
+MATHS_DOMAINS = [
+    "logique", "ensembles", "arithmetique", "analyse", "algebre_lineaire",
+    "topologie", "calcul_diff", "mesure", "probabilites", "statistiques",
+    "optimisation", "fourier", "analyse_fonc", "numerique", "algebre",
+]
+ML_DOMAINS = [
+    "ml", "ml_classique", "ml_theorie", "bayes", "dl", "generatif", "vision",
+    "nlp", "rl", "ot_geo", "ml_pratique",
+]
+
+# Cours ranges dans un autre pack que celui de leur domaine : un pack ne peut
+# s'appuyer que sur les packs qu'il requiert.
+COURSE_PACK = {
+    "af-rkhs": "ml-mva",      # s'appuie sur ml-noyaux
+}
+
+PACK_META = {
+    "maths": {
+        "title": "Mathématiques",
+        "description": ("Le socle commun : de la logique propositionnelle à l'analyse "
+                        "fonctionnelle, en passant par l'algèbre linéaire, le calcul "
+                        "différentiel, la mesure, les probabilités, les statistiques, "
+                        "l'optimisation et Fourier."),
+        "discipline": "mathématiques",
+        "requires": [],
+        "goal": "",
+        "style": [
+            "Démontrez. Les résultats importants sont démontrés, en étapes explicites, "
+            "avec la stratégie annoncée avant les calculs. Une preuve s'ouvre sur "
+            "« voici l'idée de la preuve en une phrase ».",
+            "Rigueur : les énoncés sont exacts, les hypothèses complètes, les "
+            "quantificateurs dans le bon ordre.",
+        ],
+    },
+    "ml-mva": {
+        "title": "Apprentissage automatique (M2 MVA)",
+        "description": ("De l'apprentissage statistique aux grands modèles : fondements, "
+                        "modèles classiques, théorie, bayésien, deep learning, génératif, "
+                        "vision, langage, renforcement, transport optimal, pratique PyTorch. "
+                        "Construit pour préparer le M2 MVA (ENS Paris-Saclay)."),
+        "discipline": "apprentissage automatique",
+        "requires": ["maths"],
+        "goal": ("entrer en M2 MVA (ENS Paris-Saclay, parcours IA) : optimisation, "
+                 "probabilités, apprentissage statistique et apprentissage profond"),
+        "style": [
+            "Démontrez les résultats importants, en étapes explicites, avec la stratégie "
+            "annoncée avant les calculs.",
+            "Rigueur : les énoncés sont exacts et les hypothèses complètes. Quand un "
+            "résultat n'est qu'empirique, dites-le.",
+            "Reliez la théorie à la pratique : ce qu'on observe vraiment à l'entraînement, "
+            "et au besoin un court extrait de code PyTorch dans <pre><code>.",
+        ],
+    },
+}
+
+# Parcours generiques du socle de maths : chaque chapitre avec tout ce qu'il
+# suppose avant.
+MATHS_TRACK_GROUPS = [
+    ("maths", "Les grands chapitres", "Chaque chapitre, avec tout ce qu'il suppose avant."),
+]
+MATHS_TRACKS = {
+    "maths-algebre-lineaire": {
+        "group": "maths",
+        "title": "Algèbre linéaire",
+        "goal": "al-svd",
+        "extra": ["al-spectral", "al-quadratiques"],
+    },
+    "maths-calcul-diff": {
+        "group": "maths",
+        "title": "Calcul différentiel",
+        "goal": "cd-matrix-calculus",
+        "extra": ["cd-hessienne", "cd-extrema"],
+    },
+    "maths-proba": {
+        "group": "maths",
+        "title": "Probabilités",
+        "goal": "pro-lgn-tcl",
+        "extra": ["pro-esperance-conditionnelle", "pro-markov"],
+    },
+    "maths-optimisation": {
+        "group": "maths",
+        "title": "Optimisation convexe",
+        "goal": "opt-dualite-kkt",
+        "extra": ["opt-gradient", "opt-acceleration", "opt-stochastique", "opt-proximal"],
+    },
+    "maths-analyse-fonc": {
+        "group": "maths",
+        "title": "Analyse fonctionnelle",
+        "goal": "af-compacts-spectral",
+        "extra": ["af-hahn-banach", "af-topologies-faibles"],
+    },
+    "maths-stats": {
+        "group": "maths",
+        "title": "Statistiques",
+        "goal": "sta-tests",
+        "extra": ["sta-fisher", "sta-bayes", "sta-apprentissage"],
+    },
+    "maths-fourier": {
+        "group": "maths",
+        "title": "Analyse de Fourier",
+        "goal": "fou-plancherel",
+        "extra": ["fou-tfd-fft", "fou-shannon"],
+    },
+}
+
+# Deux familles de parcours pour le M2 : les cours de la rentree (remise a
+# niveau et introduction au deep learning), puis les cours du M2 proprement dits.
+ML_TRACK_GROUPS = [
     ("rentree", "Les cours de la rentrée", "Remise à niveau et introduction au deep learning."),
     ("mva", "Les cours du M2", "Ce que chaque cours suppose acquis, et tout le chemin pour y arriver."),
 ]
 
-TRACKS = {
-    "mva-proba": {
-        "group": "rentree",
-        "title": "Remise à niveau — Probabilités",
-        "goal": "pro-lgn-tcl",
-        "extra": ["pro-esperance-conditionnelle", "pro-markov"],
-    },
-    "mva-optimisation": {
-        "group": "rentree",
-        "title": "Remise à niveau — Optimisation convexe",
-        "goal": "opt-dualite-kkt",
-        "extra": ["opt-gradient", "opt-acceleration", "opt-stochastique", "opt-proximal"],
-    },
-    "mva-analyse-fonc": {
-        "group": "rentree",
-        "title": "Remise à niveau — Analyse fonctionnelle",
-        "goal": "af-compacts-spectral",
-        "extra": ["af-hahn-banach", "af-topologies-faibles"],
-    },
-    "mva-stats": {
-        "group": "rentree",
-        "title": "Remise à niveau — Statistiques",
-        "goal": "sta-tests",
-        "extra": ["sta-fisher", "sta-bayes", "sta-apprentissage"],
-    },
-    "mva-fourier": {
-        "group": "rentree",
-        "title": "Remise à niveau — Analyse de Fourier",
-        "goal": "fou-plancherel",
-        "extra": ["fou-tfd-fft", "fou-shannon"],
-    },
+# Les remises a niveau du MVA sont des chapitres du socle : le pack ML les
+# range dans « Les cours de la rentree », sous leur titre MVA.
+ML_TRACK_OVERRIDES = {
+    "maths-proba": {"group": "rentree", "title": "Remise à niveau — Probabilités"},
+    "maths-optimisation": {"group": "rentree", "title": "Remise à niveau — Optimisation convexe"},
+    "maths-analyse-fonc": {"group": "rentree", "title": "Remise à niveau — Analyse fonctionnelle"},
+    "maths-stats": {"group": "rentree", "title": "Remise à niveau — Statistiques"},
+    "maths-fourier": {"group": "rentree", "title": "Remise à niveau — Analyse de Fourier"},
+}
+
+ML_TRACKS = {
     "mva-deep-learning": {
         "group": "rentree",
         "title": "Introduction au deep learning (PyTorch)",
@@ -1318,8 +1414,13 @@ TRACKS = {
     },
 }
 
+PACKS = [
+    ("maths", MATHS_DOMAINS, MATHS_TRACK_GROUPS, MATHS_TRACKS, {}),
+    ("ml-mva", ML_DOMAINS, ML_TRACK_GROUPS, ML_TRACKS, ML_TRACK_OVERRIDES),
+]
 
-def build():
+
+def _all_courses():
     courses = []
     seen = set()
     for domain, _, _, _ in DOMAINS:
@@ -1337,20 +1438,11 @@ def build():
                 "objectives": objectives,
                 "keywords": keywords,
             })
+    return courses
 
-    ids = {c["id"] for c in courses}
-    for c in courses:
-        for p in c["prereqs"]:
-            if p not in ids:
-                raise ValueError("prerequis inconnu %s pour %s" % (p, c["id"]))
 
-    # Les identifiants servent de noms de dossiers et de cles en base : ils
-    # doivent rester en ASCII, meme si les libelles sont accentues.
-    for cid in sorted(ids) + [d for d, _, _, _ in DOMAINS] + sorted(TRACKS):
-        if not re.fullmatch(r"[a-z0-9_-]+", cid):
-            raise ValueError("identifiant non ASCII : %r" % cid)
-
-    # detection de cycle
+def _check_acyclic(courses):
+    by_id = {c["id"]: c for c in courses}
     color = {}
 
     def visit(node, stack):
@@ -1360,7 +1452,6 @@ def build():
         if state == 2:
             return
         color[node] = 1
-        by_id = {c["id"]: c for c in courses}
         for p in by_id[node]["prereqs"]:
             visit(p, stack + [node])
         color[node] = 2
@@ -1368,38 +1459,83 @@ def build():
     for c in courses:
         visit(c["id"], [])
 
-    groups = {g for g, _, _ in TRACK_GROUPS}
-    for tid, t in TRACKS.items():
-        if t.get("group", "mva") not in groups:
-            raise ValueError("groupe de parcours inconnu pour %s" % tid)
-        if t["goal"] not in ids:
-            raise ValueError("objectif de parcours inconnu: " + t["goal"])
-        for e in t["extra"]:
-            if e not in ids:
-                raise ValueError("cours de parcours inconnu: " + e)
 
-    data = {
-        "version": 1,
-        "domains": [
-            {"id": d, "name": n, "description": desc, "color": col}
-            for d, n, desc, col in DOMAINS
-        ],
-        "levels": [{"value": k, "name": v} for k, v in sorted(LEVEL_NAMES.items())],
-        "track_groups": [
-            {"id": g, "name": n, "description": d} for g, n, d in TRACK_GROUPS
-        ],
-        "tracks": [
-            {"id": k, "title": v["title"], "goal": v["goal"], "extra": v["extra"],
-             "group": v.get("group", "mva")}
-            for k, v in TRACKS.items()
-        ],
-        "courses": courses,
-    }
-    return data
+def build():
+    """Retourne {pack_id: donnees du pack}."""
+    courses = _all_courses()
+    ids = {c["id"] for c in courses}
+    for c in courses:
+        for p in c["prereqs"]:
+            if p not in ids:
+                raise ValueError("prerequis inconnu %s pour %s" % (p, c["id"]))
+
+    all_tracks = dict(MATHS_TRACKS, **ML_TRACKS)
+    # Les identifiants servent de noms de dossiers et de cles en base : ils
+    # doivent rester en ASCII, meme si les libelles sont accentues.
+    for cid in sorted(ids) + [d for d, _, _, _ in DOMAINS] + sorted(all_tracks):
+        if not re.fullmatch(r"[a-z0-9_-]+", cid):
+            raise ValueError("identifiant non ASCII : %r" % cid)
+    _check_acyclic(courses)
+
+    domain_pack = {}
+    for pid, domains, _, _, _ in PACKS:
+        for d in domains:
+            if d in domain_pack:
+                raise ValueError("domaine dans deux packs : " + d)
+            domain_pack[d] = pid
+    missing = {d for d, _, _, _ in DOMAINS} - set(domain_pack)
+    if missing:
+        raise ValueError("domaines sans pack : %s" % sorted(missing))
+
+    course_pack = {c["id"]: COURSE_PACK.get(c["id"], domain_pack[c["domain"]])
+                   for c in courses}
+    order = [pid for pid, *_ in PACKS]
+    visible = {}
+    for pid in order:
+        # un pack voit ses propres cours et ceux des packs qu'il requiert
+        visible[pid] = {pid} | set(PACK_META[pid]["requires"])
+    for c in courses:
+        own = course_pack[c["id"]]
+        for p in c["prereqs"]:
+            if course_pack[p] not in visible[own]:
+                raise ValueError("%s (%s) depend de %s (%s), hors des packs requis"
+                                 % (c["id"], own, p, course_pack[p]))
+
+    domain_info = {d: (n, desc, col) for d, n, desc, col in DOMAINS}
+    out = {}
+    for pid, domains, groups, tracks, overrides in PACKS:
+        mine = [c for c in courses if course_pack[c["id"]] == pid]
+        reach = {c["id"] for c in courses if course_pack[c["id"]] in visible[pid]}
+        group_ids = {g for g, _, _ in groups}
+        for tid, t in tracks.items():
+            if t["group"] not in group_ids:
+                raise ValueError("groupe de parcours inconnu pour %s" % tid)
+            for target in [t["goal"]] + t["extra"]:
+                if target not in reach:
+                    raise ValueError("cours de parcours hors du pack %s : %s" % (pid, target))
+        for tid, o in overrides.items():
+            if tid not in all_tracks or o.get("group") not in group_ids:
+                raise ValueError("surcharge de parcours invalide : %s" % tid)
+        out[pid] = dict(
+            {"version": 1, "id": pid},
+            **PACK_META[pid],
+            domains=[{"id": d, "name": domain_info[d][0], "description": domain_info[d][1],
+                      "color": domain_info[d][2]} for d in domains],
+            levels=[{"value": k, "name": v} for k, v in sorted(LEVEL_NAMES.items())],
+            track_groups=[{"id": g, "name": n, "description": d} for g, n, d in groups],
+            tracks=[{"id": k, "title": v["title"], "goal": v["goal"], "extra": v["extra"],
+                     "group": v["group"]} for k, v in tracks.items()],
+            track_overrides=overrides,
+            courses=mine,
+        )
+    return out
 
 
 if __name__ == "__main__":
-    out = pathlib.Path(__file__).resolve().parent.parent / "mathsapp" / "data" / "syllabus.json"
-    data = build()
-    out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("%d cours, %d domaines -> %s" % (len(data["courses"]), len(data["domains"]), out))
+    root = pathlib.Path(__file__).resolve().parent.parent / "mathsapp" / "data" / "packs"
+    root.mkdir(parents=True, exist_ok=True)
+    for pid, data in build().items():
+        path = root / ("%s.json" % pid)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print("%-7s %3d cours, %2d domaines, %2d parcours -> %s"
+              % (pid, len(data["courses"]), len(data["domains"]), len(data["tracks"]), path))

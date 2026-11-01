@@ -20,12 +20,12 @@ from . import theme
 from .webview import WebView
 
 EMPTY_GENERAL = (
-    "Posez n'importe quelle question de maths.<br>"
+    "Posez n'importe quelle question sur le cursus.<br>"
     "Sélectionnez un passage d'un cours pour le mettre en contexte."
 )
 EMPTY_COURSE = "Questions sur ce cours. Le contexte du cursus est déjà fourni à Claude."
 EMPTY_QUESTION = (
-    "Posez n'importe quelle question de maths.<br>"
+    "Posez n'importe quelle question sur le cursus.<br>"
     "« Pourquoi la variance d'une somme n'est-elle pas la somme des variances ? »<br>"
     "« À quoi sert l'uniforme intégrabilité ? »<br>"
     "La réponse se termine par les cours qui en parlent, avec un lien vers la section."

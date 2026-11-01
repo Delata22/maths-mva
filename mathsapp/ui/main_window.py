@@ -10,10 +10,10 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDockWidget, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
+    QMenu, QMessageBox, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import content, gamify, gaps, review as review_mod, settings, status as st_mod, store
+from .. import content, curriculum, gamify, gaps, review as review_mod, settings, status as st_mod, store
 from ..generation.claude_cli import ClaudeError, check_available
 from ..generation.queue import DONE, ERROR, GenerationQueue
 from ..syllabus import Syllabus, load as load_syllabus, reload as reload_syllabus
@@ -28,6 +28,7 @@ from .queue_panel import QueuePanel
 from .session_page import SessionPage
 from .td_page import TdPage
 from .questions_page import QuestionsPage
+from .curriculum_dialog import CurriculumDialog
 from .syllabus_dialog import SyllabusDialog
 
 PAGE_HOME, PAGE_LIBRARY, PAGE_COURSE, PAGE_GRAPH, PAGE_SESSION, PAGE_TD, PAGE_QUESTIONS = range(7)
@@ -99,7 +100,7 @@ class MainWindow(QMainWindow):
         self._proof_windows: List[ProofHelperWindow] = []
         self._exporters: List[object] = []
 
-        self.setWindowTitle("Maths MVA")
+        self.setWindowTitle(curriculum.profile()["title"])
         self.resize(1500, 950)
 
         self._build_topbar()
@@ -137,9 +138,9 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(14, 8, 12, 8)
         lay.setSpacing(4)
 
-        brand = QLabel("Maths MVA")
-        brand.setObjectName("Brand")
-        lay.addWidget(brand)
+        self.brand = QLabel(curriculum.profile()["title"])
+        self.brand.setObjectName("Brand")
+        lay.addWidget(self.brand)
 
         self.nav_buttons = {}
         for key, label, tip in [
@@ -195,11 +196,19 @@ class MainWindow(QMainWindow):
         self.queue_badge.setVisible(False)
         lay.addWidget(self.queue_badge)
 
+        # « Cursus » : packs et profil, nouveau cursus, ajout de quelques cours
         self.btn_syllabus = QToolButton()
-        self.btn_syllabus.setText("Syllabus")
-        self.btn_syllabus.setToolTip("Créer de nouveaux cours dans le syllabus  (Ctrl+N)")
+        self.btn_syllabus.setText("Cursus")
+        self.btn_syllabus.setToolTip(
+            "Packs de cours, nouveau cursus pour un autre domaine, ajout de cours")
         self.btn_syllabus.setAutoRaise(True)
-        self.btn_syllabus.clicked.connect(self.open_syllabus_dialog)
+        self.btn_syllabus.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(self.btn_syllabus)
+        menu.addAction("Packs et profil…", lambda: self.open_curriculum_dialog())
+        menu.addAction("Nouveau cursus…  (Ctrl+Maj+N)",
+                       lambda: self.open_curriculum_dialog(new=True))
+        menu.addAction("Ajouter des cours au syllabus…  (Ctrl+N)", self.open_syllabus_dialog)
+        self.btn_syllabus.setMenu(menu)
         lay.addWidget(self.btn_syllabus)
 
         self.btn_theme = QToolButton()
@@ -303,6 +312,7 @@ class MainWindow(QMainWindow):
         self.dashboard.show_graph.connect(self.show_track)
         self.dashboard.session_requested.connect(self.start_session)
         self.dashboard.resume_requested.connect(self.resume_course)
+        self.dashboard.curriculum_requested.connect(lambda: self.open_curriculum_dialog(new=True))
         self.session.finished.connect(self._on_session_finished)
         self.session.leave.connect(self.go_home)
         self.td_page.course_opened.connect(self.open_course)
@@ -334,6 +344,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+6"), self, lambda: self.go(PAGE_QUESTIONS))
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("Ctrl+N"), self, self.open_syllabus_dialog)
+        QShortcut(QKeySequence("Ctrl+Shift+N"), self, lambda: self.open_curriculum_dialog(new=True))
         QShortcut(QKeySequence("Ctrl+G"), self, self.toggle_queue)
 
     # ------------------------------------------------------------- navigation
@@ -1161,7 +1172,7 @@ class MainWindow(QMainWindow):
         if QMessageBox.question(
                 self, "Importer un cours",
                 "Importer « %s » ?\n\nClaude lit tout le document, inscrit le cours au "
-                "syllabus (domaine « Cours du MVA »), le réécrit section par section en "
+                "syllabus (domaine « Cours importés »), le réécrit section par section en "
                 "relisant les pages, avec intuitions et liens vers vos cours, puis produit "
                 "QCM, fiche et corrections des exercices du document.\n\n"
                 "Comptez environ %d min et de l'ordre de %.0f à %.0f $. Tout reprend "
@@ -1438,9 +1449,26 @@ class MainWindow(QMainWindow):
         dialog.raise_()
         dialog.activateWindow()
 
+    def open_curriculum_dialog(self, new: bool = False) -> None:
+        dialog = getattr(self, "_curriculum_dialog", None)
+        if dialog is None:
+            dialog = CurriculumDialog(self.syl, self)
+            dialog.changed.connect(self.reload_syllabus)
+            self._curriculum_dialog = dialog
+        dialog.set_syllabus(self.syl)
+        if new:
+            dialog.show_new()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
     def reload_syllabus(self) -> None:
         """Après un ajout ou un retrait : on relit le syllabus et on rafraîchit tout."""
+        curriculum.reload()
         self.syl = reload_syllabus()
+        title = curriculum.profile()["title"]
+        self.brand.setText(title)
+        self.setWindowTitle(title)
         for page in (self.library, self.course_page, self.graph, self.dashboard):
             page.set_syllabus(self.syl)
         self.session.syl = self.syl
@@ -1449,9 +1477,10 @@ class MainWindow(QMainWindow):
         self.chat.syl = self.syl
         for window in self._proof_windows:
             window.chat.syl = self.syl
-        dialog = getattr(self, "_syllabus_dialog", None)
-        if dialog is not None:
-            dialog.set_syllabus(self.syl)
+        for name in ("_syllabus_dialog", "_curriculum_dialog"):
+            dialog = getattr(self, name, None)
+            if dialog is not None:
+                dialog.set_syllabus(self.syl)
         self.statusBar().showMessage(
             "Syllabus rechargé : %d cours" % len(self.syl.courses), 6000)
 

@@ -5,6 +5,7 @@ import json
 import re
 from typing import Dict, List, Optional
 
+from .. import curriculum
 from ..syllabus import Course, Syllabus
 
 # ---------------------------------------------------------------------------
@@ -127,35 +128,94 @@ table (thead/tbody/tr/th/td), blockquote, hr, span class="badge", figure,
 figcaption, et les <div class="mviz"> + <script> des figures.
 """
 
-STYLE = r"""
-Vous ecrivez un cours de mathematiques pour un etudiant francais qui entre en
-M2 MVA (ENS Paris-Saclay). Son niveau de depart a supposer : terminale option
-maths expertes, solide mais sans aucune notion post-bac. Il vise l'IA
-(optimisation, probabilites, apprentissage statistique).
+# ---------------------------------------------------------------------------
+# Le lecteur et la discipline : tirés du cursus actif (packs + profil), pour que
+# les mêmes prompts servent aux maths, à la physique ou à n'importe quel domaine.
+# ---------------------------------------------------------------------------
+def app_name() -> str:
+    return curriculum.profile().get("title") or "Mon cursus"
+
+
+def _goals(syl: Optional[Syllabus], course: Optional[Course] = None) -> List[str]:
+    """Ce que vise l'étudiant : l'objectif du pack du cours s'il en a un,
+    sinon ceux de tous les packs actifs (un cours du socle sert à tous)."""
+    if syl is None:
+        return []
+    if course is not None:
+        pack = syl.pack_of(course.id)
+        if pack and pack.goal:
+            return [pack.goal]
+    return syl.goals()
+
+
+def audience(syl: Optional[Syllabus], course: Optional[Course] = None) -> str:
+    """Qui lit, d'où il part, ce qu'il vise. Quelques phrases."""
+    prof = curriculum.profile()
+    lines = ["Le lecteur est un étudiant francophone. Niveau de départ à supposer : %s."
+             % prof["start_level"].rstrip(".")]
+    goals = _goals(syl, course)
+    if goals:
+        lines.append("Son objectif : %s." % " ; ".join(g.rstrip(".") for g in goals))
+    if prof.get("about"):
+        lines.append("Ce qu'il dit de lui : %s" % prof["about"])
+    return "\n".join(lines)
+
+
+def discipline(syl: Optional[Syllabus], course: Optional[Course] = None) -> str:
+    if syl is None:
+        return "sciences"
+    return syl.discipline(course.id if course else None)
+
+
+def style(syl: Optional[Syllabus], course: Optional[Course] = None) -> str:
+    """Ligne éditoriale commune à tout ce qui s'écrit pour l'étudiant."""
+    goals = _goals(syl, course)
+    link = ("Reliez aux objectifs de l'étudiant quand c'est honnête. Si une notion "
+            "sert directement pour ce qu'il vise (%s), dites-le en une ou deux phrases. "
+            "Ne forcez pas le lien s'il n'existe pas." % " ; ".join(goals)
+            if goals else
+            "Montrez à quoi sert chaque notion quand c'est honnête, en une ou deux "
+            "phrases. Ne forcez pas le lien s'il n'existe pas.")
+    rules = []
+    packs = []
+    if syl is not None and course is not None:
+        pack = syl.pack_of(course.id)
+        packs = [pack] if pack and pack.style else []
+    elif syl is not None:
+        packs = [p for p in syl.packs.values() if p.style]
+    for pack in packs:
+        for r in pack.style:
+            if r not in rules:
+                rules.append(r)
+    specific = ""
+    if rules:
+        specific = ("\n\nCONSIGNES PROPRES À LA DISCIPLINE\n\n"
+                    + "\n".join("- %s" % r for r in rules))
+    return f"""
+Vous écrivez un cours. Discipline : {discipline(syl, course)}.
+{audience(syl, course)}
 
 CE QUI EST ATTENDU
 
-1. L'intuition d'abord, toujours. Avant chaque definition formelle, expliquez
-   le probleme qu'elle resout et donnez une image mentale concrete. Une notion
-   qui tombe du ciel est un echec.
+1. L'intuition d'abord, toujours. Avant chaque définition formelle, expliquez
+   le problème qu'elle résout et donnez une image mentale concrète. Une notion
+   qui tombe du ciel est un échec.
 2. Longueur libre. Un cours long et lumineux vaut mieux qu'un cours court et
-   opaque. Ne compressez jamais au prix de la comprehension. En revanche pas de
+   opaque. Ne compressez jamais au prix de la compréhension. En revanche pas de
    remplissage : chaque paragraphe doit apporter quelque chose.
-3. Visuel des que possible. Une figure interactive a chaque endroit ou la
-   geometrie eclaire l'algebre.
-4. Demontrez. Les resultats importants sont demontres, en etapes explicites,
-   avec la strategie annoncee avant les calculs. Une preuve doit s'ouvrir sur
-   "voici l'idee de la preuve en une phrase".
-5. Nommez les pieges. A chaque notion delicate, dites explicitement l'erreur
+3. Visuel dès que possible. Une figure interactive à chaque endroit où la
+   géométrie, une simulation ou un graphique éclaire le raisonnement.
+4. Justifiez. Les résultats importants sont établis (démonstration,
+   dérivation ou argument), en étapes explicites, avec la stratégie annoncée
+   avant les calculs.
+5. Nommez les pièges. À chaque notion délicate, dites explicitement l'erreur
    que tout le monde fait.
-6. Reliez au ML quand c'est honnete. Si une notion sert directement en
-   apprentissage, dites-le en une ou deux phrases. Ne forcez pas le lien s'il
-   n'existe pas.
-7. Rigueur : les enonces sont exacts, les hypotheses completes, les
-   quantificateurs dans le bon ordre. Le ton est direct, en francais, sans
-   emphase creuse ("fascinant", "puissant", "il est important de noter que").
-   Vouvoyez le lecteur ou utilisez la forme impersonnelle.
-8. Notation : introduisez chaque symbole avant de l'utiliser.
+6. {link}
+7. Exactitude : les énoncés sont exacts et les hypothèses complètes. Le ton est
+   direct, en français, sans emphase creuse (« fascinant », « puissant », « il
+   est important de noter que »). Vouvoyez le lecteur ou utilisez la forme
+   impersonnelle.
+8. Notation : introduisez chaque symbole avant de l'utiliser.{specific}
 """
 
 
@@ -212,7 +272,7 @@ PLAN_SCHEMA = {
 
 
 def plan_prompt(syl: Syllabus, course: Course, max_sections: int = 9) -> str:
-    return f"""{STYLE}
+    return f"""{style(syl, course)}
 
 {_context(syl, course)}
 
@@ -274,7 +334,7 @@ def section_prompt(syl: Syllabus, course: Course, plan: dict, index: int,
                  "<div class=\"box recap\"> qui liste ce qu'il faut retenir, puis un court "
                  "paragraphe sur ce que ce cours ouvre.\n")
 
-    return f"""{STYLE}
+    return f"""{style(syl, course)}
 
 {HTML_CONVENTIONS}
 
@@ -370,7 +430,7 @@ EXERCISES_SCHEMA = {
 def exercises_prompt(syl: Syllabus, course: Course, plan: dict, digest: str) -> str:
     left = plan.get("left_as_exercise", [])
     left_txt = "\n".join("  - %s" % r for r in left) or "  (aucun)"
-    return f"""{STYLE}
+    return f"""{style(syl, course)}
 
 Vous produisez les exercices d'un cours deja redige. Voici sa structure et ses
 passages cles.
@@ -462,6 +522,9 @@ DEUX TYPES DE QUESTIONS, indiques par le champ `kind`.
   - `section` : le titre de la section du cours concernee.
 
 `proofs` : 5 demonstrations a faire, difficulte croissante (1 a 5).
+  - Hors des mathematiques, une « demonstration a faire » peut etre une
+    derivation (etablir une loi, une equation, un ordre de grandeur) ou un
+    probleme a resoudre de bout en bout : le format reste le meme.
   - Reprenez en priorite les resultats laisses en exercice ci-dessus.
   - `statement` : l'enonce complet, hypotheses comprises.
   - `hints` : 3 indices, du plus vague au plus explicite. Le premier donne la
@@ -481,9 +544,9 @@ Repondez uniquement par l'objet JSON."""
 
 # ---------------------------------------------------------------------- chat
 def chat_system(course: Optional[Course], syl: Optional[Syllabus]) -> str:
-    base = """Vous etes un tuteur de mathematiques. Votre interlocuteur prepare
-son entree en M2 MVA (IA, ENS Paris-Saclay) et remonte tout son cursus de maths
-depuis le niveau terminale.
+    who = audience(syl, course)
+    base = """Vous etes un tuteur. Discipline : %s.
+%s
 
 Regles :
 - Repondez en francais, directement, sans preambule ni flatterie.
@@ -501,7 +564,8 @@ em, code, pre, h4, table, et <div class="box intuition|warning|example">
 $ ... $ ou $$ ... $$ (KaTeX). Pas de balises ``` autour de la reponse, pas de
 <html> ni <body>. N'ecrivez JAMAIS de mathematiques dans <code> ni dans <pre> :
 <code> est reserve aux identifiants de code. Macros disponibles : \\R \\N \\Z \\Q \\C \\E \\P \\eps \\dd
-\\Var \\Cov \\rank \\tr \\diag \\Id \\argmin \\argmax \\norm{} \\abs{} \\scal{}{}."""
+\\Var \\Cov \\rank \\tr \\diag \\Id \\argmin \\argmax \\norm{} \\abs{} \\scal{}{}.""" % (
+        discipline(syl, course), who)
     if course is None:
         return base
     ctx = "\n\nCONTEXTE : la question porte sur le cours \"%s\" (%s, niveau %d/5). %s" % (
@@ -719,7 +783,7 @@ def daily_quiz_prompt(syl: Syllabus, items: List[dict], count: int = 10) -> str:
     corpus = "\n\n".join(blocks)
     titles = ", ".join(item["course"].title for item in items)
 
-    return f"""{STYLE}
+    return f"""{style(syl)}
 
 Vous composez le QUIZ DU JOUR : une serie courte qui fait reviser plusieurs
 chapitres a la fois, pour entretenir ce qui a deja ete travaille.
@@ -849,7 +913,7 @@ def syllabus_prompt(syl: Syllabus, request: str, count: int,
     if level_hint:
         level = "\nNiveau vise : %s. Ajustez la profondeur en consequence.\n" % level_hint
 
-    return f"""{STYLE}
+    return f"""{style(syl)}
 
 Vous n'ecrivez pas un cours ici : vous concevez une EXTENSION DE SYLLABUS.
 
@@ -1065,7 +1129,7 @@ def extra_quiz_prompt(syl: Syllabus, course: Course, plan: dict, digest: str,
         "  - [%s] %s" % (q.get("kind", "direct"),
                          re.sub(r"<[^>]+>", " ", q.get("question", ""))[:160])
         for q in existing)
-    return f"""{STYLE}
+    return f"""{style(syl, course)}
 
 Vous produisez une SERIE SUPPLEMENTAIRE de questions pour un cours dont une
 serie existe deja. Elle doit permettre de se retester sans retomber sur les
@@ -1130,12 +1194,14 @@ def td_structure_prompt(syl: Syllabus, pdf_path: str, document_text: str = "") -
         access = (f"Voici le texte du sujet de TD, extrait automatiquement du PDF\n"
                   f"« {pdf_path} ». Travaillez uniquement à partir de ce texte, "
                   f"n'ouvrez aucun fichier.\nL'extraction abîme souvent les formules : "
-                  f"rétablissez-les en LaTeX d'après\nle contexte mathématique.\n\n"
+                  f"rétablissez-les en LaTeX d'après\nle contexte scientifique.\n\n"
                   f"--- début du document ---\n{document_text}\n--- fin du document ---")
     else:
         access = (f"Lisez le sujet de TD situé dans le fichier suivant, avec l'outil Read,\n"
                   f"page par page et en entier :\n\n    {pdf_path}")
     return f"""{access}
+
+{audience(syl)}
 
 Vous devez en produire une transcription STRUCTURÉE et FIDÈLE.
 
@@ -1158,7 +1224,7 @@ Vous devez en produire une transcription STRUCTURÉE et FIDÈLE.
    - `key_results` : les résultats précis dont la résolution a besoin, nommés
      comme dans un cours (« théorème de convergence dominée », « formule de
      transfert », « lemme de Borel-Cantelli »), trois à six.
-   - `difficulty` : de 1 à 5, pour un étudiant qui entre en M2.
+   - `difficulty` : de 1 à 5, pour l'étudiant décrit plus haut.
 
 CATALOGUE DES COURS (identifiant, niveau, titre) :
 
@@ -1223,14 +1289,14 @@ def td_correction_prompt(syl: Syllabus, td_title: str, exercise: dict,
     material = "\n\n".join(blocks) or "(aucun cours rattaché)"
     results = "\n".join("  - %s" % r for r in exercise.get("key_results", [])) or "  (non précisés)"
 
-    return f"""{STYLE}
+    return f"""{style(syl)}
 
 {MVIZ_API}
 
 {TD_CONVENTIONS}
 
-Vous rédigez la CORRECTION COMMENTÉE d'un exercice de TD, pour un étudiant qui
-entre en M2 MVA et vient de chercher l'exercice. Ce n'est pas un corrigé
+Vous rédigez la CORRECTION COMMENTÉE d'un exercice de TD, pour l'étudiant
+décrit plus haut, qui vient de chercher l'exercice. Ce n'est pas un corrigé
 d'examen à recopier : c'est une correction qui fait COMPRENDRE, pour qu'il sache
 refaire seul un exercice voisin.
 
@@ -1311,7 +1377,7 @@ def training_prompt(syl: Syllabus, course: Course, section_titles: List[str],
     later_txt = ", ".join(c.title for c in later if c) or "(aucun)"
     sections = "\n".join("  - %s" % t for t in section_titles) or "  (aucune)"
     seen_txt = "\n".join("  - %s" % t for t in seen[:40]) or "  (aucun)"
-    return f"""{STYLE}
+    return f"""{style(syl, course)}
 
 {_context(syl, course)}
 
@@ -1444,7 +1510,7 @@ def refresher_prompt(syl: Syllabus, course: Course, digest: str, missed: List[di
     missed_text = "\n\n".join(blocks) or "  (aucune question précise)"
     seen_text = "\n".join("  - %s" % s[:110] for s in seen[:30]) or "  (aucune)"
 
-    return f"""{STYLE}
+    return f"""{style(syl, course)}
 
 Vous préparez un RAPPEL CIBLÉ sur le cours « {course.title} » [{course.id}],
 niveau {course.level}/5.
@@ -1499,10 +1565,12 @@ difficulty, question, choices, answer, explanation, section."""
 # Assistant de l'application
 # ---------------------------------------------------------------------------
 def assistant_system(state: str) -> str:
-    return f"""Vous êtes l'assistant intégré à « Maths MVA », une application de bureau
-qui prépare son utilisateur à la rentrée du M2 MVA : cursus de mathématiques
-complet (262 cours et plus), cours rédigés par Claude à la demande, QCM,
-démonstrations, fiches de révision, corrections de TD, révisions espacées.
+    return f"""Vous êtes l'assistant intégré à « {app_name()} », une application de bureau
+d'apprentissage scientifique : un cursus en packs (le socle de mathématiques,
+puis des extensions par domaine, dont celles que l'utilisateur génère), des
+cours rédigés par Claude à la demande, QCM, démonstrations, fiches de révision,
+corrections de TD, révisions espacées.
+{audience(None)}
 
 Votre rôle : comprendre ce que l'utilisateur veut faire DANS l'application et le
 lui préparer. Vous ne faites rien vous-même : vous proposez des actions, que
@@ -1540,7 +1608,7 @@ FORME DE LA RÉPONSE :
 - N'utilisez que des identifiants présents dans l'état ci-dessous.
 - Si la demande est ambiguë au point de risquer une dépense inutile, posez
   une question courte au lieu de proposer une action.
-- Pour une question de mathématiques pure, répondez brièvement et signalez que
+- Pour une question de cours pure (maths, physique…), répondez brièvement et signalez que
   le bouton « Chat » ouvre le tuteur, plus adapté.
 - Français avec tous les accents.
 - Chaque message de l'utilisateur commence par un bloc <etat_a_jour> : la file
@@ -1553,8 +1621,9 @@ FORME DE LA RÉPONSE :
 
 
 def code_change_system() -> str:
-    return """Vous modifiez le code de « Maths MVA », une application de bureau Python
-(PySide6 + QtWebEngine) qui aide son utilisateur à préparer le M2 MVA. Vous
+    return """Vous modifiez le code de « maths-app », une application de bureau Python
+(PySide6 + QtWebEngine) qui génère des cursus scientifiques complets (maths en
+socle, puis n'importe quel domaine) et les cours qui vont avec. Vous
 travaillez dans le dossier du projet, avec les outils Read, Edit, Write, Glob
 et Grep. Vous n'avez pas de shell : l'application lancera elle-même la suite de
 tests (tools/selftest.py) après vous et vous renverra les échecs éventuels.
@@ -1600,10 +1669,10 @@ def code_fix_prompt(report: str) -> str:
 # ---------------------------------------------------------------------------
 # Questions libres
 # ---------------------------------------------------------------------------
-def question_system(catalogue: str) -> str:
-    return f"""Vous êtes le tuteur de mathématiques de l'application « Maths MVA ». Votre
-interlocuteur prépare le M2 MVA et reprend tout le cursus depuis la terminale. Il
-pose ici une question libre, sur n'importe quel sujet de maths.
+def question_system(catalogue: str, syl: Optional[Syllabus] = None) -> str:
+    return f"""Vous êtes le tuteur de l'application « {app_name()} ». Son cursus couvre :
+{discipline(syl)}. {audience(syl)}
+Il pose ici une question libre, sur n'importe quel sujet de ce cursus.
 
 RÉPONDRE :
 - Directement, sans préambule ni flatterie. L'intuition d'abord, puis l'énoncé
@@ -1685,8 +1754,9 @@ def course_import_prompt(syl: Syllabus, pdf_path: str, document_text: str = "") 
                   f"(paramètre pages). Les transparents Beamer répètent souvent la même page "
                   f"en\najoutant un élément à chaque fois : ne comptez chaque contenu "
                   f"qu'une fois, mais\nnotez les pages où il se trouve.")
-    return f"""Vous préparez l'import d'un cours magistral dans « Maths MVA », une
-application qui prépare au master MVA. Le cours sera réécrit section par
+    return f"""Vous préparez l'import d'un cours magistral dans « {app_name()} », une
+application d'apprentissage. {audience(syl)}
+Le cours sera réécrit section par
 section, fidèlement mais avec plus d'intuition, et ses exercices seront corrigés.
 Votre travail ici : lire le document et en établir le plan détaillé.
 
@@ -1754,7 +1824,7 @@ def _source_block(plan: dict, index: int, source_text: str = "") -> str:
                   % (source.get("pdf", ""), pages))
     return f"""
 
-SOURCE : ce cours réécrit un cours magistral du master MVA (« {origin} »).
+SOURCE : ce cours réécrit un cours magistral (« {origin} »).
 {access}
 
 FIDÉLITÉ : tout ce que contiennent ces pages figure dans votre section :
@@ -1842,8 +1912,9 @@ def gaps_prompt(syl: Syllabus, items: List[dict], existing: List[dict]) -> str:
         used += len(block.encode("utf-8"))
     known = "\n".join("  - [%s] %s" % (c["id"], c["notion"]) for c in existing) or "  (aucune)"
     courses = sorted({e["course_id"] for e in items})
-    return f"""Vous relisez la séance de travail d'un étudiant en M2 MVA qui reprend
-ses bases de mathématiques. Pendant qu'il travaillait un cours, il a posé des
+    return f"""Vous relisez la séance de travail d'un étudiant qui reprend ses bases.
+{audience(syl)}
+Pendant qu'il travaillait un cours, il a posé des
 questions à l'assistant. Beaucoup portent sur la démonstration du moment, mais
 certaines révèlent une NOTION DE BASE OUBLIÉE : une définition, une propriété ou
 un calcul élémentaire qu'il devrait savoir sans réfléchir (par exemple
@@ -1886,3 +1957,199 @@ RÈGLES :
 8. Formules en LaTeX entre $…$. Français avec tous les accents.
 
 Répondez uniquement par {{"cards": [...]}}."""
+
+
+# ---------------------------------------------------------------------------
+# Nouveau cursus : concevoir tout un pack à partir d'objectifs
+# ---------------------------------------------------------------------------
+# Trois temps, pour que chaque appel reste de taille raisonnable :
+#   1. l'architecture : le pack, ses domaines (dans l'ordre), ce que chacun couvre ;
+#   2. les cours, domaine par domaine, câblés sur le catalogue existant et sur
+#      les domaines déjà produits ;
+#   3. les parcours, une fois tous les cours connus.
+CURRICULUM_OUTLINE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pack": {
+            "type": "object",
+            "properties": {
+                "title": _STR, "description": _STR, "discipline": _STR,
+                "goal": _STR, "style": _STRS,
+            },
+            "required": ["title", "description", "discipline", "goal", "style"],
+        },
+        "domains": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": _STR, "name": _STR, "description": _STR, "color": _STR,
+                    "scope": _STR, "count": {"type": "integer"},
+                    "reuses": _STRS,
+                },
+                "required": ["id", "name", "description", "scope", "count"],
+            },
+        },
+        "notes": _STR,
+    },
+    "required": ["pack", "domains"],
+}
+
+CURRICULUM_COURSES_SCHEMA = {
+    "type": "object",
+    "properties": {"courses": SYLLABUS_SCHEMA["properties"]["courses"]},
+    "required": ["courses"],
+}
+
+CURRICULUM_TRACKS_SCHEMA = {
+    "type": "object",
+    "properties": {"tracks": SYLLABUS_SCHEMA["properties"]["tracks"]},
+    "required": ["tracks"],
+}
+
+
+def _brief_text(brief: dict) -> str:
+    lines = ["Sujet du cursus : %s" % brief.get("subject", "").strip()]
+    if brief.get("goals"):
+        lines.append("Objectifs de l'étudiant, avec ses mots :\n%s" % brief["goals"].strip())
+    if brief.get("start_level"):
+        lines.append("Niveau de départ : %s" % brief["start_level"].strip())
+    if brief.get("target_level"):
+        lines.append("Niveau visé : %s" % brief["target_level"].strip())
+    if brief.get("notes"):
+        lines.append("Remarques : %s" % brief["notes"].strip())
+    return "\n".join(lines)
+
+
+def curriculum_outline_prompt(syl: Syllabus, brief: dict, size: int) -> str:
+    return f"""Vous concevez un CURSUS COMPLET pour une application d'apprentissage
+autonome. L'application génère ensuite, cours par cours, un cours rédigé avec
+figures interactives, des QCM, des exercices et des fiches. Votre travail ici
+n'est pas d'écrire des cours : c'est l'architecture du cursus.
+
+LA DEMANDE
+{_brief_text(brief)}
+
+LE CURSUS EXISTE DÉJÀ EN PARTIE. Voici les cours déjà présents (identifiant,
+niveau 1 à 5, titre). Ils seront les prérequis de vos cours : ne les refaites
+pas, appuyez-vous dessus.
+
+{catalogue(syl)}
+
+TÂCHE : proposer l'architecture d'un nouveau PACK d'environ {size} cours, qui
+mène l'étudiant de son niveau de départ à ses objectifs.
+
+1. Partez des objectifs et remontez : de quoi a-t-on besoin pour les atteindre,
+   et de quoi a-t-on besoin pour cela, jusqu'à ce que tout repose sur le niveau
+   de départ ou sur des cours du catalogue. Les fondations manquantes font
+   partie du pack : par exemple, une physique quantique sérieuse demande de la
+   mécanique classique (lagrangien, hamiltonien), des ondes, de
+   l'électromagnétisme, et des mathématiques absentes du catalogue (analyse
+   complexe, EDP, espaces de Hilbert appliqués…). Mettez ces fondations dans
+   leurs propres domaines, en tête.
+2. `domains` : de 3 à 10 domaines, du plus fondamental au plus avancé. Pour
+   chacun :
+   - `id` : identifiant court en ASCII minuscule (lettres, chiffres, `_`),
+     distinct des domaines existants ;
+   - `name` : nom en français accentué ; `description` : une phrase ;
+   - `color` : couleur hexadécimale lisible sur fond clair comme sombre, et
+     distincte des autres domaines ;
+   - `scope` : trois à six phrases qui disent précisément ce que couvre le
+     domaine, dans quel ordre, et jusqu'où ;
+   - `count` : le nombre de cours prévus (2 à 20) ; le total fait environ {size} ;
+   - `reuses` : les identifiants du catalogue sur lesquels ce domaine s'appuie.
+3. `pack` :
+   - `title` : le nom du cursus, court (« Physique quantique ») ;
+   - `description` : deux phrases sur ce que couvre le pack ;
+   - `discipline` : la discipline, au singulier, en minuscules, sans article
+     (« physique », « chimie », « informatique théorique ») ;
+   - `goal` : l'objectif, formulé à l'infinitif (« comprendre la mécanique
+     quantique jusqu'à … ») ; il sera repris tel quel dans les consignes de
+     rédaction ;
+   - `style` : trois à six consignes de rédaction PROPRES À CETTE DISCIPLINE,
+     qui s'ajouteront aux consignes générales (intuition d'abord, figures,
+     pièges nommés). Par exemple, pour la physique : vérifier l'homogénéité
+     et les unités, donner les ordres de grandeur, étudier les cas limites,
+     relier chaque modèle à une expérience, dire le domaine de validité d'une
+     approximation.
+4. `notes` : deux ou trois phrases sur vos choix : ce qui est couvert, ce qui
+   est laissé de côté, et pourquoi.
+
+Français avec tous les accents (sauf dans les identifiants). Répondez
+uniquement par l'objet JSON."""
+
+
+def curriculum_courses_prompt(syl: Syllabus, brief: dict, outline: dict,
+                              domain: dict, produced: List[dict]) -> str:
+    plan = "\n".join(
+        "  %s [%s] — %s%s" % (d["name"], d["id"], d.get("scope", ""),
+                              "   <- DOMAINE À PRODUIRE" if d["id"] == domain["id"] else "")
+        for d in outline["domains"])
+    done = "\n".join("  %-34s niv.%d  %s   (domaine %s)"
+                     % (c["id"], c["level"], c["title"], c["domain"]) for c in produced)
+    return f"""Vous concevez les cours d'un domaine d'un nouveau cursus.
+
+LA DEMANDE
+{_brief_text(brief)}
+
+LE CURSUS « {outline["pack"]["title"]} » et ses domaines, dans l'ordre :
+{plan}
+
+COURS DÉJÀ PRÉSENTS DANS L'APPLICATION (identifiant, niveau, titre) :
+
+{catalogue(syl)}
+
+COURS DÉJÀ PRODUITS POUR CE CURSUS, dans les domaines précédents :
+{done or "  (aucun : ce domaine est le premier)"}
+
+TÂCHE : les cours du domaine « {domain["name"]} » (identifiant `{domain["id"]}`).
+Ce qu'il couvre : {domain.get("scope", "")}
+Nombre de cours visé : {domain.get("count", 6)}.
+
+Règles :
+- `domain` vaut `{domain["id"]}` pour chaque cours.
+- `id` : ASCII minuscule, mots séparés par des tirets, préfixés par un
+  trigramme propre à ce domaine (par exemple `mqa-oscillateur`). Ils servent de
+  noms de dossiers : aucun accent, aucun espace. Jamais un identifiant existant.
+- Ordonnez du plus fondamental au plus avancé. `prereqs` : ce qui est
+  nécessaire pour suivre le cours, ni plus ni moins, parmi les cours déjà
+  présents, les cours déjà produits ci-dessus, et les cours de ce domaine
+  placés AVANT lui. Le premier cours du domaine s'appuie sur des cours
+  existants, pas sur du vide.
+- Ne redonnez JAMAIS un cours déjà présent ou déjà produit, même sous un autre
+  titre : appuyez-vous dessus.
+- Un cours = une à deux heures de lecture attentive : un sujet net, pas un
+  chapitre de manuel entier.
+- `level` de 1 (post-bac) à 5 (master 2, recherche). Soyez honnête.
+- `summary` : une à deux phrases, concrètes, sans emphase.
+- `objectives` : 3 à 4 compétences vérifiables, à l'infinitif.
+- `keywords` : 4 à 6 termes techniques.
+- Français avec tous les accents (sauf dans les identifiants).
+
+Répondez uniquement par {{"courses": [...]}}."""
+
+
+def curriculum_tracks_prompt(brief: dict, outline: dict, courses: List[dict]) -> str:
+    listing = "\n".join("  %-34s niv.%d  %s   (domaine %s)"
+                        % (c["id"], c["level"], c["title"], c["domain"]) for c in courses)
+    return f"""Vous proposez les PARCOURS d'un nouveau cursus. Un parcours mène à un
+cours cible : l'application y ajoute automatiquement tous ses prérequis, directs
+ou non, et l'affiche avec sa progression sur la page d'accueil.
+
+LA DEMANDE
+{_brief_text(brief)}
+
+LES COURS DU CURSUS « {outline["pack"]["title"]} » :
+{listing}
+
+TÂCHE : deux à six parcours, qui correspondent aux objectifs de l'étudiant et
+aux grandes étapes du cursus (par exemple : les fondations, puis chaque
+objectif). Pour chacun :
+- `id` : ASCII minuscule avec tirets ;
+- `title` : court, en français accentué ;
+- `goal` : l'identifiant du cours le plus avancé du parcours ;
+- `extra` : deux à cinq autres cours importants qui ne seraient pas déjà des
+  prérequis de `goal`.
+Uniquement des identifiants de la liste ci-dessus.
+
+Répondez uniquement par {{"tracks": [...]}}."""
